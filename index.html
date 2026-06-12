@@ -148,6 +148,7 @@ body{font-family:system-ui,sans-serif;background:#f9f9f9;color:#111}
 </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.4/lib/msal-browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
 const MS_CLIENT_ID="2688e58a-1841-4c5b-8630-f92ff88238cc";
 const MS_TENANT_ID="2c6b3d13-b98c-4605-8fcc-d8eed3579136";
@@ -1503,22 +1504,44 @@ async function graphGet(path,token){
   }
   return res.json();
 }
+async function graphDownload(path,token){
+  const res=await fetch(`https://graph.microsoft.com/v1.0${path}`,{headers:{Authorization:`Bearer ${token}`}});
+  if(!res.ok){
+    const text=await res.text();
+    let msg=text;
+    try{
+      const j=JSON.parse(text);
+      msg=(j.error&&j.error.message)||text;
+    }catch(e){}
+    throw new Error(`Graph download ${res.status}: ${msg.slice(0,500)}`);
+  }
+  return res.arrayBuffer();
+}
 function graphPathEncode(path){
   return String(path||'').split('/').filter(Boolean).map(encodeURIComponent).join('/');
 }
-async function readWorkbookRowsFromBasePath(basePath,token){
-  const wsData=await graphGet(`${basePath}/workbook/worksheets`, token);
-  const sheets=(wsData.value||[]);
+function readWorkbookRowsFromArrayBuffer(buf){
+  if(!window.XLSX) throw new Error('XLSX parser did not load. Refresh or check that jsDelivr is allowed.');
+  const wb=XLSX.read(buf,{type:'array'});
   let rows=[];
-  for(const ws of sheets){
-    try{
-      const used=await graphGet(`${basePath}/workbook/worksheets/${encodeURIComponent(ws.id)}/usedRange(valuesOnly=true)`, token);
-      rows=rows.concat(parseDriverRowsFromValues(used.values));
-    }catch(err){
-      console.warn('Could not read worksheet', ws.name, err);
-    }
+  for(const sheetName of wb.SheetNames){
+    const ws=wb.Sheets[sheetName];
+    const values=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    rows=rows.concat(parseDriverRowsFromValues(values));
   }
   return rows;
+}
+async function readWorkbookRowsFromDriveItem(item,token){
+  if(!item || !item.id) throw new Error('Drive item not found for Current Trucks & Drivers.xlsx');
+  let downloadPath;
+  const driveId=item.parentReference && item.parentReference.driveId;
+  if(driveId){
+    downloadPath=`/drives/${encodeURIComponent(driveId)}/items/${encodeURIComponent(item.id)}/content`;
+  }else{
+    downloadPath=`/me/drive/items/${encodeURIComponent(item.id)}/content`;
+  }
+  const buf=await graphDownload(downloadPath,token);
+  return readWorkbookRowsFromArrayBuffer(buf);
 }
 function b64UrlEncode(str){
   const bytes=new TextEncoder().encode(str);
@@ -1584,24 +1607,26 @@ async function loadLiveDriverTruckData(){
   let rows=[];
   let lastErr=null;
 
-  // Best route for a company SharePoint workbook: resolve the site, then read the file by library path.
+  // Best route: resolve the SharePoint file, download the .xlsx, and parse it in the browser.
+  // This avoids the Graph Excel /workbook API, which can fail for some AAD/SharePoint files.
   try{
     const site=await graphGet(`/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:`, token);
-    const fileBase=`/sites/${encodeURIComponent(site.id)}/drive/root:/${graphPathEncode(CURRENT_TRUCKS_DRIVE_PATH)}:`;
-    rows=await readWorkbookRowsFromBasePath(fileBase, token);
+    const item=await graphGet(`/sites/${encodeURIComponent(site.id)}/drive/root:/${graphPathEncode(CURRENT_TRUCKS_DRIVE_PATH)}:`, token);
+    rows=await readWorkbookRowsFromDriveItem(item, token);
   }catch(err){
     lastErr=err;
-    console.warn('Site/path workbook read failed; trying shared-link route.', err);
+    console.warn('Site/path xlsx download failed; trying shared-link route.', err);
   }
 
-  // Fallback route: use the full SharePoint sharing/open URL.
+  // Fallback route: use the full SharePoint sharing/open URL to resolve the DriveItem, then download content.
   if(!rows.length){
     try{
       const shareId='u!'+b64UrlEncode(CURRENT_TRUCKS_URL);
-      rows=await readWorkbookRowsFromBasePath(`/shares/${shareId}/driveItem`, token);
+      const item=await graphGet(`/shares/${shareId}/driveItem`, token);
+      rows=await readWorkbookRowsFromDriveItem(item, token);
     }catch(err){
       lastErr=err;
-      console.warn('Shared-link workbook read failed.', err);
+      console.warn('Shared-link xlsx download failed.', err);
     }
   }
 
@@ -1612,7 +1637,7 @@ async function loadLiveDriverTruckData(){
     setAuthStatus(`Signed in. Live sheet loaded: ${parsed.length} driver/truck rows.`, 'ok');
     setAuthButtons(true);
     const note=document.getElementById('ctx-source-note');
-    if(note) note.textContent='(live dropdowns loaded from Microsoft Graph)';
+    if(note) note.textContent='(live dropdowns loaded from downloaded Excel file)';
     refreshOpenContextForm();
   } else {
     if(lastErr) throw lastErr;
