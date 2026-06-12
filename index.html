@@ -217,6 +217,12 @@ const DR=[
 {n:"Young, Samuel",f:"Samuel",l:"Young",a:"S.C.Y. Trucking LLC",t:"869"}
 ];
 
+let DRIVER_DATA=DR.slice();
+let DRIVER_FOLDER_MAP=new Map();
+let TRACTOR_FOLDER_MAP=new Map();
+function getDriverData(){return (DRIVER_DATA&&DRIVER_DATA.length)?DRIVER_DATA:DR;}
+function normKey(v){return String(v||'').trim().toLowerCase().replace(/&/g,'and').replace(/[^a-z0-9]+/g,' ').trim();}
+function normTruck(v){return String(v||'').trim().replace(/^#/,'');}
 
 const SP_ROOT='https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents';
 const CURRENT_TRUCKS_URL='https://ultimatecorp.sharepoint.com/:x:/r/sites/UltimateLogisticsLLC/_layouts/15/Doc.aspx?sourcedoc=%7B58899F0D-511F-401C-8824-A4D3C55071FA%7D&file=Current%20Trucks%20%26%20Drivers.xlsx&action=default&mobileredirect=true';
@@ -280,9 +286,14 @@ let curBodyFn=null;
 
 
 function dOpts(){return '<option value="">Select driver...</option>'+getDriverData().map(d=>`<option value="${d.n}">${d.n}${d.t?' (#'+d.t+')':''}</option>`).join('');}
+function truckNums(){
+  const fromFolders=[...TRACTOR_FOLDER_MAP.keys()].filter(Boolean);
+  const fromSheet=getDriverData().map(d=>normTruck(d.t)).filter(Boolean);
+  const nums=[...new Set((fromFolders.length?fromFolders:fromSheet))];
+  return nums.sort((a,b)=>(Number(a)||99999)-(Number(b)||99999)||String(a).localeCompare(String(b)));
+}
 function truckOpts(){
-  const nums=[...new Set(getDriverData().map(d=>d.t).filter(Boolean))].sort((a,b)=>Number(a)-Number(b));
-  return nums.map(t=>`<option value="${t}">`).join('');
+  return truckNums().map(t=>`<option value="${t}">`).join('');
 }
 function encSeg(s){return encodeURIComponent(String(s||'').trim()).replace(/%20/g,'%20');}
 function driverFolderName(){
@@ -295,8 +306,28 @@ function driverFolderName(){
   const last=parts.pop();
   return `${last}, ${parts.join(' ')}`;
 }
-function driverFolderUrl(){const f=driverFolderName(); return f ? SP_LINKS.driverDocs+'/'+encSeg(f) : SP_LINKS.driverDocs;}
-function truckFolderUrl(num){return num ? SP_LINKS.tractors+'/'+encSeg(num) : SP_LINKS.tractors;}
+function driverFolderUrl(){
+  const f=driverFolderName();
+  if(f){
+    const row=getDriverData().find(d=>d.n===CTX.drvKey || d.folder===f || d.n===f);
+    if(row&&row.driverFolderUrl) return row.driverFolderUrl;
+    const hit=DRIVER_FOLDER_MAP.get(normKey(f));
+    if(hit&&hit.webUrl) return hit.webUrl;
+    return SP_LINKS.driverDocs+'/'+encSeg(f);
+  }
+  return SP_LINKS.driverDocs;
+}
+function truckFolderUrl(num){
+  const t=normTruck(num);
+  if(t){
+    const row=getDriverData().find(d=>normTruck(d.t)===t);
+    if(row&&row.truckFolderUrl) return row.truckFolderUrl;
+    const hit=TRACTOR_FOLDER_MAP.get(t);
+    if(hit&&hit.webUrl) return hit.webUrl;
+    return SP_LINKS.tractors+'/'+encSeg(t);
+  }
+  return SP_LINKS.tractors;
+}
 function linkPill(label,url){return `<a class="link-pill" href="${url}" target="_blank">${label}</a>`;}
 function updateCtxLinks(){
   const box=document.getElementById('ctx-links');
@@ -1550,54 +1581,107 @@ function b64UrlEncode(str){
   return btoa(bin).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
 }
 function normCell(v){return String(v??'').trim();}
-function normHeader(v){return normCell(v).toLowerCase().replace(/[^a-z0-9]+/g,' ');}
+function normHeader(v){return normCell(v).toLowerCase().replace(/[^a-z0-9#]+/g,' ');}
 function colIndex(headers,patterns){
   return headers.findIndex(h=>patterns.some(p=>h.includes(p)));
 }
 function splitDriverName(name){
-  const n=normCell(name);
+  const n=normCell(name).replace(/^(Was|Shop)\s+/i,'').trim();
   if(n.includes(',')){
     const [last,...rest]=n.split(',');
     const first=rest.join(',').trim();
-    return {f:first.split(/\s+/)[0]||'', l:last.trim()};
+    return {f:first,l:last.trim(),folder:`${last.trim()}, ${first}`.trim()};
   }
   const parts=n.split(/\s+/).filter(Boolean);
-  if(parts.length>1){const last=parts.pop(); return {f:parts.join(' '),l:last};}
-  return {f:n,l:''};
+  if(parts.length>1){const last=parts.pop(); const first=parts.join(' '); return {f:first,l:last,folder:`${last}, ${first}`};}
+  return {f:n,l:'',folder:n};
+}
+function isCurrentDateOut(v){
+  const s=normCell(v).toLowerCase();
+  if(!s) return true; // if a sheet lacks Date Out, don't accidentally hide everyone
+  return s.includes('current');
 }
 function parseDriverRowsFromValues(values){
   if(!Array.isArray(values)) return [];
   let best={score:0,idx:-1,map:null};
-  for(let r=0;r<Math.min(values.length,25);r++){
+  for(let r=0;r<Math.min(values.length,40);r++){
     const headers=(values[r]||[]).map(normHeader);
-    const driver=colIndex(headers,['driver name','driver','name']);
-    const truck=colIndex(headers,['truck','tractor','unit','vehicle']);
-    const authority=colIndex(headers,['authority','company','carrier','llc']);
+    const unit=colIndex(headers,['unit #','unit','truck','tractor','vehicle']);
+    const first=colIndex(headers,['first name','first']);
+    const last=colIndex(headers,['last name','last']);
+    const driver=colIndex(headers,['driver name','driver']);
+    const authority=colIndex(headers,['fmcsa authority','authority','company','carrier','llc']);
+    const dateOut=colIndex(headers,['date out','out']);
+    const notes=colIndex(headers,['notes','note']);
     const dot=colIndex(headers,['dot','usdot']);
-    let score=(driver>=0?2:0)+(truck>=0?2:0)+(authority>=0?1:0)+(dot>=0?1:0);
-    if(score>best.score) best={score,idx:r,map:{driver,truck,authority,dot}};
+    let score=(unit>=0?2:0)+(first>=0?2:0)+(last>=0?2:0)+(driver>=0?2:0)+(authority>=0?1:0)+(dateOut>=0?2:0);
+    if(score>best.score) best={score,idx:r,map:{unit,first,last,driver,authority,dateOut,notes,dot}};
   }
-  if(best.idx<0 || !best.map || best.map.driver<0) return [];
+  if(best.idx<0 || !best.map || (best.map.driver<0 && (best.map.first<0 || best.map.last<0))) return [];
   const out=[];
   for(const row of values.slice(best.idx+1)){
-    const name=normCell(row[best.map.driver]);
-    const truck=best.map.truck>=0?normCell(row[best.map.truck]):'';
+    const unit=best.map.unit>=0?normTruck(row[best.map.unit]):'';
+    const firstRaw=best.map.first>=0?normCell(row[best.map.first]):'';
+    const lastRaw=best.map.last>=0?normCell(row[best.map.last]):'';
+    const driverRaw=best.map.driver>=0?normCell(row[best.map.driver]):'';
+    const dateOut=best.map.dateOut>=0?normCell(row[best.map.dateOut]):'';
+    const notes=best.map.notes>=0?normCell(row[best.map.notes]):'';
     const auth=best.map.authority>=0?normCell(row[best.map.authority]):'';
     const dot=best.map.dot>=0?normCell(row[best.map.dot]):'';
-    if(!name || /^total/i.test(name) || /^driver/i.test(name)) continue;
-    if(!truck && !auth) continue;
-    const parts=splitDriverName(name);
-    out.push({n:name,f:parts.f,l:parts.l,a:auth,t:truck,dot});
+    if(!unit && !firstRaw && !lastRaw && !driverRaw) continue;
+    if(!isCurrentDateOut(dateOut)) continue;
+    if(/^was\b/i.test(firstRaw) || /^was\b/i.test(driverRaw)) continue;
+    if(/^shop\b/i.test(firstRaw) || /^shop\b/i.test(driverRaw) || /\bshop\b/i.test(notes)) continue;
+    let f=firstRaw,l=lastRaw,folder='';
+    if(driverRaw && (!f || !l)){
+      const parts=splitDriverName(driverRaw); f=parts.f; l=parts.l; folder=parts.folder;
+    }else{
+      f=f.replace(/^(Was|Shop)\s+/i,'').trim();
+      folder=(l&&f)?`${l}, ${f}`:driverRaw;
+    }
+    if(!f && !l) continue;
+    const display=(l&&f)?`${l}, ${f}`:(driverRaw||`${f} ${l}`.trim());
+    out.push({n:display,f,l,a:auth,t:unit,dot,dateOut,notes,folder});
   }
   return out;
 }
 function dedupeDrivers(rows){
   const map=new Map();
   for(const r of rows){
-    const key=(r.n+'|'+r.t).toLowerCase();
+    const key=(r.folder||r.n||'').toLowerCase()+'|'+normTruck(r.t);
     if(!map.has(key)) map.set(key,r);
   }
   return [...map.values()].sort((a,b)=>a.n.localeCompare(b.n));
+}
+function indexFolders(items,type){
+  const map=new Map();
+  (items||[]).forEach(it=>{
+    if(!it || !it.folder || !it.name) return;
+    const name=String(it.name).trim();
+    if(type==='driver'){
+      const low=name.toLowerCase();
+      if(low.includes('old driver') || low.includes('template') || low.includes('package') || low.includes('current trucks') || low.includes('authority driver') || low.includes('drivers to do')) return;
+      map.set(normKey(name),{name,webUrl:it.webUrl});
+    }else if(type==='tractor'){
+      const m=name.match(/\d{3,4}/);
+      if(m) map.set(m[0],{name,webUrl:it.webUrl});
+    }
+  });
+  return map;
+}
+async function listDriveChildren(siteId,path,token){
+  const j=await graphGet(`/sites/${encodeURIComponent(siteId)}/drive/root:/${graphPathEncode(path)}:/children?$select=name,webUrl,folder,file&$top=999`,token);
+  return j.value||[];
+}
+function reconcileRowsWithFolders(rows){
+  // Sheet = who is assigned to what truck. Folders = the clickable/current file locations.
+  // Keep rows that are current in the sheet; attach folder links when exact folder matches exist.
+  return dedupeDrivers(rows).map(r=>{
+    const folderName=r.folder||r.n;
+    const folderHit=DRIVER_FOLDER_MAP.get(normKey(folderName));
+    const truckHit=TRACTOR_FOLDER_MAP.get(normTruck(r.t));
+    return {...r,driverFolderUrl:folderHit&&folderHit.webUrl,truckFolderUrl:truckHit&&truckHit.webUrl};
+  });
 }
 async function loadLiveDriverTruckData(){
   if(liveSheetLoaded) return;
@@ -1606,11 +1690,32 @@ async function loadLiveDriverTruckData(){
 
   let rows=[];
   let lastErr=null;
+  let site=null;
 
-  // Best route: resolve the SharePoint file, download the .xlsx, and parse it in the browser.
-  // This avoids the Graph Excel /workbook API, which can fail for some AAD/SharePoint files.
   try{
-    const site=await graphGet(`/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:`, token);
+    site=await graphGet(`/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:`, token);
+  }catch(err){
+    lastErr=err;
+    console.warn('Could not resolve SharePoint site.',err);
+  }
+
+  // Pull folder lists first. These are used for accurate links and truck-number autocomplete.
+  if(site&&site.id){
+    try{
+      const [driverRes,tractorRes]=await Promise.allSettled([
+        listDriveChildren(site.id,'Driver Documents',token),
+        listDriveChildren(site.id,'Equipment/Tractors',token)
+      ]);
+      if(driverRes.status==='fulfilled') DRIVER_FOLDER_MAP=indexFolders(driverRes.value,'driver');
+      if(tractorRes.status==='fulfilled') TRACTOR_FOLDER_MAP=indexFolders(tractorRes.value,'tractor');
+    }catch(folderErr){
+      console.warn('Folder index load failed; continuing with sheet data.',folderErr);
+    }
+  }
+
+  // Resolve the SharePoint file, download the .xlsx, and parse the current rows in the browser.
+  try{
+    if(!site||!site.id) throw new Error('SharePoint site was not resolved.');
     const item=await graphGet(`/sites/${encodeURIComponent(site.id)}/drive/root:/${graphPathEncode(CURRENT_TRUCKS_DRIVE_PATH)}:`, token);
     rows=await readWorkbookRowsFromDriveItem(item, token);
   }catch(err){
@@ -1630,18 +1735,21 @@ async function loadLiveDriverTruckData(){
     }
   }
 
-  const parsed=dedupeDrivers(rows);
+  const parsed=reconcileRowsWithFolders(rows);
   if(parsed.length){
     DRIVER_DATA=parsed;
     liveSheetLoaded=true;
-    setAuthStatus(`Signed in. Live sheet loaded: ${parsed.length} driver/truck rows.`, 'ok');
+    const folderNote=[];
+    if(DRIVER_FOLDER_MAP.size) folderNote.push(`${DRIVER_FOLDER_MAP.size} driver folders`);
+    if(TRACTOR_FOLDER_MAP.size) folderNote.push(`${TRACTOR_FOLDER_MAP.size} tractor folders`);
+    setAuthStatus(`Signed in. Live sheet loaded: ${parsed.length} current assignments${folderNote.length?' + '+folderNote.join(' / '):''}.`, 'ok');
     setAuthButtons(true);
     const note=document.getElementById('ctx-source-note');
-    if(note) note.textContent='(live dropdowns loaded from downloaded Excel file)';
+    if(note) note.textContent='(live dropdowns loaded from Current Trucks & Drivers; folder links loaded from SharePoint)';
     refreshOpenContextForm();
   } else {
     if(lastErr) throw lastErr;
-    setAuthStatus('Signed in, but no driver/truck rows were found. Using embedded snapshot.', 'warn');
+    setAuthStatus('Signed in, but no current driver/truck rows were found. Using embedded snapshot.', 'warn');
   }
 }
 function refreshOpenContextForm(){
