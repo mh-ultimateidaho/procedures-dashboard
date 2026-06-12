@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ultimate Logistics Procedures Dashboard v48</title>
+<title>Ultimate Logistics Procedures Dashboard v59</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,sans-serif;background:#f9f9f9;color:#111}
@@ -82,6 +82,14 @@ body{font-family:system-ui,sans-serif;background:#f9f9f9;color:#111}
 .more-link{font-size:11px;margin-left:6px;color:#185fa5;text-decoration:none;border:0.5px solid #b5d4f4;background:#e6f1fb;border-radius:10px;padding:1px 6px;white-space:nowrap}
 .more-link:hover{background:#d0e6f8;border-color:#3a85d8}
 .ref-anchor{scroll-margin-top:18px}
+
+.auth-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+.auth-btn{font-size:12px;padding:5px 12px;border-radius:8px;cursor:pointer;border:0.5px solid #3a85d8;background:#e6f1fb;color:#185fa5;font-weight:500}
+.auth-btn:hover{background:#d0e6f8}
+.auth-btn.secondary{border-color:#ddd;background:#f5f5f5;color:#555}
+.auth-status{font-size:11px;color:#666}
+.auth-status.ok{color:#0F6E56}
+.auth-status.warn{color:#92400E}
 </style>
 </head>
 <body>
@@ -89,6 +97,11 @@ body{font-family:system-ui,sans-serif;background:#f9f9f9;color:#111}
 <h2>Ultimate Logistics — Procedures Dashboard</h2>
 <p>Click any event for step-by-step instructions. Driver event cards let you select a driver to auto-fill the checklist.</p>
 <div class="sp-note">&#128279; All file paths refer to <a href="https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC" target="_blank" rel="noopener noreferrer"><strong>https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC</strong></a></div>
+<div class="auth-row">
+  <button class="auth-btn" id="ms-signin" onclick="signInMicrosoft()">Connect Microsoft / live sheet</button>
+  <button class="auth-btn secondary" id="ms-signout" onclick="signOutMicrosoft()" style="display:none">Sign out</button>
+  <span class="auth-status" id="ms-status">Using embedded driver/truck snapshot.</span>
+</div>
 
 <div class="view-tabs">
   <span class="view-tab active" id="tab-home" onclick="showHome()">&#127968; Home</span>
@@ -134,7 +147,16 @@ body{font-family:system-ui,sans-serif;background:#f9f9f9;color:#111}
 <div class="mbody" id="m-body"></div>
 </div>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.4/lib/msal-browser.min.js"></script>
 <script>
+const MS_CLIENT_ID="2688e58a-1841-4c5b-8630-f92ff88238cc";
+const MS_TENANT_ID="2c6b3d13-b98c-4605-8fcc-d8eed3579136";
+const MS_SCOPES=["User.Read","Files.Read.All","Sites.Read.All"];
+const MS_REDIRECT_URI="https://mh-ultimateidaho.github.io/procedures-dashboard/";
+let msalApp=null;
+let msAccount=null;
+let liveSheetLoaded=false;
+
 const DR=[
 {n:"Acosta Luna, Adan",f:"Adan",l:"Acosta Luna",a:"Moon Transportation LLC",t:"759"},
 {n:"Alcala, Ernesto",f:"Ernesto",l:"Alcala",a:"Ernie's Logistics LLC",t:"841"},
@@ -253,9 +275,9 @@ let CTX={driver:'',auth:'',old:'',nw:'',dot:'',drvKey:''};
 let curBodyFn=null;
 
 
-function dOpts(){return '<option value="">Select driver...</option>'+DR.map(d=>`<option value="${d.n}">${d.n} (#${d.t})</option>`).join('');}
+function dOpts(){return '<option value="">Select driver...</option>'+getDriverData().map(d=>`<option value="${d.n}">${d.n}${d.t?' (#'+d.t+')':''}</option>`).join('');}
 function truckOpts(){
-  const nums=[...new Set(DR.map(d=>d.t).filter(Boolean))].sort((a,b)=>Number(a)-Number(b));
+  const nums=[...new Set(getDriverData().map(d=>d.t).filter(Boolean))].sort((a,b)=>Number(a)-Number(b));
   return nums.map(t=>`<option value="${t}">`).join('');
 }
 function encSeg(s){return encodeURIComponent(String(s||'').trim()).replace(/%20/g,'%20');}
@@ -286,7 +308,7 @@ function updateCtxLinks(){
 function onCtxInput(){readCtx();updateCtxLinks();}
 function onDrvChange(){
   const sel=document.getElementById('ctx-drv');if(!sel)return;
-  const d=DR.find(x=>x.n===sel.value);if(!d)return;
+  const d=getDriverData().find(x=>x.n===sel.value);if(!d)return;
   const fn=document.getElementById('ctx-dname'),auth=document.getElementById('ctx-auth'),ot=document.getElementById('ctx-old'),nt=document.getElementById('ctx-new');
   if(fn)fn.value=d.f+' '+d.l;
   if(auth)auth.value=d.a;
@@ -336,7 +358,7 @@ function ctxForm(fields){
     nw:`<div class="ctx-group"><label>New truck #</label><input list="ctx-truck-options" id="ctx-new" placeholder="e.g. 835" value="${CTX.nw}" oninput="onCtxInput()"></div>`,
   };
   const rows=fields.map(row=>`<div class="ctx-row">${row.map(f=>map[f]).join('')}</div>`).join('');
-  return `<div class="ctx-form"><div class="ctx-title">Driver / truck context — auto-fills checklist and links</div><div class="ctx-source">Source sheet: <a href="${SP_LINKS.currentTrucks}" target="_blank">Current Trucks &amp; Drivers.xlsx</a> <span style="color:#999">(dropdown uses the dashboard's embedded snapshot)</span></div><datalist id="ctx-truck-options">${truckOpts()}</datalist>${rows}<button class="ctx-btn" onclick="applyCtx()">Apply to checklist &#8595;</button><div class="ctx-hint">Select a driver or enter truck numbers. Folder links below update from the selected driver/truck.</div><div class="ctx-links" id="ctx-links"></div></div>`;
+  return `<div class="ctx-form"><div class="ctx-title">Driver / truck context — auto-fills checklist and links</div><div class="ctx-source">Source sheet: <a href="${SP_LINKS.currentTrucks}" target="_blank">Current Trucks &amp; Drivers.xlsx</a> <span id="ctx-source-note" style="color:#999">(connect Microsoft to load live dropdowns)</span></div><datalist id="ctx-truck-options">${truckOpts()}</datalist>${rows}<button class="ctx-btn" onclick="applyCtx()">Apply to checklist &#8595;</button><div class="ctx-hint">Select a driver or enter truck numbers. Folder links below update from the selected driver/truck.</div><div class="ctx-links" id="ctx-links"></div></div>`;
 }
 
 
@@ -1380,7 +1402,184 @@ function closeModal(){
   if(document.getElementById('home-view').style.display !== 'none') renderHome();
 }
 
+
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
+
+function setAuthStatus(msg,cls){
+  const el=document.getElementById('ms-status');
+  if(el){el.textContent=msg;el.className='auth-status '+(cls||'');}
+}
+function setAuthButtons(signedIn){
+  const signIn=document.getElementById('ms-signin'), signOut=document.getElementById('ms-signout');
+  if(signIn) signIn.style.display=signedIn?'none':'inline-block';
+  if(signOut) signOut.style.display=signedIn?'inline-block':'none';
+}
+function initMsal(){
+  if(msalApp || !window.msal) return msalApp;
+  msalApp = new msal.PublicClientApplication({
+    auth:{
+      clientId: MS_CLIENT_ID,
+      authority: `https://login.microsoftonline.com/${MS_TENANT_ID}`,
+      redirectUri: MS_REDIRECT_URI,
+      postLogoutRedirectUri: MS_REDIRECT_URI,
+      navigateToLoginRequestUrl: false
+    },
+    cache:{cacheLocation:'localStorage',storeAuthStateInCookie:false}
+  });
+  return msalApp;
+}
+async function handleMicrosoftRedirect(){
+  try{
+    const app=initMsal();
+    if(!app) return;
+    const res=await app.handleRedirectPromise();
+    const accounts=app.getAllAccounts();
+    msAccount = (res&&res.account) || accounts[0] || null;
+    setAuthButtons(!!msAccount);
+    if(msAccount){
+      setAuthStatus('Signed in. Loading live Current Trucks & Drivers...', 'warn');
+      await loadLiveDriverTruckData();
+    } else {
+      setAuthStatus('Using embedded driver/truck snapshot.', '');
+    }
+  }catch(err){
+    console.warn('Microsoft sign-in redirect failed:', err);
+    setAuthStatus('Microsoft sign-in failed. Using embedded snapshot.', 'warn');
+  }
+}
+function signInMicrosoft(){
+  const app=initMsal();
+  if(!app){setAuthStatus('MSAL did not load. Check internet/CDN access.', 'warn');return;}
+  app.loginRedirect({scopes: MS_SCOPES, prompt:'select_account'});
+}
+function signOutMicrosoft(){
+  const app=initMsal();
+  if(!app || !msAccount) return;
+  app.logoutRedirect({account:msAccount, postLogoutRedirectUri:MS_REDIRECT_URI});
+}
+async function getGraphToken(){
+  const app=initMsal();
+  if(!app) throw new Error('MSAL not loaded');
+  if(!msAccount){
+    const accounts=app.getAllAccounts();
+    msAccount=accounts[0]||null;
+  }
+  if(!msAccount) throw new Error('Not signed in');
+  try{
+    const res=await app.acquireTokenSilent({account:msAccount, scopes:MS_SCOPES});
+    return res.accessToken;
+  }catch(err){
+    if(err instanceof msal.InteractionRequiredAuthError){
+      await app.acquireTokenRedirect({scopes:MS_SCOPES, account:msAccount});
+      return null;
+    }
+    throw err;
+  }
+}
+async function graphGet(path,token){
+  const res=await fetch(`https://graph.microsoft.com/v1.0${path}`,{headers:{Authorization:`Bearer ${token}`}});
+  if(!res.ok){
+    const text=await res.text();
+    throw new Error(`Graph ${res.status}: ${text.slice(0,300)}`);
+  }
+  return res.json();
+}
+function b64UrlEncode(str){
+  const bytes=new TextEncoder().encode(str);
+  let bin='';
+  bytes.forEach(b=>bin+=String.fromCharCode(b));
+  return btoa(bin).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+}
+function normCell(v){return String(v??'').trim();}
+function normHeader(v){return normCell(v).toLowerCase().replace(/[^a-z0-9]+/g,' ');}
+function colIndex(headers,patterns){
+  return headers.findIndex(h=>patterns.some(p=>h.includes(p)));
+}
+function splitDriverName(name){
+  const n=normCell(name);
+  if(n.includes(',')){
+    const [last,...rest]=n.split(',');
+    const first=rest.join(',').trim();
+    return {f:first.split(/\s+/)[0]||'', l:last.trim()};
+  }
+  const parts=n.split(/\s+/).filter(Boolean);
+  if(parts.length>1){const last=parts.pop(); return {f:parts.join(' '),l:last};}
+  return {f:n,l:''};
+}
+function parseDriverRowsFromValues(values){
+  if(!Array.isArray(values)) return [];
+  let best={score:0,idx:-1,map:null};
+  for(let r=0;r<Math.min(values.length,25);r++){
+    const headers=(values[r]||[]).map(normHeader);
+    const driver=colIndex(headers,['driver name','driver','name']);
+    const truck=colIndex(headers,['truck','tractor','unit','vehicle']);
+    const authority=colIndex(headers,['authority','company','carrier','llc']);
+    const dot=colIndex(headers,['dot','usdot']);
+    let score=(driver>=0?2:0)+(truck>=0?2:0)+(authority>=0?1:0)+(dot>=0?1:0);
+    if(score>best.score) best={score,idx:r,map:{driver,truck,authority,dot}};
+  }
+  if(best.idx<0 || !best.map || best.map.driver<0) return [];
+  const out=[];
+  for(const row of values.slice(best.idx+1)){
+    const name=normCell(row[best.map.driver]);
+    const truck=best.map.truck>=0?normCell(row[best.map.truck]):'';
+    const auth=best.map.authority>=0?normCell(row[best.map.authority]):'';
+    const dot=best.map.dot>=0?normCell(row[best.map.dot]):'';
+    if(!name || /^total/i.test(name) || /^driver/i.test(name)) continue;
+    if(!truck && !auth) continue;
+    const parts=splitDriverName(name);
+    out.push({n:name,f:parts.f,l:parts.l,a:auth,t:truck,dot});
+  }
+  return out;
+}
+function dedupeDrivers(rows){
+  const map=new Map();
+  for(const r of rows){
+    const key=(r.n+'|'+r.t).toLowerCase();
+    if(!map.has(key)) map.set(key,r);
+  }
+  return [...map.values()].sort((a,b)=>a.n.localeCompare(b.n));
+}
+async function loadLiveDriverTruckData(){
+  if(liveSheetLoaded) return;
+  const token=await getGraphToken();
+  if(!token) return;
+  const shareId='u!'+b64UrlEncode(CURRENT_TRUCKS_URL);
+  const wsData=await graphGet(`/shares/${shareId}/driveItem/workbook/worksheets`, token);
+  const sheets=(wsData.value||[]);
+  let rows=[];
+  for(const ws of sheets){
+    try{
+      const used=await graphGet(`/shares/${shareId}/driveItem/workbook/worksheets/${encodeURIComponent(ws.id)}/usedRange(valuesOnly=true)`, token);
+      rows=rows.concat(parseDriverRowsFromValues(used.values));
+    }catch(err){
+      console.warn('Could not read worksheet', ws.name, err);
+    }
+  }
+  const parsed=dedupeDrivers(rows);
+  if(parsed.length){
+    DRIVER_DATA=parsed;
+    liveSheetLoaded=true;
+    setAuthStatus(`Signed in. Live sheet loaded: ${parsed.length} driver/truck rows.`, 'ok');
+    setAuthButtons(true);
+    const note=document.getElementById('ctx-source-note');
+    if(note) note.textContent='(live dropdowns loaded from Microsoft Graph)';
+    refreshOpenContextForm();
+  } else {
+    setAuthStatus('Signed in, but no driver/truck rows were found. Using embedded snapshot.', 'warn');
+  }
+}
+function refreshOpenContextForm(){
+  const sel=document.getElementById('ctx-drv');
+  const datalist=document.getElementById('ctx-truck-options');
+  if(sel){
+    const prev=sel.value;
+    sel.innerHTML=dOpts();
+    if([...sel.options].some(o=>o.value===prev)) sel.value=prev;
+  }
+  if(datalist) datalist.innerHTML=truckOpts();
+  updateCtxLinks();
+}
 
 let dashboardInitialized = false;
 function initDashboard(){
@@ -1389,6 +1588,7 @@ function initDashboard(){
   loadStorage();
   buildChips();
   showHome();
+  handleMicrosoftRedirect();
 }
 
 if(document.readyState === 'loading'){
