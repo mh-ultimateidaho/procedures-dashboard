@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ultimate Logistics Procedures Dashboard v59</title>
+<title>Ultimate Logistics Procedures Dashboard</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,sans-serif;background:#f9f9f9;color:#111}
@@ -54,10 +54,23 @@ body{font-family:system-ui,sans-serif;background:#f9f9f9;color:#111}
 .ctx-btn{font-size:12px;padding:5px 14px;border-radius:6px;cursor:pointer;border:0.5px solid #3a85d8;background:#e6f1fb;color:#185fa5;font-weight:500;margin-top:4px}
 .ctx-btn:hover{background:#d0e6f8}
 .ctx-hint{font-size:11px;color:#888;margin-top:6px;font-style:italic}
-.ctx-links{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-.ctx-source{font-size:11px;color:#666;margin-bottom:8px}
-.ctx-source a{color:#185fa5;text-decoration:none;font-weight:500}
-.ctx-source a:hover{text-decoration:underline}
+.ctx-links{display:none;gap:6px;flex-wrap:wrap;margin-top:8px}
+.ctx-link-btn{font-size:12px;padding:4px 10px;border-radius:14px;background:#e6f1fb;color:#185fa5;border:0.5px solid #b5d4f4;text-decoration:none;display:inline-flex;align-items:center;gap:4px}
+.ctx-link-btn:hover{background:#d0e6f8}
+/* link editor */
+.ob-item-wrap{position:relative;display:flex;align-items:flex-start;gap:0}
+.ob-item-wrap .ob-item{flex:1}
+.link-edit-btn{opacity:0;flex-shrink:0;font-size:10px;padding:1px 4px;margin-left:4px;margin-top:2px;border-radius:3px;cursor:pointer;border:0.5px solid #ccc;background:#f5f5f5;color:#888;line-height:1.4;transition:opacity 0.1s;white-space:nowrap;text-decoration:none}
+.ob-item-wrap:hover .link-edit-btn{opacity:1}
+.link-edit-btn:hover{background:#e6f1fb;color:#185fa5;border-color:#b5d4f4}
+.link-popup{display:none;position:fixed;z-index:99999;background:#fff;border:0.5px solid #ddd;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.15);padding:12px 14px;width:340px}
+.link-popup.open{display:block}
+.link-popup-title{font-size:12px;font-weight:500;color:#111;margin-bottom:8px}
+.link-popup input{width:100%;font-size:12px;padding:5px 8px;border:0.5px solid #ccc;border-radius:5px;margin-bottom:8px}
+.link-popup-btns{display:flex;gap:6px}
+.link-popup-btns button{flex:1;font-size:12px;padding:4px 8px;border-radius:5px;cursor:pointer;border:0.5px solid #ccc;background:#f5f5f5}
+.link-popup-btns .save-btn{background:#e6f1fb;color:#185fa5;border-color:#b5d4f4}
+.link-popup-btns .clear-btn{color:#c00;border-color:#fca5a5;background:#fef2f2}
 /* ── HOME SCREEN ── */
 #home-view{display:block}
 #browse-view{display:none}
@@ -74,34 +87,18 @@ body{font-family:system-ui,sans-serif;background:#f9f9f9;color:#111}
 .card-wrap{position:relative}
 .pin-btn{position:absolute;top:7px;right:7px;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,0.9);border:0.5px solid #ddd;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;color:#ccc;transition:all 0.15s;z-index:2;opacity:0;line-height:1}
 .card-wrap:hover .pin-btn{opacity:1}
-.pin-btn.pinned{opacity:1!important;color:#3a85d8;border-color:#3a85d8;background:#e6f1fb}
+.pin-btn.pinned{opacity:1;color:#3a85d8;border-color:#3a85d8;background:#e6f1fb}
 .pin-btn:hover{color:#3a85d8;border-color:#3a85d8}
-.card.pinned-card{border-color:#3a85d8!important}
+.card.pinned-card{border-color:#3a85d8}
 .card.recent-card{border-left:3px solid #e0a800}
 .recent-time{font-size:10px;color:#bbb;margin-top:2px}
-.more-link{font-size:11px;margin-left:6px;color:#185fa5;text-decoration:none;border:0.5px solid #b5d4f4;background:#e6f1fb;border-radius:10px;padding:1px 6px;white-space:nowrap}
-.more-link:hover{background:#d0e6f8;border-color:#3a85d8}
-.ref-anchor{scroll-margin-top:18px}
-
-.auth-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px}
-.auth-btn{font-size:12px;padding:5px 12px;border-radius:8px;cursor:pointer;border:0.5px solid #3a85d8;background:#e6f1fb;color:#185fa5;font-weight:500}
-.auth-btn:hover{background:#d0e6f8}
-.auth-btn.secondary{border-color:#ddd;background:#f5f5f5;color:#555}
-.auth-status{font-size:11px;color:#666}
-.auth-status.ok{color:#0F6E56}
-.auth-status.warn{color:#92400E}
 </style>
 </head>
 <body>
 <div class="dash">
 <h2>Ultimate Logistics — Procedures Dashboard</h2>
 <p>Click any event for step-by-step instructions. Driver event cards let you select a driver to auto-fill the checklist.</p>
-<div class="sp-note">&#128279; All file paths refer to <a href="https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC" target="_blank" rel="noopener noreferrer"><strong>https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC</strong></a></div>
-<div class="auth-row">
-  <button class="auth-btn" id="ms-signin" onclick="signInMicrosoft()">Connect Microsoft / live sheet</button>
-  <button class="auth-btn secondary" id="ms-signout" onclick="signOutMicrosoft()" style="display:none">Sign out</button>
-  <span class="auth-status" id="ms-status">Using embedded driver/truck snapshot.</span>
-</div>
+<div class="sp-note">&#128279; All file paths refer to <strong>https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC</strong></div>
 
 <div class="view-tabs">
   <span class="view-tab active" id="tab-home" onclick="showHome()">&#127968; Home</span>
@@ -122,7 +119,7 @@ body{font-family:system-ui,sans-serif;background:#f9f9f9;color:#111}
   <div class="home-section">
     <div class="home-section-header">
       <span class="home-section-title">&#128336; Recently opened</span>
-      <span class="home-section-hint" id="recents-clear-btn" onclick="clearRecents(event)" style="cursor:pointer;color:#c00;display:none">Clear</span>
+      <span class="home-section-hint" id="recents-clear-btn" onclick="clearRecents()" style="cursor:pointer;color:#c00;display:none">Clear</span>
     </div>
     <div class="home-grid" id="recents-grid">
       <div class="home-empty" id="recents-empty">No recent cards yet — open a procedure and it will appear here.</div>
@@ -138,6 +135,15 @@ body{font-family:system-ui,sans-serif;background:#f9f9f9;color:#111}
   <div class="no-results" id="no-res" style="display:none">No matching procedures found.</div>
 </div>
 </div>
+<div class="link-popup" id="link-popup">
+  <div class="link-popup-title">Set link for this item</div>
+  <input type="text" id="link-popup-input" placeholder="https://... (leave blank to remove)">
+  <div class="link-popup-btns">
+    <button class="clear-btn" onclick="clearItemLink()">Remove link</button>
+    <button onclick="closeLinkPopup()">Cancel</button>
+    <button class="save-btn" onclick="saveItemLink()">Save</button>
+  </div>
+</div>
 <div class="modal-bg" id="mbg" onclick="if(event.target===this)closeModal()">
 <div class="modal">
 <div class="mhead">
@@ -147,100 +153,67 @@ body{font-family:system-ui,sans-serif;background:#f9f9f9;color:#111}
 <div class="mbody" id="m-body"></div>
 </div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.4/lib/msal-browser.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
-const MS_CLIENT_ID="2688e58a-1841-4c5b-8630-f92ff88238cc";
-const MS_TENANT_ID="2c6b3d13-b98c-4605-8fcc-d8eed3579136";
-const MS_SCOPES=["User.Read","Files.Read.All","Sites.Read.All"];
-const MS_REDIRECT_URI="https://mh-ultimateidaho.github.io/procedures-dashboard/";
-const SP_HOSTNAME="ultimatecorp.sharepoint.com";
-const SP_SITE_PATH="/sites/UltimateLogisticsLLC";
-const CURRENT_TRUCKS_DRIVE_PATH="Driver Documents/Current Trucks & Drivers.xlsx";
-let msalApp=null;
-let msAccount=null;
-let liveSheetLoaded=false;
-
 const DR=[
-{n:"Acosta Luna, Adan",f:"Adan",l:"Acosta Luna",a:"Moon Transportation LLC",t:"759"},
-{n:"Alcala, Ernesto",f:"Ernesto",l:"Alcala",a:"Ernie's Logistics LLC",t:"841"},
-{n:"Arnold, Timothy",f:"Timothy",l:"Arnold",a:"2 Believers Logistics LLC",t:"835"},
-{n:"Barrera, Sergio",f:"Sergio",l:"Barrera",a:"King Gus Transportation LLC",t:"839"},
-{n:"Britton, Phillip",f:"Phillip",l:"Britton",a:"Joel Lamb Transport LLC",t:"793"},
-{n:"Brown, Todd",f:"Todd",l:"Brown",a:"Popa Toad Trucking LLC",t:"749"},
-{n:"Bueno, Luis",f:"Luis",l:"Bueno",a:"MAG LLC",t:"865"},
-{n:"Burleigh, Lloyd",f:"Lloyd",l:"Burleigh",a:"Bannon Trucking LLC",t:"859"},
-{n:"Burrow, James",f:"James",l:"Burrow",a:"Tex-Mex Express LLC",t:"875"},
-{n:"Cameron, Charles",f:"Charles",l:"Cameron",a:"Pug Trucking LLC",t:"803"},
-{n:"Cardenas, Efrain",f:"Efrain",l:"Cardenas",a:"Wallflower Express LLC",t:"745"},
-{n:"Carver, Leroy",f:"Leroy",l:"Carver",a:"GLC Trucking LLC",t:"725"},
-{n:"Chavez-Hernandez, Gustavo",f:"Gustavo",l:"Chavez-Hernandez",a:"King Gus Transportation LLC",t:"715"},
-{n:"Clay, Evangeline",f:"Evangeline",l:"Clay",a:"Christ Delivers LLC",t:"787"},
-{n:"Climer, Rick",f:"Rick",l:"Climer",a:"Rick Climer Trucking LLC",t:"833"},
-{n:"Da Silva Filho, Edgard",f:"Edgard",l:"Da Silva Filho",a:"Eddie Haul Express LLC",t:"871"},
-{n:"Danaila, Neculai",f:"Neculai",l:"Danaila",a:"Nova Transport LLC",t:"829"},
-{n:"DeForest, Scott",f:"Scott",l:"DeForest",a:"Ace Express LLC",t:"821"},
-{n:"Edgington, Mark",f:"Mark",l:"Edgington",a:"R&M GAF Trucking LLC",t:"761"},
-{n:"Garland, Sean",f:"Sean",l:"Garland",a:"S&K Garland Express LLC",t:"851"},
-{n:"Garlington, Leslie",f:"Leslie",l:"Garlington",a:"Buck's Trucking LLC",t:"855"},
-{n:"Gonzalez, Fernando",f:"Fernando",l:"Gonzalez",a:"FCG Logistics LLC",t:"825"},
-{n:"Grishchuk, Grigoriy",f:"Grigoriy",l:"Grishchuk",a:"Bannon Trucking LLC",t:"683"},
-{n:"Grishchuk, Pavel",f:"Pavel",l:"Grishchuk",a:"Bannon Trucking LLC",t:"857"},
-{n:"Heinrich, Victor",f:"Victor",l:"Heinrich",a:"Circle H Trucking LLC",t:"847"},
-{n:"Henson, Lois",f:"Lois",l:"Henson",a:"Shortstack Logistics LLC",t:"863"},
-{n:"Hogenkamp, James",f:"James",l:"Hogenkamp",a:"JH Hogen Trucking LLC",t:"751"},
-{n:"Huerta, Patrick",f:"Patrick",l:"Huerta",a:"Blue Diamond Logistics LLC",t:"773"},
-{n:"Jennings, John",f:"John",l:"Jennings",a:"Joel Lamb Transport LLC",t:"831"},
-{n:"Karpekin, David",f:"David",l:"Karpekin",a:"Bannon Trucking LLC",t:"813"},
-{n:"Kilgore, Jacob",f:"Jacob",l:"Kilgore",a:"Ultimate Innovations LLC",t:"861"},
-{n:"King, James",f:"James",l:"King",a:"Abundant Transport LLC",t:"811"},
-{n:"Kyle, Janette",f:"Janette",l:"Kyle",a:"Pug Trucking LLC",t:"785"},
-{n:"Lamb, Joel",f:"Joel",l:"Lamb",a:"Joel Lamb Transport LLC",t:"873"},
-{n:"Lisby, Jeremiah",f:"Jeremiah",l:"Lisby",a:"Shortstack Logistics LLC",t:"817"},
-{n:"Lopez, Felipe",f:"Felipe",l:"Lopez",a:"Carry Your Cross Trucking LLC",t:"765"},
-{n:"McGowan, James",f:"James",l:"McGowan",a:"Godric Trucking LLC",t:"699"},
-{n:"Means, Johnny",f:"Johnny",l:"Means",a:"Klassic Knights Logistics LLC",t:"867"},
-{n:"Montoya, Michael",f:"Michael",l:"Montoya",a:"MC Monty Transport LLC",t:"667"},
-{n:"Moses, Peter",f:"Peter",l:"Moses",a:"Load 2 Go LLC",t:"791"},
-{n:"Perez, Ricardo",f:"Ricardo",l:"Perez",a:"RP Trucking LLC",t:"741"},
-{n:"Reyes, Eleazar",f:"Eleazar",l:"Reyes",a:"Tres Hijas Transportation LLC",t:"689"},
-{n:"Robertson, Lauren",f:"Lauren",l:"Robertson",a:"N and P International LLC",t:"837"},
-{n:"Robertson, Leona",f:"Leona",l:"Robertson",a:"N and P International LLC",t:"837"},
-{n:"Sanchez, Danny",f:"Danny",l:"Sanchez",a:"Dan's 808 Express LLC",t:"777"},
-{n:"Scott, Tommie",f:"Tommie",l:"Scott",a:"S.C.Y. Trucking LLC",t:"739"},
-{n:"Ston, Karl",f:"Karl",l:"Ston",a:"K&R Express LLC",t:"843"},
-{n:"Tadic, Goran",f:"Goran",l:"Tadic",a:"Gemini Logistics LLC",t:"827"},
-{n:"Thomas, Torry",f:"Torry",l:"Thomas",a:"Torry Thomas Trucking LLC",t:"797"},
-{n:"Tracy, Ed",f:"Ed",l:"Tracy",a:"Flying Eagle Transport LLC",t:"831"},
-{n:"Wallman, Jason",f:"Jason",l:"Wallman",a:"Cthulhu Actual Transport LLC",t:"849"},
-{n:"Werner, Paul",f:"Paul",l:"Werner",a:"S.C.Y. Trucking LLC",t:"823"},
-{n:"Young, Samuel",f:"Samuel",l:"Young",a:"S.C.Y. Trucking LLC",t:"869"}
+  {n:"Acosta Luna, Adan",f:"Adan",l:"Acosta Luna",a:"Moon Transportation LLC",t:"759",folder:"Acosta Luna, Adan"},
+  {n:"Alcala, Ernesto",f:"Ernesto",l:"Alcala",a:"Ernie's Logistics LLC",t:"841",folder:"Alcala, Ernesto"},
+  {n:"Arnold, Timothy",f:"Timothy",l:"Arnold",a:"2 Believers Logistics LLC",t:"835",folder:"Arnold, Timothy"},
+  {n:"Barrera, Sergio",f:"Sergio",l:"Barrera",a:"King Gus Transportation LLC",t:"839",folder:"Barrera, Sergio"},
+  {n:"Britton, Phillip",f:"Phillip",l:"Britton",a:"Joel Lamb Transport LLC",t:"793",folder:"Britton, Phillip"},
+  {n:"Brown, Todd",f:"Todd",l:"Brown",a:"Popa Toad Trucking LLC",t:"749",folder:"Brown, Todd"},
+  {n:"Bueno, Luis",f:"Luis",l:"Bueno",a:"MAG LLC",t:"865",folder:"Bueno, Luis"},
+  {n:"Burleigh, Lloyd",f:"Lloyd",l:"Burleigh",a:"Bannon Trucking LLC",t:"859",folder:"Burleigh, Lloyd"},
+  {n:"Burrow, James",f:"James",l:"Burrow",a:"Tex-Mex Express LLC",t:"875",folder:"Burrow, James"},
+  {n:"Cameron, Charles",f:"Charles",l:"Cameron",a:"Pug Trucking LLC",t:"803",folder:"Cameron, Charles"},
+  {n:"Cardenas, Efrain",f:"Efrain",l:"Cardenas",a:"Wallflower Express LLC",t:"745",folder:"Cardenas, Efrain"},
+  {n:"Carver, Leroy",f:"Leroy",l:"Carver",a:"GLC Trucking LLC",t:"725",folder:"Carver, Leroy"},
+  {n:"Chavez-Hernandez, Gustavo",f:"Gustavo",l:"Chavez-Hernandez",a:"King Gus Transportation LLC",t:"715",folder:"Chavez-Hernandez, Gustavo"},
+  {n:"Clay, Evangeline",f:"Evangeline",l:"Clay",a:"Christ Delivers LLC",t:"787",folder:"Clay, Evangeline"},
+  {n:"Climer, Rick",f:"Rick",l:"Climer",a:"Rick Climer Trucking LLC",t:"833",folder:"Climer, Rick"},
+  {n:"Da Silva Filho, Edgard",f:"Edgard",l:"Da Silva Filho",a:"Eddie Haul Express LLC",t:"871",folder:"Da Silva Filho, Edgard"},
+  {n:"Danaila, Neculai",f:"Neculai",l:"Danaila",a:"Nova Transport LLC",t:"829",folder:"Danaila, Neculai"},
+  {n:"DeForest, Scott",f:"Scott",l:"DeForest",a:"Ace Express LLC",t:"821",folder:"DeForest, Scott"},
+  {n:"Edgington, Mark",f:"Mark",l:"Edgington",a:"R&M GAF Trucking LLC",t:"761",folder:"Edgington, Mark"},
+  {n:"Garland, Sean",f:"Sean",l:"Garland",a:"S&K Garland Express LLC",t:"851",folder:"Garland, Sean"},
+  {n:"Garlington, Leslie",f:"Leslie",l:"Garlington",a:"Buck's Trucking LLC",t:"855",folder:"Garlington, Leslie"},
+  {n:"Gonzalez, Fernando",f:"Fernando",l:"Gonzalez",a:"FCG Logistics LLC",t:"825",folder:"Gonzalez, Fernando"},
+  {n:"Grishchuk, Grigoriy",f:"Grigoriy",l:"Grishchuk",a:"Bannon Trucking LLC",t:"683",folder:"Grishchuk, Grigoriy"},
+  {n:"Grishchuk, Pavel",f:"Pavel",l:"Grishchuk",a:"Bannon Trucking LLC",t:"857",folder:"Grishchuk, Pavel"},
+  {n:"Heinrich, Victor",f:"Victor",l:"Heinrich",a:"Circle H Trucking LLC",t:"847",folder:"Heinrich, Victor"},
+  {n:"Henson, Lois",f:"Lois",l:"Henson",a:"Shortstack Logistics LLC",t:"863",folder:"Henson, Lois"},
+  {n:"Hogenkamp, James",f:"James",l:"Hogenkamp",a:"JH Hogen Trucking LLC",t:"751",folder:"Hogenkamp, James"},
+  {n:"Huerta, Patrick",f:"Patrick",l:"Huerta",a:"Blue Diamond Logistics, LLC",t:"773",folder:"Huerta, Patrick"},
+  {n:"Jennings, John",f:"John",l:"Jennings",a:"Joel Lamb Transport LLC",t:"831",folder:"Jennings, John"},
+  {n:"Karpekin, David",f:"David",l:"Karpekin",a:"Bannon Trucking LLC",t:"813",folder:"Karpekin, David"},
+  {n:"Kilgore, Jacob",f:"Jacob",l:"Kilgore",a:"Ultimate Innovations LLC",t:"861",folder:"Kilgore, Jacob"},
+  {n:"King, James",f:"James",l:"King",a:"Abundant Transport LLC",t:"811",folder:"King, James"},
+  {n:"Kyle, Janette",f:"Janette",l:"Kyle",a:"Pug Trucking LLC",t:"785",folder:"Kyle, Janette"},
+  {n:"Lamb, Joel",f:"Joel",l:"Lamb",a:"Joel Lamb Transport LLC",t:"873",folder:"Lamb, Joel"},
+  {n:"Lisby, Jeremiah",f:"Jeremiah",l:"Lisby",a:"Shortstack Logistics LLC",t:"817",folder:"Lisby, Jeremiah"},
+  {n:"Lopez, Felipe",f:"Felipe",l:"Lopez",a:"Carry Your Cross Trucking LLC",t:"765",folder:"Lopez, Felipe"},
+  {n:"McGowan, James",f:"James",l:"McGowan",a:"Godric Trucking LLC",t:"699",folder:"McGowan, James"},
+  {n:"Means, Johnny",f:"Johnny",l:"Means",a:"Klassic Knights Logistics LLC",t:"867",folder:"Means, Johnny"},
+  {n:"Montoya, Michael",f:"Michael",l:"Montoya",a:"MC Monty Transport LLC",t:"667",folder:"Montoya, Michael"},
+  {n:"Moses, Peter",f:"Peter",l:"Moses",a:"Load 2 Go, LLC",t:"791",folder:"Moses, Peter"},
+  {n:"Perez, Ricardo",f:"Ricardo",l:"Perez",a:"RP Trucking LLC",t:"741",folder:"Perez, Ricardo"},
+  {n:"Reyes, Eleazar",f:"Eleazar",l:"Reyes",a:"Tres Hijas Transportation LLC",t:"689",folder:"Reyes, Eleazar"},
+  {n:"Robertson, Lauren",f:"Lauren",l:"Robertson",a:"N and P International LLC",t:"837",folder:"Robertson, Lauren"},
+  {n:"Robertson, Leona",f:"Leona",l:"Robertson",a:"N and P International LLC",t:"837",folder:"Robertson, Leona"},
+  {n:"Sanchez, Danny",f:"Danny",l:"Sanchez",a:"Dan's 808 Express LLC",t:"777",folder:"Sanchez, Danny"},
+  {n:"Scott, Tommie",f:"Tommie",l:"Scott",a:"S.C.Y. Trucking LLC",t:"739",folder:"Scott, Tommie"},
+  {n:"Ston, Karl",f:"Karl",l:"Ston",a:"K&R Express LLC",t:"843",folder:"Ston, Karl"},
+  {n:"Tadic, Goran",f:"Goran",l:"Tadic",a:"Gemini Logistics LLC",t:"827",folder:"Tadic, Goran"},
+  {n:"Thomas, Torry",f:"Torry",l:"Thomas",a:"Torry Thomas Trucking LLC",t:"797",folder:"Thomas, Torry"},
+  {n:"Tracy, Ed",f:"Ed",l:"Tracy",a:"Flying Eagle Transport LLC",t:"831",folder:"Tracy, Ed"},
+  {n:"Wallman, Jason",f:"Jason",l:"Wallman",a:"Cthulhu Actual Transport LLC",t:"849",folder:"Wallman, Jason"},
+  {n:"Werner, Paul",f:"Paul",l:"Werner",a:"S.C.Y. Trucking LLC",t:"823",folder:"Werner, Paul"},
+  {n:"Young, Samuel",f:"Samuel",l:"Young",a:"S.C.Y. Trucking LLC",t:"869",folder:"Young, Samuel"},
 ];
-
-let DRIVER_DATA=DR.slice();
-let DRIVER_FOLDER_MAP=new Map();
-let TRACTOR_FOLDER_MAP=new Map();
-function getDriverData(){return (DRIVER_DATA&&DRIVER_DATA.length)?DRIVER_DATA:DR;}
-function normKey(v){return String(v||'').trim().toLowerCase().replace(/&/g,'and').replace(/[^a-z0-9]+/g,' ').trim();}
-function normTruck(v){return String(v||'').trim().replace(/^#/,'');}
-
-const SP_ROOT='https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents';
-const CURRENT_TRUCKS_URL='https://ultimatecorp.sharepoint.com/:x:/r/sites/UltimateLogisticsLLC/_layouts/15/Doc.aspx?sourcedoc=%7B58899F0D-511F-401C-8824-A4D3C55071FA%7D&file=Current%20Trucks%20%26%20Drivers.xlsx&action=default&mobileredirect=true';
-const GET_PERMITS_URL='https://docs.google.com/spreadsheets/d/14xLm6Cbv6glvDTwCpOhfaLeYbMi-S5lBmNN5-aTq_fI/edit?gid=914971856#gid=914971856';
-const SP_LINKS={
-  currentTrucks:CURRENT_TRUCKS_URL,
-  driverDocs:SP_ROOT+'/Driver%20Documents',
-  tractors:SP_ROOT+'/Equipment/Tractors',
-  permits:SP_ROOT+'/Compliance/Permits',
-  permitSheet:GET_PERMITS_URL,
-  quartix:SP_ROOT+'/Compliance/Quartix',
-  authorityDriverList:SP_ROOT+'/Driver%20Documents/Authority%20Driver%20List.xlsx',
-  ultimateContractualCarriers:SP_ROOT+'/Driver%20Documents/Ultimate%20Contractual%20Carriers.xlsx'
-};
 
 const SECS=[
 {id:'all',label:'All'},
 {id:'daily',label:'Daily & Routine'},
+{id:'checklists',label:'Checklists'},
 {id:'updates',label:'Driver & Equipment Updates'},
 {id:'onboarding',label:'Driver Onboarding'},
 {id:'docs',label:'Documents & Carrier Package'},
@@ -252,13 +225,12 @@ const SECS=[
 {id:'motive',label:'Motive (ELD)'},
 {id:'payroll',label:'Payroll'},
 {id:'macros',label:'Excel Macros'},
-{id:'authority',label:'New Authority'},
 {id:'email',label:'Email Templates'},
-{id:'checklists',label:'Checklists'},
 ];
 
 const SS={
 daily:{bg:'#E1F5EE',color:'#0F6E56'},
+checklists:{bg:'#FDE8D8',color:'#9A3412'},
 updates:{bg:'#E6F1FB',color:'#185FA5'},
 onboarding:{bg:'#FCE7F3',color:'#9D174D'},
 docs:{bg:'#FEF3C7',color:'#92400E'},
@@ -272,7 +244,6 @@ payroll:{bg:'#FFF3E0',color:'#7A3B00'},
 macros:{bg:'#F3F4F6',color:'#374151'},
 authority:{bg:'#E8F5E9',color:'#1B5E20'},
 email:{bg:'#F5F3FF',color:'#5B21B6'},
-checklists:{bg:'#FFE4E6',color:'#9F1239'},
 };
 
 const KJS={bg:'#DBEAFE',bd:'#3B82F6',lc:'#1E3A5F',tc:'#1E3A5F'};
@@ -281,104 +252,71 @@ const BLS={bg:'#FFF9C4',bd:'#E0A800',lc:'#7A5200',tc:'#7A5200'};
 const NRS={bg:'#F3F4F6',bd:'#9CA3AF',lc:'#374151',tc:'#374151'};
 
 let activeSec='all';
-let CTX={driver:'',auth:'',old:'',nw:'',dot:'',drvKey:''};
+let CTX={driver:'',auth:'',old:'',nw:'',dot:''};
 let curBodyFn=null;
 
-
-function dOpts(){return '<option value="">Select driver...</option>'+getDriverData().map(d=>`<option value="${d.n}">${d.n}${d.t?' (#'+d.t+')':''}</option>`).join('');}
-function truckNums(){
-  const fromFolders=[...TRACTOR_FOLDER_MAP.keys()].filter(Boolean);
-  const fromSheet=getDriverData().map(d=>normTruck(d.t)).filter(Boolean);
-  const nums=[...new Set((fromFolders.length?fromFolders:fromSheet))];
-  return nums.sort((a,b)=>(Number(a)||99999)-(Number(b)||99999)||String(a).localeCompare(String(b)));
-}
-function truckOpts(){
-  return truckNums().map(t=>`<option value="${t}">`).join('');
-}
-function encSeg(s){return encodeURIComponent(String(s||'').trim()).replace(/%20/g,'%20');}
-function driverFolderName(){
-  if(CTX.drvKey) return CTX.drvKey;
-  const nm=(CTX.driver||'').trim();
-  if(!nm) return '';
-  if(nm.includes(',')) return nm;
-  const parts=nm.split(/\s+/);
-  if(parts.length<2) return nm;
-  const last=parts.pop();
-  return `${last}, ${parts.join(' ')}`;
-}
-function driverFolderUrl(){
-  const f=driverFolderName();
-  if(f){
-    const row=getDriverData().find(d=>d.n===CTX.drvKey || d.folder===f || d.n===f);
-    if(row&&row.driverFolderUrl) return row.driverFolderUrl;
-    const hit=DRIVER_FOLDER_MAP.get(normKey(f));
-    if(hit&&hit.webUrl) return hit.webUrl;
-    return SP_LINKS.driverDocs+'/'+encSeg(f);
-  }
-  return SP_LINKS.driverDocs;
-}
-function truckFolderUrl(num){
-  const t=normTruck(num);
-  if(t){
-    const row=getDriverData().find(d=>normTruck(d.t)===t);
-    if(row&&row.truckFolderUrl) return row.truckFolderUrl;
-    const hit=TRACTOR_FOLDER_MAP.get(t);
-    if(hit&&hit.webUrl) return hit.webUrl;
-    return SP_LINKS.tractors+'/'+encSeg(t);
-  }
-  return SP_LINKS.tractors;
-}
-function linkPill(label,url){return `<a class="link-pill" href="${url}" target="_blank">${label}</a>`;}
-function updateCtxLinks(){
-  const box=document.getElementById('ctx-links');
-  if(!box) return;
-  const links=[linkPill('Current Trucks & Drivers source ↗',SP_LINKS.currentTrucks)];
-  if(CTX.driver||CTX.drvKey) links.push(linkPill('Driver cloud folder ↗',driverFolderUrl()));
-  if(CTX.old) links.push(linkPill(`Truck #${CTX.old} cloud folder ↗`,truckFolderUrl(CTX.old)));
-  if(CTX.nw) links.push(linkPill(`New truck #${CTX.nw} cloud folder ↗`,truckFolderUrl(CTX.nw)));
-  links.push(linkPill('Get permits / permit sheet ↗',SP_LINKS.permitSheet));
-  links.push(linkPill('Permit folders ↗',SP_LINKS.permits));
-  box.innerHTML=links.join('');
-}
-function onCtxInput(){readCtx();updateCtxLinks();}
+function dOpts(){return '<option value="">Select driver...</option>'+DR.map(d=>`<option value="${d.n}">${d.n} (#${d.t})</option>`).join('');}
 function onDrvChange(){
   const sel=document.getElementById('ctx-drv');if(!sel)return;
-  const d=getDriverData().find(x=>x.n===sel.value);if(!d)return;
+  const d=DR.find(x=>x.n===sel.value);if(!d)return;
   const fn=document.getElementById('ctx-dname'),auth=document.getElementById('ctx-auth'),ot=document.getElementById('ctx-old'),nt=document.getElementById('ctx-new');
-  if(fn)fn.value=d.f+' '+d.l;
-  if(auth)auth.value=d.a;
-  if(ot)ot.value=d.t;
-  if(nt && !nt.value)nt.value='';
-  readCtx();updateCtxLinks();applyCtx(false);
+  if(fn)fn.value=d.f+' '+d.l;if(auth)auth.value=d.a;if(ot)ot.value=d.t;if(nt)nt.value='';
+  // Show folder links
+  const lnk=document.getElementById('ctx-links');
+  if(lnk){
+    const driverUrl='https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/'+encodeURIComponent(d.folder).replace(/%2C/g,',');
+    const truckUrl='https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Equipment/Tractors/'+d.t;
+    lnk.innerHTML=
+      '<a href="'+driverUrl+'" target="_blank" class="ctx-link-btn">&#128193; '+d.f+' '+d.l+' folder</a>'+
+      '<a href="'+truckUrl+'" target="_blank" class="ctx-link-btn">&#128666; Truck #'+d.t+' folder</a>';
+    lnk.style.display='flex';
+  }
 }
 function readCtx(){
   const g=id=>document.getElementById(id);
-  CTX.drvKey=g('ctx-drv')?g('ctx-drv').value.trim():CTX.drvKey;
   CTX.driver=g('ctx-dname')?g('ctx-dname').value.trim():CTX.driver;
   CTX.auth=g('ctx-auth')?g('ctx-auth').value.trim():CTX.auth;
   CTX.old=g('ctx-old')?g('ctx-old').value.trim():CTX.old;
   CTX.nw=g('ctx-new')?g('ctx-new').value.trim():CTX.nw;
   CTX.dot=g('ctx-dot')?g('ctx-dot').value.trim():CTX.dot;
 }
-function applyCtx(scroll){
+function applyCtx(){
   readCtx();
   const tgt=document.getElementById('ctx-cl');
   if(tgt&&curBodyFn)tgt.innerHTML=curBodyFn();
-  updateCtxLinks();
-  if(scroll!==false && tgt) tgt.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 function fc(t){
   let s=t;
-  if(CTX.driver)s=s.replace(/\[DRIVER\]/gi,CTX.driver);
-  if(CTX.auth)s=s.replace(/\[AUTH\]/gi,CTX.auth);
-  if(CTX.old)s=s.replace(/\[OLD\]/gi,'#'+CTX.old);
-  if(CTX.nw)s=s.replace(/\[NEW\]/gi,'#'+CTX.nw);
-  if(CTX.dot)s=s.replace(/\[DOT\]/gi,CTX.dot);
+  if(CTX.driver)s=s.replace(/\[DRIVER\]/g,CTX.driver);
+  if(CTX.auth)s=s.replace(/\[AUTH\]/g,CTX.auth);
+  if(CTX.old)s=s.replace(/\[OLD\]/g,'#'+CTX.old);
+  if(CTX.nw)s=s.replace(/\[NEW\]/g,'#'+CTX.nw);
+  if(CTX.dot)s=s.replace(/\[DOT\]/g,CTX.dot);
   return s;
 }
 function fp(path){return `<span class="filepath">${path}</span>`;}
 function fl(path,url){return `<a href="${url}" target="_blank" class="filepath" style="text-decoration:none">${path} &#8599;</a>`;}
-function ob(label,st,items){return `<div class="ob" style="border:1px solid ${st.bd};border-left:4px solid ${st.bd}"><div class="ob-lbl" style="background:${st.bg};color:${st.lc};border-bottom:1px solid ${st.bd}">${label}</div><div class="ob-items" style="background:${st.bg}">${items.map(i=>`<div class="ob-item" style="color:${st.tc}">${fc(i)}</div>`).join('')}</div></div>`;}
+function ob(label,st,items){
+  const rows=items.map(raw=>{
+    const filled=fc(raw);
+    // extract plain text key (strip any fl() wrapper to get label)
+    const keyMatch=raw.match(/fl\('([^']+)'/);
+    const key=(keyMatch?keyMatch[1]:raw).replace(/\[\w+\]/g,'').trim().substring(0,80);
+    const customUrl=customLinks[key];
+    // determine base url (from fl() call or custom)
+    const flMatch=filled.match(/^<a href="([^"]+)"[^>]*>(.+)<\/a>$/);
+    const baseUrl=flMatch?flMatch[1]:'';
+    const displayUrl=customUrl||baseUrl;
+    const displayText=flMatch?flMatch[2]:filled;
+    const itemHtml=displayUrl
+      ? `<a href="${displayUrl}" target="_blank" style="color:inherit;text-decoration:underline;text-decoration-color:#ccc">${displayText}</a>`
+      : displayText;
+    const btnTitle=customUrl?'Edit link (custom)':baseUrl?'Edit link':'Add link';
+    const btnStyle=customUrl?'background:#fef3c7;border-color:#e0a800;color:#7a5200;opacity:1':baseUrl?'':'';
+    return `<div class="ob-item-wrap"><div class="ob-item" style="color:${st.tc}">${itemHtml}</div><button class="link-edit-btn" style="${btnStyle}" onclick="openLinkEditor('${key.replace(/'/g,"\'")}','${displayUrl}',this)" title="${btnTitle}">✎ link</button></div>`;
+  }).join('');
+  return `<div class="ob" style="border:1px solid ${st.bd};border-left:4px solid ${st.bd}"><div class="ob-lbl" style="background:${st.bg};color:${st.lc};border-bottom:1px solid ${st.bd}">${label}</div><div class="ob-items" style="background:${st.bg}">${rows}</div></div>`;
+}
 function steps(arr){return arr.map((s,i)=>`<div class="step"><div class="step-num">${i+1}</div><div class="step-text">${fc(s)}</div></div>`).join('');}
 function note(t){return `<div class="note"><strong>Note:</strong> ${t}</div>`;}
 function links(arr){return `<div class="links-row">${arr.map(l=>`<a class="link-pill" href="${l.url}" target="_blank">${l.label}</a>`).join('')}</div>`;}
@@ -386,149 +324,17 @@ function subh(t){return `<div class="subh">${t}</div>`;}
 function ctxForm(fields){
   const map={
     driverSel:`<div class="ctx-group"><label>Driver</label><select id="ctx-drv" onchange="onDrvChange()">${dOpts()}</select></div>`,
-    dname:`<div class="ctx-group"><label>Driver name</label><input type="text" id="ctx-dname" placeholder="First Last" value="${CTX.driver}" oninput="onCtxInput()"></div>`,
-    auth:`<div class="ctx-group"><label>Authority / LLC</label><input type="text" id="ctx-auth" placeholder="e.g. Ace Express LLC" value="${CTX.auth}" oninput="onCtxInput()"></div>`,
-    dot:`<div class="ctx-group"><label>DOT #</label><input type="text" id="ctx-dot" placeholder="e.g. 4197145" value="${CTX.dot}" oninput="onCtxInput()"></div>`,
-    old:`<div class="ctx-group"><label>Current truck #</label><input list="ctx-truck-options" id="ctx-old" placeholder="e.g. 821" value="${CTX.old}" oninput="onCtxInput()"></div>`,
-    nw:`<div class="ctx-group"><label>New truck #</label><input list="ctx-truck-options" id="ctx-new" placeholder="e.g. 835" value="${CTX.nw}" oninput="onCtxInput()"></div>`,
+    dname:`<div class="ctx-group"><label>Driver name</label><input type="text" id="ctx-dname" placeholder="First Last" value="${CTX.driver}"></div>`,
+    auth:`<div class="ctx-group"><label>Authority / LLC</label><input type="text" id="ctx-auth" placeholder="e.g. Ace Express LLC" value="${CTX.auth}"></div>`,
+    dot:`<div class="ctx-group"><label>DOT #</label><input type="text" id="ctx-dot" placeholder="e.g. 4197145" value="${CTX.dot}"></div>`,
+    old:`<div class="ctx-group"><label>Current truck #</label><input type="text" id="ctx-old" placeholder="e.g. 821" value="${CTX.old}"></div>`,
+    nw:`<div class="ctx-group"><label>New truck #</label><input type="text" id="ctx-new" placeholder="e.g. 835" value="${CTX.nw}"></div>`,
   };
   const rows=fields.map(row=>`<div class="ctx-row">${row.map(f=>map[f]).join('')}</div>`).join('');
-  return `<div class="ctx-form"><div class="ctx-title">Driver / truck context — auto-fills checklist and links</div><div class="ctx-source">Source sheet: <a href="${SP_LINKS.currentTrucks}" target="_blank">Current Trucks &amp; Drivers.xlsx</a> <span id="ctx-source-note" style="color:#999">(connect Microsoft to load live dropdowns)</span></div><datalist id="ctx-truck-options">${truckOpts()}</datalist>${rows}<button class="ctx-btn" onclick="applyCtx()">Apply to checklist &#8595;</button><div class="ctx-hint">Select a driver or enter truck numbers. Folder links below update from the selected driver/truck.</div><div class="ctx-links" id="ctx-links"></div></div>`;
-}
-
-
-function checklistStyle(label){
-  const l=(label||'').toLowerCase();
-  if(l.includes('amie')) return AMS;
-  if(l.includes('kj')) return KJS;
-  if(l.includes('qb')||l.includes('quickbooks')||l.includes('before')||l.includes('b4')) return BLS;
-  return NRS;
-}
-function checklistSummary(){
-  const hasCtx = CTX.driver || CTX.auth || CTX.old || CTX.nw || CTX.dot;
-  return hasCtx
-    ? `<div class="note"><strong>Workflow for:</strong> ${CTX.driver||'Driver TBD'} &nbsp; | &nbsp; <strong>Authority:</strong> ${CTX.auth||'TBD'} &nbsp; | &nbsp; <strong>Old truck:</strong> ${CTX.old?('#'+CTX.old):'TBD'} &nbsp; | &nbsp; <strong>New/current truck:</strong> ${CTX.nw?('#'+CTX.nw):'TBD'} &nbsp; | &nbsp; <strong>DOT:</strong> ${CTX.dot||'TBD'}</div>`
-    : `<div class="note"><strong>Tip:</strong> Fill in driver, authority, truck #, and DOT details above, then click Apply to checklist.</div>`;
-}
-function refLink(id,label){
-  return ` <a href="#${id}" class="more-link" onclick="event.preventDefault();document.getElementById('${id}')?.scrollIntoView({behavior:'smooth',block:'start'});">${label||'more info'} ↓</a>`;
-}
-function cardLink(title,label){
-  const safe=String(title).replace(/'/g,"\\'");
-  return ` <a href="#" class="more-link" onclick="event.preventDefault();openCardByTitle('${safe}');">${label||title} ↗</a>`;
-}
-
-function fileLink(url,label){return ` <a href="${url}" target="_blank" class="more-link">${label} ↗</a>`;}
-function locationLinkForItem(item){
-  const l=String(item||'').toLowerCase();
-  if(l.includes('truck cloud file') || l.includes('id card on truck cloud')) return fileLink(truckFolderUrl(CTX.nw||CTX.old),'truck folder');
-  if(l.includes('driver cloud') || l.includes('driver cloud folder')) return fileLink(driverFolderUrl(),'driver folder');
-  if(l.includes('get permits') || l.includes('get new permits') || l.includes('new permits')) return fileLink(SP_LINKS.permitSheet,'get permits');
-  if(l.includes('permit sheets')) return fileLink(SP_LINKS.permitSheet,'permit sheet');
-  if(l.includes('permit folders') || l.includes('permits/close accounts') || l.includes('cancel permits')) return fileLink(SP_LINKS.permits,'permit folder');
-  if(l.includes('current trucks & drivers')) return fileLink(SP_LINKS.currentTrucks,'source sheet');
-  if(l.includes('driver authority sheet')) return fileLink(SP_LINKS.authorityDriverList,'authority sheet');
-  if(l.includes('ultimate contractual carriers')) return fileLink(SP_LINKS.ultimateContractualCarriers,'carrier list');
-  if(l.includes('quartix')) return fileLink(SP_LINKS.quartix,'Quartix folder');
-  return '';
-}
-function itemWithRef(item, refs){
-  let out='☐ '+item;
-  let addedRef=false;
-  (refs||[]).some(r=>{
-    const matches=(r.match||[]).some(m=>item.toLowerCase().includes(m.toLowerCase()));
-    if(matches){
-      out += r.cardTitle ? cardLink(r.cardTitle,r.label) : refLink(r.id,r.label);
-      addedRef=true;
-      return true;
-    }
-    return false;
-  });
-  const loc=locationLinkForItem(item);
-  if(loc && !addedRef) out += loc;
-  return out;
-}
-function renderRespGroups(groups, refs){
-  return (groups||[]).map(g=>ob(g.label||'Checklist',checklistStyle(g.label),(g.items||[]).map(i=>itemWithRef(i,refs)))).join('');
-}
-function makResp(groups, refs){
-  return subh('Mak\'s Responsibilities')+
-    '<div class="note"><strong>Source:</strong> These are your tasks from the checklist Excel. Blank owner cells and “B4 driver leaves” items are treated as Mak tasks. Items with extra instructions have a blue shortcut; file/location shortcuts only show where the location is known.</div>'+
-    renderRespGroups(groups, refs);
-}
-function otherResp(groups, refs){
-  if(!groups || !groups.length) return '';
-  return subh('Other People\'s Responsibilities')+
-    '<div class="note"><strong>Heads up:</strong> These stay visible for context, but they are not Mak\'s main working checklist.</div>'+
-    renderRespGroups(groups, refs);
-}
-function checklistBody(makGroups, otherGroups){
-  return ctxForm([['driverSel','dname'],['auth','dot'],['old','nw']])+
-    '<div id="ctx-cl">'+checklistSummary()+
-    makResp(makGroups,[])+
-    otherResp(otherGroups,[])+
-    '</div>';
-}
-function combinedChecklistBody(makGroups, otherGroups, referenceHtml, workflowNote, refs){
-  return ctxForm([['driverSel','dname'],['auth','dot'],['old','nw']])+
-    '<div id="ctx-cl">'+checklistSummary()+
-    (workflowNote?note(workflowNote):'')+
-    makResp(makGroups,refs||[])+
-    otherResp(otherGroups,refs||[])+
-    subh('Full Procedure / Reference')+
-    referenceHtml+
-    '</div>';
+  return `<div class="ctx-form"><div class="ctx-title">Driver context — auto-fills checklist below</div>${rows}<button class="ctx-btn" onclick="applyCtx()">Apply to checklist &#8595;</button><div id="ctx-links" class="ctx-links"></div><div class="ctx-hint">List from <a href="https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1" target="_blank" style="color:#185fa5">Current Trucks &amp; Drivers.xlsx</a>. Select a driver to auto-fill and open their folders.</div></div>`;
 }
 
 const EVENTS=[
-
-// ── CHECKLIST CARDS FROM UPLOADED WORKBOOK ─────────────────
-{title:"Driver Quit Checklist",sec:'checklists',isDriver:true,body:()=>checklistBody([{"label": "Mak's follow-up tasks", "items": ["Remove auth from \"Ultimate Contractual Carriers\"", "Email Disp & Office new Carrier Packet (replace ^)", "Cancel permits/close accounts", "Move/rename permit files to canceled", "Update permit sheets", "Move/rename truck lease to old", "Move DOP to old", "Move carrier package to old", "Move driver cloud folder to old", "Move any driver citations to old", "Move ID card on truck cloud to Old Docs", "Update current trucks & drivers sheet", "Update driver authority sheet", "Remove from safety excel sheet (CDL/Med/MVR checklist)", "Remove from email contacts and contact lists", "Remove from Drivers Information on Drivers & Locations", "Disable auto-run and deactivate on embark", "Remove mailbox tag", "Quartix- remove truck from all groups except ult log all and trucks no driver. change name to No Driver."]}],[{"label": "Amie does", "items": ["Email blueline to close D&A policy", "Close prepass account"]}])},
-
-{title:"New Driver Setup",sec:'checklists',isDriver:true,body:()=>combinedChecklistBody([{"label": "Before driver leaves", "items": ["Get permits", "Add transponder in OR (non B#)", "Truck docs. Email & Upload to cloud", "Truck Checklist (clipboard)", "Take picture of truck"]}, {"label": "Mak's follow-up tasks", "items": ["Check truck cloud file has DOT, reg & ID card", "Carrier package. Uploud to cloud", "Enter NM transaction in quickbooks", "Update permit folders on cloud", "Update permit sheets on cloud", "Update quartix. Add truck to dispatch and active group, add driver name to truck name", "Scan in & upload 2-pg lease to cloud", "Scan in & upload DOP to cloud", "Scan in & upload driver POA to driver cloud", "Move driver cloud from potential to current", "Update current trucks & drivers sheet", "Add to driver authority sheet", "Add to safety sheet (CDL/Med/MVR checklist)", "Add to Drivers Information on Drivers & Locations", "Add to email contacts and contact lists", "Add to embark, schedule MVR year from start date", "Add mailbox tag"]}],[{"label": "KJ does", "items": ["Commercial package (60-40)", "Two-pg Lease w/ Form", "Operating Agreement (change date!!) print w/ EIN letter & LLC cert", "Pre-Employment Query (PUT IN QuickBooks!)", "SRS (if new graphics/DOT#)", "Blank Ins Cancellation Form, W-9 Form", "Add to Drivers in ITS", "Update driver packages to do sheet", "Add to line-items to show monthly truck payment on 2-pg lease"]}, {"label": "Amie does", "items": ["Bestpass/prepass swap", "D&A test"]}],
-subh('When to use this')+
-steps(['Use this when a brand-new driver is being hired and started under temporary authority. The checklist above is Mak\'s working list. The reference below only keeps details that are not already repeated in Mak\'s checklist.'])+
-note('Mak checklist above already covers the system/list adds, cloud uploads, permit folders/sheets, carrier package, truck docs, scans/uploads, and contact/mailbox/Embark updates.')+
-`<div id="nd-details" class="ref-anchor"></div>`+subh('Reference — Details not already in Mak checklist')+
-`<div id="nd-docs" class="ref-anchor"></div>`+ob('Document/context reminders',NRS,['Process the authority file from Amie or KJ.','If passenger forms are included, scan them and send to Kathryn and Amie; also include them in truck docs.','Save IRS letter and State of ID letters to 03 Confidential > LLC, if applicable.','For truck docs and carrier package, use the existing Truck Docs / Carrier Package procedures for the detailed build order.'])+
-`<div id="nd-employment" class="ref-anchor"></div>`+ob('Employment history',BLS,['Confirm last 3 years of employment addresses.','Fill out Request from Prev Employer sheets. Skip only if it is their own company; send anyway if the company is out of business.','Create copies of the sheets plus mailing envelopes.','Mail the sheets out.'])+
-`<div id="nd-package" class="ref-anchor"></div>`+subh('Reference — Driver Packages: New Driver')+
-ob('Paper/package pieces',NRS,['60/40 package — contains 1-pg lease with Temp Authority. Need all info from Bill or emails from Kathryn to complete.','Two Page Lease — between Ultimate Logistics and the driver\'s LLC.','Idaho LLC Operating Agreement — for the bank, with LLC and IRS letter from Kathryn. Change the D&A policy date to current date.','Blank insurance cancellation request — driver signs as named insured. Do NOT date.','Safety Responsibility Statement for temp authority.','Truck Docs — build using the Truck Docs procedure.'])+
-subh('Order PSP')+steps(['Log in to MVRcheck.com → Order → New Order.','Select PSP Crash and Inspection History → QuickApp.','Input driver\'s Last and First name, plus their email. Send.'])+
-subh('Order Background Check')+steps(['Log in to bluelinebackgrounds.com → Order → New Order.','Choose Blueline National Plus (the only one we order) → QuickApp.','Input driver\'s Last and First name, plus email. Send.','If they email back about additional county records — always say yes.'])+
-links([{label:'bluelinebackgrounds.com',url:'https://www.bluelinebackgrounds.com'},{label:'MVRcheck.com',url:'https://www.mvrcheck.com'}])+
-`<div id="nd-systems" class="ref-anchor"></div>`+subh('Detailed system-entry notes')+
-steps(['ITS: Admin → Drivers → Add. Copy/paste from 60/40 package. Notes box: Temp Authority [auth] and CDL State. Pay tab: Pay Type = %, Standard 60%, FSC 60%, Additional Charges 0%. Save.','Motive: Admin → Drivers → Add Driver. Fill out Name, Email, Phone, CDL, Username, ELD settings, DOT # for Temporary Authority, Home Terminal, cycle, Yard Move, and Personal Conveyance. Save.','Email the driver, cc Kage, the Ultimate Onboarding email only after the query is done.','Payroll line item example: Studor, Robert, TRK PMT, after lease program payments are complete truck 705 payment will be $1,000. Driver start date 2/28.']),
-"Use this for first-time hire setup under temp authority. If their own authority is approved later, use Authority Change / Switch Authority instead.",[
-  {match:["Truck docs. Email"],cardTitle:"Truck Docs",label:"Truck Docs"},
-  {match:["Carrier package. Uploud","Carrier package. Upload"],cardTitle:"Carrier Package",label:"Carrier Package"},
-  {match:["Commercial package","60-40","Two-pg Lease","Operating Agreement","Blank Ins Cancellation","SRS"],id:"nd-package",label:"package details"},
-  {match:["Pre-Employment Query"],cardTitle:"Run Query on DACH",label:"DACH query"},
-  {match:["Add to Drivers in ITS","Add to line-items"],id:"nd-systems",label:"ITS/payroll notes"}
-])},
-{title:"Authority Change / Switch Authority",sec:'checklists',isDriver:true,body:()=>combinedChecklistBody([{"label": "Before driver leaves", "items": ["Cancel old permits", "UCR (if new auth)", "Permit accounts set-up (POAs)", "Get new permits", "Add transponder in OR (non B#)", "Truck docs. Email & Upload to cloud", "Take picture of truck"]}, {"label": "Mak's follow-up tasks", "items": ["Check truck cloud file has DOT, reg & ID card", "Add auth to \"Ultimate Contractual Carriers\"", "Email Disp & Office new Carrier Packet (replace ^)", "Get new MVR", "Update embark scheduled MVR date", "Carrier package. Uploud to cloud, move old package to old folder", "Enter NM transaction in quickbooks", "Update permit folders on cloud", "Update permit sheets on cloud", "Update current trucks & drivers sheet", "Update driver authority sheet"]}],[{"label": "KJ does", "items": ["Driver's Authority Package", "Two-pg Lease w/ Form", "Clearinghouse account setup (fmcsa portal and login.gov)", "Pre-Employment Query (PUT IN QuickBooks!)", "SRS", "Make motive fleet manager account and email details", "Change motive logs to new DOT#", "Update driver packages to do sheet", "Add authority to External Carriers in ITS"]}, {"label": "Amie does", "items": ["Bestpass/prepass swap", "D&A test and policy setup", "Email blueline to remove from previous company"]}],
-subh('When to use this')+
-steps(['Use this any time a driver switches authorities: temporary authority → their own approved authority, existing authority → a different authority, or another authority correction/change.'])+
-note('Mak checklist above already covers permits/accounts, truck docs, carrier package, MVR/Embark dates, QuickBooks, cloud filing, Current Trucks & Drivers, and the driver authority sheet.')+
-`<div id="auth-package" class="ref-anchor"></div>`+subh('Reference — Authority package details')+
-ob('Documents to assemble / confirm',NRS,["Driver\'s authority package — Auth to Drive and Trailer Interchange for Bill to sign; no lease.","1st page of the Two Page Lease between driver LLC and Ultimate, signed when they signed 60/40 or similar.","Safety Responsibility Statement — has driver\'s authority on it, driver signs.",'POAs for permits — driver signs + KY email. Located at Compliance > Authority POA: NM Tax Auth, OR App for Motor Carrier Account, OR Power of Attorney.','Carrier Package — build/update using the Carrier Package procedure; Mak checklist covers upload/moving old copy.','Truck Docs — build/update using the Truck Docs procedure; Mak checklist covers email/upload.'])+
-note('For a finished example, see Driver Documents > Bueno, Luis > 01 Operational.')+
-links([{label:'Authority POA folder',url:'https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits/Authority%20POA'},{label:'Driver Documents',url:'https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents'}])+
-`<div id="auth-setup" class="ref-anchor"></div>`+subh('Reference — other setup details')+
-steps(['Drug and alcohol policy: driver goes to American Diag for drug test. Email Blueline the New DOT D&A Policy email.','Graphics — Todd Moss handles these.','ITS: add the MC # and D&A policy date to the external carrier.','If switching trucks, add to line items. Example: Swarbrick Eric, TRK PMT, Changed to truck #757 on 7/5/22 $1000 payment, MH.']),
-"Use this for the approved-authority switch and for any other driver authority change. The checklist above is Mak's working list; the reference below keeps the longer package details handy.",[
-  {match:["Truck docs. Email"],cardTitle:"Truck Docs",label:"Truck Docs"},
-  {match:["Carrier package. Uploud","Carrier package. Upload","Carrier Packet"],cardTitle:"Carrier Package",label:"Carrier Package"},
-  {match:["Permit accounts set-up","POAs","Driver's Authority Package","Two-pg Lease"],id:"auth-package",label:"authority pkg details"},
-  {match:["Clearinghouse account setup"],cardTitle:"Create Clearinghouse Account",label:"Clearinghouse"},
-  {match:["Pre-Employment Query"],cardTitle:"Run Query on DACH",label:"DACH query"},
-  {match:["Make motive fleet manager","Change motive logs"],cardTitle:"Motive — Change Logs to New DOT",label:"Motive steps"},
-  {match:["Add authority to External Carriers in ITS","D&A test and policy setup","Email blueline"],id:"auth-setup",label:"setup notes"}
-])},
-{title:"Permanent Truck Change Checklist",sec:'checklists',isDriver:true,body:()=>checklistBody([{"label": "Before driver leaves", "items": ["Truck Checklist (clipboard)", "Cancel old permits", "Get new permits", "Add transponder in OR (non B#)", "Truck docs. Email & Upload to cloud", "Take picture of truck"]}, {"label": "Mak's follow-up tasks", "items": ["Check truck cloud file has DOT, reg & ID card", "Carrier package. Uploud to cloud, move old package to old folder", "Update quartix. Old truck: remove from all groups except \"Ultimate Logistics All Vehicles\", and replace name with \"No Driver\". New truck: add to dispatch and active group, add driver name to name.", "Scan in & upload 2-pg lease to cloud. Move/rename old truck lease to old folder.", "Enter NM transaction in quickbooks", "Update permit folders on cloud", "Update permit sheets on cloud", "Update current trucks & drivers sheet"]}],[{"label": "KJ does", "items": ["SRS (if new graphics/DOT#)", "2-pg lease, auth to drive, trailer lease agreement", "Add to line-items to show new monthly truck payment"]}, {"label": "Amie does", "items": ["Bestpass/prepass swap"]}])},
-{title:"Temp Truck Change Checklist",sec:'checklists',isDriver:true,body:()=>checklistBody([{"label": "Before driver leaves", "items": ["Truck Checklist (clipboard)", "Get new permits", "Add transponder in OR (non B#)", "Truck docs. Email & Upload to cloud", "Take picture of truck"]}, {"label": "Mak's follow-up tasks", "items": ["Check truck cloud file has DOT, reg & ID card", "Carrier package. Uploud to cloud, move old package to old folder", "Update quartix. Old truck: add \"Shop\" in front of name. New truck: add to dispatch and active group, add driver name to name. add \"Temp\" in front of name.", "Scan in & upload 2-pg lease to cloud. Add \"TEMP\" to the end of file name", "Enter NM transaction in quickbooks", "Update permit folders on cloud", "Update permit sheets on cloud. add \"in shop (date)\" to normal truck notes, and \"temp truck\" to temoporary truck notes.", "Update current trucks & drivers sheet. Mark normal truck as in shop and temporary as a temp truck."]}],[{"label": "KJ does", "items": ["SRS (if new graphics/DOT#)", "2-pg lease, auth to drive, trailer lease agreement", "Add to line-items to show new monthly truck payment"]}, {"label": "Amie does", "items": ["Bestpass/prepass swap"]}])},
-{title:"Temp to Normal Truck Checklist",sec:'checklists',isDriver:true,body:()=>checklistBody([{"label": "Mak's follow-up tasks", "items": ["Cancel temp permits", "Check normal permits are still active", "Move temp carrier package to old folder", "Move/rename temp truck lease to old folder (if there is one)", "Update quartix. Old truck: remove from all groups except \"Ultimate Logistics All Vehicles\", and replace name with \"No Driver\". New truck: remove \"Shop\" from name.", "Check truck cloud file has DOT, reg & ID card", "Update permit folders on cloud", "Update permit sheets on cloud. leave notes until next tax period.", "Update current trucks & drivers sheet. Mark temp truck as \"was\", and remove shop notes from normal truck."]}],[])},
-
 // ── SECTION 1: DAILY & ROUTINE ──────────────────────────────
 {title:'Trippaks — Receiving',sec:'daily',body:()=>steps([
   'Sort trippaks alphabetically by driver. Stamp each with Received plus today\'s date.',
@@ -644,25 +450,235 @@ steps(['Drug and alcohol policy: driver goes to American Diag for drug test. Ema
   'Print for Bill (with CDL).',
   'View Charges and print to PDF for QuickBooks.',
 ])+links([{label:'MVRcheck.com',url:'https://www.mvrcheck.com'}])},
-{title:'Driver Tractor Change',sec:'updates',body:()=>steps([
-  'Update '+fl('Driver Documents > Current Trucks & Drivers.xlsx','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx')+'.',
-  'Update the Driver Bonuses payroll Excel with new dates and truck numbers.',
-  'Build a new Carrier Package (see Carrier Package).',
-  'Build new Truck Docs (see Truck Docs).',
-  'Create a new Safety Responsibility Statement.',
-  'Use the Tractor Docs Only with Form template (1-pg lease + auth to drive + trailer lease). Exclude the 1-pg lease if moving tractors within the same authority.',
-  'Use the Two Page Lease with Form template.',
-  'Email Kathryn, Amie, and Carol a copy of the truck docs and 2-pg lease.',
-])},
-{title:'Driver Quits',sec:'updates',body:()=>
-  '<p style="font-size:13px;color:#111;margin-bottom:8px"><strong>Remove from all of the following:</strong></p>'+
-  ob('Remove from systems',NRS,['Safety Doc (CDL/Med Checklist)','Monthly Dues Doc (cert of viol., MVR checklist)','Authority Doc','Email Contacts/Lists','Embark','CAT Scale (email Amie to remind)','Mailbox'])+
-  subh('Then')+steps([
-    'Rename and move the driver\'s folder to '+fl('Driver Documents > 2 Old Drivers','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/2%20Old%20Drivers')+'.',
-    'Cancel truck permits.',
-  ])},
+// ── SECTION 2b: CHECKLISTS ──────────────────────────────────
+{title:'New Driver',sec:'checklists',isDriver:true,body:()=>
+  ctxForm([['driverSel','dname'],['auth','dot','nw']])+
+  '<div id="ctx-cl">'+
+  ob('Before driver leaves — your tasks',BLS,[
+    'Get permits for [AUTH]',
+    'Add transponder in OR (non B#) — truck [NEW]',
+    'Truck docs — email & upload to cloud',
+    'Truck Checklist (clipboard)',
+    'Take picture of truck [NEW]',
+  ])+
+  ob('No rush — your tasks',NRS,[
+    'Check truck [NEW] cloud file has DOT, reg & ID card',
+    'Carrier package — upload to cloud',
+    'Enter NM transaction in QuickBooks for truck [NEW]',
+    fl('Update permit folders on cloud','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits'),
+    fl('Update permit sheets on cloud','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits'),
+    fl('Update Quartix — add truck [NEW] to dispatch and active group, add [DRIVER] name to truck name','https://gogps.com'),
+    'Scan in & upload 2-pg lease to driver cloud folder',
+    'Scan in & upload DOP to driver cloud folder',
+    'Scan in & upload [DRIVER] POA to driver cloud folder',
+    'Move [DRIVER] cloud from Potential to Current',
+    fl('Update Current Trucks & Drivers.xlsx','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1'),
+    'Add [DRIVER] to Driver Authority sheet',
+    'Add [DRIVER] to Safety sheet (CDL/Med/MVR checklist)',
+    'Add [DRIVER] to Drivers Information on Drivers & Locations',
+    'Add [DRIVER] to email contacts and contact lists',
+    'Add [DRIVER] to Embark — schedule MVR year from start date',
+    'Add mailbox tag for [DRIVER]',
+  ])+
+  '<details style="margin-top:10px"><summary style="font-size:11px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:0.4px;cursor:pointer;user-select:none">▸ KJ & Amie tasks (covering only)</summary>'+
+  '<div style="margin-top:8px">'+
+  ob('KJ does',KJS,[
+    'Commercial package (60-40)',
+    'Two-pg Lease w/ Form',
+    'Operating Agreement (change date!!) — print w/ EIN letter & LLC cert',
+    'Pre-Employment Query (PUT IN QuickBooks!)',
+    'SRS (if new graphics/DOT#)',
+    'Blank Ins Cancellation Form, W-9 Form',
+    'Add [DRIVER] to Drivers in ITS',
+    'Update Driver Packages to Do sheet',
+    'Add [DRIVER] to line-items to show monthly truck payment on 2-pg lease',
+  ])+
+  ob('Amie does',AMS,[
+    'BestPass/Prepass swap — truck [NEW]',
+    'D&A test',
+  ])+
+  '</div></details>'+
+  '</div>'
+},
+{title:'Authority Change',sec:'checklists',isDriver:true,body:()=>
+  ctxForm([['driverSel','dname'],['auth','dot','old']])+
+  '<div id="ctx-cl">'+
+  ob('Before driver leaves — your tasks',BLS,[
+    'Cancel old permits for truck [OLD]',
+    'UCR (if new auth)',
+    'Permit accounts set-up (POAs) for [AUTH]',
+    'Get new permits for [AUTH]',
+    'Add transponder in OR (non B#) — truck [OLD]',
+    'Truck docs for [AUTH] — email & upload to cloud',
+    'Take picture of truck [OLD]',
+  ])+
+  ob('No rush — your tasks',NRS,[
+    'Check truck [OLD] cloud file has DOT, reg & ID card',
+    'Add [AUTH] to "Ultimate Contractual Carriers"',
+    'Email Dispatch & Office new Carrier Packet (replaces previous)',
+    'Get new MVR for [DRIVER]',
+    'Update Embark scheduled MVR date for [DRIVER]',
+    'Carrier package for [AUTH] — upload to cloud, move old package to old folder',
+    'Enter NM transaction in QuickBooks for truck [OLD]',
+    fl('Update permit folders on cloud','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits'),
+    fl('Update permit sheets on cloud','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits'),
+    fl('Update Current Trucks & Drivers.xlsx','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1'),
+    'Update Driver Authority sheet',
+  ])+
+  '<details style="margin-top:10px"><summary style="font-size:11px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:0.4px;cursor:pointer;user-select:none">▸ KJ & Amie tasks (covering only)</summary>'+
+  '<div style="margin-top:8px">'+
+  ob('KJ does',KJS,[
+    "Driver's Authority Package for [AUTH]",
+    'Two-pg Lease w/ Form',
+    'Clearinghouse account setup (FMCSA portal and login.gov)',
+    'Pre-Employment Query (PUT IN QuickBooks!)',
+    'SRS',
+    'Make Motive fleet manager account and email [DRIVER] details',
+    'Change Motive logs to new DOT [DOT]',
+    'Update Driver Packages to Do sheet',
+    'Add [AUTH] to External Carriers in ITS',
+  ])+
+  ob('Amie does',AMS,[
+    'BestPass/Prepass swap — truck [OLD]',
+    'D&A test and policy setup for [AUTH]',
+    'Email Blueline to remove [DRIVER] from previous company',
+  ])+
+  '</div></details>'+
+  '</div>'
+},
+{title:'Driver Quits',sec:'checklists',isDriver:true,body:()=>
+  ctxForm([['driverSel','dname'],['auth','old']])+
+  '<div id="ctx-cl">'+
+  ob('No rush — your tasks',NRS,[
+    'Remove [AUTH] from "Ultimate Contractual Carriers"',
+    'Email Dispatch & Office new Carrier Packet (remove [DRIVER])',
+    'Cancel permits/close accounts for [AUTH]',
+    'Move/rename permit files for [AUTH] to canceled',
+    'Update permit sheets',
+    'Move [DRIVER] cloud folder to old',
+    'Move ID card on truck [OLD] cloud to Old Docs',
+    fl('Update Current Trucks & Drivers.xlsx','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1'),
+    'Update Driver Authority sheet — remove [AUTH]',
+    'Remove [DRIVER] from Safety Excel sheet (CDL/Med/MVR checklist)',
+    'Remove [DRIVER] from email contacts and contact lists',
+    'Remove [DRIVER] from Drivers Information on Drivers & Locations',
+    'Disable auto-run and deactivate [DRIVER] on Embark',
+    'Remove mailbox tag for [DRIVER]',
+    fl('Quartix — remove truck [OLD] from all groups except Ultimate Logistics All Vehicles and Trucks No Driver. Change name to No Driver.','https://gogps.com'),
+  ])+
+  '<details style="margin-top:10px"><summary style="font-size:11px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:0.4px;cursor:pointer;user-select:none">▸ Amie tasks (covering only)</summary>'+
+  '<div style="margin-top:8px">'+
+  ob('Amie does',AMS,[
+    'Email Blueline to close D&A policy for [AUTH]',
+    'Close Prepass account for [AUTH]',
+  ])+
+  '</div></details>'+
+  '</div>'
+},
+{title:'Permanent Truck Change',sec:'checklists',isDriver:true,body:()=>
+  ctxForm([['driverSel','dname'],['auth','old','nw']])+
+  '<div id="ctx-cl">'+
+  ob('Before driver leaves — your tasks',BLS,[
+    'Truck Checklist (clipboard) for truck [NEW]',
+    'Cancel old permits for truck [OLD]',
+    'Get new permits for truck [NEW]',
+    'Add transponder in OR (non B#) — truck [NEW]',
+    'Truck docs for [DRIVER] / truck [NEW] — email & upload to cloud',
+    'Take picture of truck [NEW]',
+  ])+
+  ob('No rush — your tasks',NRS,[
+    'Check truck [NEW] cloud file has DOT, reg & ID card',
+    'Carrier package — upload to cloud, move old package for truck [OLD] to old folder',
+    fl('Quartix — truck [OLD]: remove from all groups except Ultimate Logistics All Vehicles, rename to No Driver. Truck [NEW]: add to dispatch and active group, add [DRIVER] name.','https://gogps.com'),
+    'Scan in & upload 2-pg lease for truck [NEW] to cloud. Move old truck [OLD] lease to old folder.',
+    'Enter NM transaction in QuickBooks for truck [NEW]',
+    fl('Update permit folders on cloud','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits'),
+    'Update permit sheets on cloud',
+    fl('Update Current Trucks & Drivers.xlsx','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1'),
+  ])+
+  '<details style="margin-top:10px"><summary style="font-size:11px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:0.4px;cursor:pointer;user-select:none">▸ KJ & Amie tasks (covering only)</summary>'+
+  '<div style="margin-top:8px">'+
+  ob('KJ does',KJS,[
+    'SRS (if new graphics/DOT#)',
+    '2-pg lease, auth to drive, trailer lease agreement — [DRIVER] / truck [NEW]',
+    'Add [DRIVER] / truck [NEW] to line-items to show new monthly truck payment',
+  ])+
+  ob('Amie does',AMS,[
+    'BestPass/Prepass swap — truck [OLD] to [NEW]',
+  ])+
+  '</div></details>'+
+  '</div>'
+},
+{title:'Temp Truck Change',sec:'checklists',isDriver:true,body:()=>
+  ctxForm([['driverSel','dname'],['auth','old','nw']])+
+  '<div id="ctx-cl">'+
+  ob('Before driver leaves — your tasks',BLS,[
+    'Truck Checklist (clipboard) for truck [NEW]',
+    'Get new permits for truck [NEW] (do NOT cancel permits for truck [OLD])',
+    'Add transponder in OR (non B#) — truck [NEW]',
+    'Truck docs for [DRIVER] / truck [NEW] — email & upload to cloud',
+    'Take picture of truck [NEW]',
+  ])+
+  ob('No rush — your tasks',NRS,[
+    'Check truck [NEW] cloud file has DOT, reg & ID card',
+    'Carrier package — upload to cloud, move old package to old folder',
+    fl('Quartix — truck [OLD]: add "Shop" in front of name. Truck [NEW]: add to dispatch and active group, add [DRIVER] name, add "Temp" in front of name.','https://gogps.com'),
+    'Scan in & upload 2-pg lease for truck [NEW] to cloud. Add "TEMP" to end of file name.',
+    'Enter NM transaction in QuickBooks for truck [NEW]',
+    fl('Update permit folders on cloud','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits'),
+    fl('Update permit sheets on cloud — add "in shop (date)" to truck [OLD] notes, "temp truck" to truck [NEW] notes.','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits'),
+    fl('Update Current Trucks & Drivers.xlsx','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1')+' — mark truck [OLD] as in shop, truck [NEW] as temp truck for [DRIVER].',
+  ])+
+  '<details style="margin-top:10px"><summary style="font-size:11px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:0.4px;cursor:pointer;user-select:none">▸ KJ & Amie tasks (covering only)</summary>'+
+  '<div style="margin-top:8px">'+
+  ob('KJ does',KJS,[
+    'SRS (if new graphics/DOT#)',
+    '2-pg lease, auth to drive, trailer lease agreement — [DRIVER] / truck [NEW]',
+    'Add [DRIVER] / truck [NEW] to line-items to show new monthly truck payment',
+  ])+
+  ob('Amie does',AMS,[
+    'BestPass/Prepass swap — truck [OLD] to [NEW]',
+  ])+
+  '</div></details>'+
+  '</div>'
+},
+{title:'Out of Temp Truck',sec:'checklists',isDriver:true,body:()=>
+  ctxForm([['driverSel','dname'],['auth','old','nw']])+
+  '<p style="font-size:12px;color:#888;margin:-6px 0 12px">OLD = temp truck being returned &nbsp;|&nbsp; NEW = regular truck coming back.</p>'+
+  '<div id="ctx-cl">'+
+  ob('No rush — your tasks',NRS,[
+    'Cancel temp permits for truck [OLD]',
+    'Check normal permits for truck [NEW] are still active',
+    'Move temp carrier package for truck [OLD] to old folder',
+    'Move/rename temp truck [OLD] lease to old folder (if there is one)',
+    'Quartix — truck [OLD]: remove from all groups except Ultimate Logistics All Vehicles, rename to No Driver. Truck [NEW]: remove "Shop" from name.',
+    'Check truck [NEW] cloud file has DOT, reg & ID card',
+    fl('Update permit folders on cloud','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits'),
+    fl('Update permit sheets on cloud — leave notes until next tax period.','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits'),
+    fl('Update Current Trucks & Drivers.xlsx','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1')+' — mark truck [OLD] as "was", remove shop notes from truck [NEW].',
+  ])+
+  '</div>'
+},
+{title:'New Authority Package',sec:'checklists',body:()=>
+  subh('Paper documents to assemble')+
+  ob('Documents to include',NRS,["Driver's authority package (Auth to Drive and Trailer Interchange for Bill to sign — no lease)","1st page of the Two Page Lease between driver LLC and Ultimate (signed when they signed 60/40 or similar)","Safety Responsibility Statement — has driver's authority on it, driver signs","POAs for permits — driver signs + KY email. Located at Compliance > Authority POA: NM Tax Auth, OR App for Motor Carrier Account, OR Power of Attorney","Carrier Package","Truck Docs"])+
+  note('For a finished example, see Driver Documents > Bueno, Luis > 01 Operational.')+
+  links([{label:'Authority POA folder',url:'https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits/Authority%20POA'},{label:'Driver Documents',url:'https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents'}])+
+  subh('Admin tasks')+steps([
+    fl('Update Authority Driver List.xlsx','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Authority%20Driver%20List.xlsx?web=1')+' and '+fl('Current Trucks & Drivers.xlsx','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1')+'.',
+    'Create the authority files and labels. Process the authority file from Amie.',
+    'Grab the old authority folder. Create copies of the application and previous employer sheets — put behind the new ones.',
+    "Take out anything specific to the old authority and put it into the new authority's Ultimate Program Docs file.",
+    'On the new Previous Employers page, write the old authority and "see attached". Fill out the Request from Prev Employer sheet.',
+    'Drug and alcohol policy: driver goes to American Diag for drug test. Email Blueline the New DOT D&A Policy email (see Email Templates).',
+    'Graphics — Todd Moss handles these.',
+    'Update Driver Documents > Driver Packages to Do.xlsx.',
+    'Update start date for the annual MVR list. Make sure MVR is within 30 days.',
+    'In ITS, add the MC # and D&A policy date to the external carrier.',
+    'If switching trucks, add to line items. Example: Swarbrick Eric, TRK PMT, Changed to truck #757 on 7/5/22 $1000 payment, MH.',
+  ])
+},
 
-// ── SECTION 3: DRIVER ONBOARDING ────────────────────────────
 {title:'Create FMCSA Portal Account',sec:'onboarding',body:()=>
   subh('Information needed')+steps([
     'DOT # and DOT PIN — from the FMCSA letter, emailed by Kathryn or Amie.',
@@ -740,7 +756,7 @@ steps(['Drug and alcohol policy: driver goes to American Diag for drug test. Ema
   'Account Type: Weight Distance (Permit & Tax). Continue to Authorization page. Click Attach Completed Form ACD-31102 Tax Information Authorization and continue.',
 ])+note('Only process 10 authorities per day or the card will get declined.')},
 {title:'Greenlight (PrePass)',sec:'onboarding',body:()=>steps([
-  'Log in to PrePass. Also open '+fl('Driver Documents > Current Trucks & Drivers.xlsx','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx')+' (Scale/Toll Transponders tab) and the OR Accounts & Passwords sheet (PrePass tab).',
+  'Log in to PrePass. Also open '+fl('Driver Documents > Current Trucks & Drivers.xlsx','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1')+' (Scale/Toll Transponders tab) and the OR Accounts & Passwords sheet (PrePass tab).',
   'Using the PrePass tab, copy/paste the OLD authority\'s PrePass # into the PrePass search bar. If the truck is NOT yet assigned to anything, skip removing it.',
   'After selecting, go to Equipment Management, select the old truck. Click Unassign Transponder → Return to Customer Inventory. If not the last truck on the account, also check "delete the source equipment." Click Save. Don\'t assign a new transponder on the next page — just Cancel and Save again.',
   'Go back to My PrePass. Paste the NEW authority\'s PrePass # into the search bar.',
@@ -749,7 +765,7 @@ steps(['Drug and alcohol policy: driver goes to American Diag for drug test. Ema
   'Click Jurisdiction States. If not filled: select all EXCEPT AK, HI, PR, NF, NT, PQ, YT. For Canada, check the checkbox and put 36287 in the dropdown.',
   'Need a transponder: No. (Click Yes if ordering new — when prompted, select the address with Amie\'s name.) Equipment hauls hazmat: No.',
   'Search for a transponder by transponder ID (or add 3rd party, Best Pass). Enter the transponder ID, select, OK on Device Transfer Warning, Save. Complete equipment submission. Close.',
-  'Update '+fl('Driver Documents > Current Trucks & Drivers.xlsx','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx')+': cut/paste transponder # from old to new truck. Add a note: updated MM/DD/YY. Confirm the authority on the new truck is correct.',
+  'Update '+fl('Driver Documents > Current Trucks & Drivers.xlsx','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1')+': cut/paste transponder # from old to new truck. Add a note: updated MM/DD/YY. Confirm the authority on the new truck is correct.',
 ])},
 {title:'Best Pass — White Bar',sec:'onboarding',body:()=>subh('Best Pass')+steps([
   'Take a picture of the white bar and send to Amie to edit the Current Trucks & Drivers sheet.',
@@ -771,8 +787,27 @@ steps(['Drug and alcohol policy: driver goes to American Diag for drug test. Ema
   'BestPass → Vehicles & Devices → Edit Vehicle.',
   'Enter the BestPass # (BP Horizon) into the Quick Assign Device.',
   'It will say the transponder comes as a pair (white box) and will remove the old transponder IDs. Click Yes.',
-  'Update '+fl('Driver Documents > Current Trucks & Drivers.xlsx','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx')+': cut/paste transponder # from old to new truck. Add note: updated MM/DD/YY. Confirm the authority is correct.',
+  'Update '+fl('Driver Documents > Current Trucks & Drivers.xlsx','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1')+': cut/paste transponder # from old to new truck. Add note: updated MM/DD/YY. Confirm the authority is correct.',
 ])},
+{title:'Driver Packages — New Driver',sec:'onboarding',body:()=>subh('Paper parts')+
+  ob('Documents needed',NRS,['60/40 package — contains 1-pg lease with Temp Authority (need all info from Bill or emails from Kathryn to complete)','Two Page Lease — between Ultimate Logistics and the driver\'s LLC','Idaho LLC Operating Agreement — for the bank, with LLC and IRS letter from Kathryn. Change the D&A policy date to current date.','Blank insurance cancellation request — driver signs as named insured. Do NOT date.','Safety Responsibility Statement for temp authority','Truck Docs (see Truck Docs)'])+
+  subh('Non-paper parts — Order PSP')+steps([
+    'Log in to MVRcheck.com → Order → New Order.',
+    'Select PSP Crash and Inspection History → QuickApp.',
+    'Input driver\'s Last and First name, plus their email. Send.',
+  ])+subh('Non-paper parts — Order Background Check')+steps([
+    'Log in to bluelinebackgrounds.com → Order → New Order.',
+    'Choose Blueline National Plus (the only one we order) → QuickApp.',
+    'Input driver\'s Last and First name, plus email. Send.',
+    'If they email back about additional county records — always say yes (extra cost, worth it).',
+  ])+links([{label:'bluelinebackgrounds.com',url:'https://www.bluelinebackgrounds.com'},{label:'MVRcheck.com',url:'https://www.mvrcheck.com'}])+subh('Update systems')+steps([
+    'Update '+fl('Driver Documents > Current Trucks & Drivers.xlsx','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1')+'.',
+    'Add driver to ITS: Admin → Drivers → Add. Copy/paste from 60/40 package. Notes box: Temp Authority [auth] and CDL State. Pay tab: Pay Type = %, Standard 60%, FSC 60%, Additional Charges 0%. Save.',
+    'Add driver to Motive: Admin → Drivers → Add Driver. Fill out Name, Email, Phone, CDL, Username (simplified auth name). Select Electronic Logs Required and Compliance Mode ELD. Home Terminal Time: Mountain. Check Yard Move and Personal Conveyance (NOT Manual Drive). Select DOT # for Temporary Authority. Home Terminal Address: 4663 S Enterprise St. Cycle: 70HR USA, 34hr reset, 30min break. Save.',
+    'Run Full Pre-employment Query on DACH under Temporary Authority (see Run Query on DACH).',
+    'Email the driver (cc Kage) the Ultimate Onboarding email (see Email Templates). Only after running the query.',
+    'Add the driver to the Payroll Line Items Google sheet. Example: Studor, Robert, TRK PMT, after lease program payments are complete truck 705 payment will be $1,000. Driver start date 2/28.',
+  ])},
 {title:'DOT Authority',sec:'onboarding',body:()=>steps([
   'Apply for the DOT/authority.',
   'Request the PIN the day after applying — it won\'t work the same day.',
@@ -845,7 +880,7 @@ steps(['Drug and alcohol policy: driver goes to American Diag for drug test. Ema
   'At the end, click Get this Report and save the file as the authority\'s name. Save to the corresponding folder.',
   'Once all authorities are filed, triple-check that you really filed them all.',
   'Print all the mile returns (don\'t print 0s). Enter into QuickBooks as checks with a max of 14.',
-])},
+])+links([{label:'Oregon Permit Dates.xlsx',url:'https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits/Oregon%20Permit%20Dates.xlsx?web=1'},{label:'Oregon Permits folder',url:'https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits/Oregon%20Permits'}])},
 {title:'New Mexico Tax (Quarterly)',sec:'taxes',body:()=>subh('Add the miles')+steps([
   'In Quartix, Trips → IFTA Mileage, enter the first truck with the corresponding date range.',
   'Click View IFTA Mileage and copy NM miles into the New Mexico Permit sheet. Move on.',
@@ -857,7 +892,7 @@ steps(['Drug and alcohol policy: driver goes to American Diag for drug test. Ema
   'Save the return, select Make a Payment, pay with credit card.',
   'Move to the next authority. Only do 10 a day or the card will get declined.',
   'Enter each authority into QuickBooks separately, attaching the receipt.',
-])},
+])+links([{label:'New Mexico Permit Dates.xlsx',url:'https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits/New%20Mexico%20Permit%20Dates.xlsx?web=1'},{label:'New Mexico Permits folder',url:'https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits/New%20Mexico%20Permits'}])},
 {title:'Kentucky Tax (Quarterly)',sec:'taxes',body:()=>subh('Add the miles')+steps([
   'In Quartix, Trips → IFTA Mileage, first truck, corresponding date range.',
   'Click View IFTA Mileage, copy KY miles into the Kentucky Permit sheet. Move on.',
@@ -869,7 +904,7 @@ steps(['Drug and alcohol policy: driver goes to American Diag for drug test. Ema
   'Do NOT cease ops unless told to.',
   'At the end, Print Return and save as PDF under the authority\'s name. If there were miles, print the voucher.',
   'Enter vouchers into QuickBooks (under Kentucky vendor). Combine all returns into one PDF and attach to the first KY check.',
-])},
+])+links([{label:'Kentucky Permit Dates.xlsx',url:'https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits/Kentucky%20Permit%20Dates.xlsx?web=1'},{label:'Kentucky Permits folder',url:'https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits/Kentucky%20Permits'}])},
 
 // ── SECTION 7: AUDITS & COMPLIANCE ─────────────────────────
 {title:'Audits',sec:'compliance',body:()=>steps([
@@ -919,7 +954,7 @@ steps(['Drug and alcohol policy: driver goes to American Diag for drug test. Ema
 
 // ── SECTION 8: EQUIPMENT TRACKING ──────────────────────────
 {title:'Quartix Check',sec:'tracking',body:()=>steps([
-  'Go to '+fl('Equipment > Quartix > Quartix Check Template','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Quartix')+' and add a new sheet.',
+  'Go to '+fl('Equipment > Quartix > Quartix Check Template','https://gogps.com')+' and add a new sheet.',
   'In Quartix, go to Live Tracking. Group: All, Vehicle: All.',
   'Copy and paste (without formatting — Ctrl+Shift+V) the entire text of data into the Quartix sheet.',
   'Clean up: delete everything besides the description (has driver name), unit number, and date/time/location column.',
@@ -929,7 +964,7 @@ steps(['Drug and alcohol policy: driver goes to American Diag for drug test. Ema
   'With the remaining ones, compare data to ITS to see if the equipment has had loads since the last Quartix reading. If yes, the truck is moving — delete that row. If no, the Quartix may be broken.',
   'Highlight any new broken ones in red and email the Excel to Kathryn, Amie, and Brett.',
   'Email the driver and dispatcher to let them know the Quartix needs to be looked at.',
-])+links([{label:'Current Quartix.xlsx',url:'https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Quartix/Current%20Quartix.xlsx'},{label:'Compliance > Quartix folder',url:'https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Quartix'}])},
+])+links([{label:'Current Quartix.xlsx',url:'https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Quartix/Current%20Quartix.xlsx?web=1'},{label:'Compliance > Quartix folder',url:'https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Quartix'}])},
 {title:'Quartix Change/Update',sec:'tracking',body:()=>subh('Edit OLD Quartix')+steps([
   'Log in to Quartix under the admin account → Configure → Vehicles.',
   'Copy the Quartix # from Description to Registration # (keep in Description too).',
@@ -1117,17 +1152,6 @@ steps(['Drug and alcohol policy: driver goes to American Diag for drug test. Ema
 ])+links([{label:'Excel Macros folder',url:'https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Office%20Documents/Payroll/Templates%20Forms%20Instructions%20etc/Excel%20Macros'}])},
 
 // ── SECTION 13: NEW AUTHORITY ───────────────────────────────
-{title:'New Authority',sec:'authority',body:()=>steps([
-  'Update the Authority Doc: '+fp('Driver Documents > Authority Driver List.xlsx')+'.',
-  'Update '+fl('Driver Documents > Current Trucks & Drivers.xlsx','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx')+'.',
-  'Create the authority files and labels.',
-  'Process the authority file from Amie. Fill out the New Authority checklist.',
-  'Grab the old authority folder.',
-  'Create copies of the application and previous employer sheets from the old authority. Put them behind the new application and previous employer sheets.',
-  'Take out anything specific to the driver\'s old authority and put it into the new authority\'s Ultimate Program Docs file.',
-  'On the new Previous Employers page, write the old authority and "see attached".',
-  'Fill out the Request from Prev Employer sheet with the old authority.',
-])+links([{label:'Authority Driver List.xlsx',url:'https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Authority%20Driver%20List.xlsx'},{label:'Current Trucks & Drivers.xlsx',url:'https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx'}])},
 
 // ── SECTION 14: EMAIL TEMPLATES ─────────────────────────────
 {title:'Email — Motive DOT Approval',sec:'email',body:()=>`<div style="background:#f7f7f7;border-radius:8px;padding:14px;font-size:13px;line-height:1.7">
@@ -1210,63 +1234,25 @@ function loadStorage(){
   try {
     const p = localStorage.getItem('ul_pins');
     const r = localStorage.getItem('ul_recents');
-    const parsedPins = p ? JSON.parse(p) : [];
-    const parsedRecents = r ? JSON.parse(r) : [];
-    pins = Array.isArray(parsedPins) ? parsedPins : [];
-    recents = Array.isArray(parsedRecents) ? parsedRecents : [];
-  } catch(e){
-    pins = [];
-    recents = [];
-  }
+    if(p) pins = JSON.parse(p);
+    if(r) recents = JSON.parse(r);
+  } catch(e){}
 }
 function savePins(){ try{ localStorage.setItem('ul_pins', JSON.stringify(pins)); }catch(e){} }
 function saveRecents(){ try{ localStorage.setItem('ul_recents', JSON.stringify(recents)); }catch(e){} }
-function redrawSavedCards(){
-  renderHome();
-  render();
-}
-function refreshSavedCards(){
-  loadStorage();
-  redrawSavedCards();
-}
-function saveAndRedraw(){
-  savePins();
-  saveRecents();
-  redrawSavedCards();
-  // Some hosts/cache layers update click-driven DOM changes late. Queue extra redraws.
-  setTimeout(redrawSavedCards, 0);
-  requestAnimationFrame(redrawSavedCards);
-}
-
-function updatePinVisual(idx, pinned, btn){
-  // Immediate visual update for the clicked card. This prevents the "saved but stale"
-  // look where the blue border/pin only appears after a hard refresh.
-  const wrap = btn ? btn.closest('.card-wrap') : null;
-  const card = wrap ? wrap.querySelector('.card') : null;
-  if(card) card.classList.toggle('pinned-card', pinned);
-  if(btn){
-    btn.classList.toggle('pinned', pinned);
-    btn.setAttribute('title', pinned ? 'Unpin' : 'Pin to home');
-  }
-}
 
 // ── Pin logic ────────────────────────────────────────────
 function togglePin(idx, ev){
-  if(ev){ ev.preventDefault(); ev.stopPropagation(); }
-  const btn = ev ? ev.currentTarget : null;
+  ev.stopPropagation();
   const id = EVENTS[idx].title;
-  const willPin = !pins.includes(id);
-  if(willPin){
-    pins.push(id);
-  } else {
+  if(pins.includes(id)){
     pins = pins.filter(p => p !== id);
+  } else {
+    pins.push(id);
   }
   savePins();
-  updatePinVisual(idx, willPin, btn);
   renderHome();
-  render();
-  setTimeout(() => { renderHome(); render(); }, 0);
-  requestAnimationFrame(() => { renderHome(); render(); });
+  render(); // refresh pin icons in browse view
 }
 function isPinned(idx){ return pins.includes(EVENTS[idx].title); }
 
@@ -1276,20 +1262,13 @@ function addRecent(idx){
   recents = recents.filter(r => r.id !== id);
   recents.unshift({id, ts: Date.now()});
   if(recents.length > MAX_RECENTS) recents = recents.slice(0, MAX_RECENTS);
-  saveAndRedraw();
+  saveRecents();
+  // don't re-render home while modal is open — just keep state updated
 }
-function clearRecents(ev){
-  if(ev){ ev.preventDefault(); ev.stopPropagation(); }
+function clearRecents(){
   recents = [];
   saveRecents();
-  // Immediate visible wipe, then normal redraw.
-  const rg = document.getElementById('recents-grid');
-  const cb = document.getElementById('recents-clear-btn');
-  if(rg) rg.innerHTML = `<div class="home-empty" id="recents-empty">No recent cards yet — open a procedure and it will appear here.</div>`;
-  if(cb) cb.style.display = 'none';
   renderHome();
-  setTimeout(renderHome, 0);
-  requestAnimationFrame(renderHome);
 }
 function timeAgo(ts){
   const s = Math.floor((Date.now()-ts)/1000);
@@ -1335,39 +1314,43 @@ function homeCard(idx, opts={}){
 
 // ── Render home screen ───────────────────────────────────
 function renderHome(){
+  // Pinned
   const pg = document.getElementById('pinned-grid');
-  const rg = document.getElementById('recents-grid');
-  const cb = document.getElementById('recents-clear-btn');
-  if(!pg || !rg) return;
-
-  // Rebuild the grids from scratch every time. This avoids stale detached nodes in
-  // SharePoint/browser-cache restores and makes unpin/clear reflect immediately.
-  const pinnedCards = pins
-    .map(id => EVENTS.findIndex(e => e.title === id))
-    .filter(idx => idx >= 0)
-    .map(idx => homeCard(idx, {pinned:true}))
-    .join('');
-
-  if(pinnedCards){
-    pg.innerHTML = pinnedCards + `<div style="display:flex;align-items:center;justify-content:center;border:1.5px dashed #e0e0e0;border-radius:12px;min-height:68px;cursor:pointer;color:#bbb;font-size:12px" onclick="showBrowse()">+ Browse all</div>`;
+  const pe = document.getElementById('pinned-empty');
+  if(pins.length === 0){
+    pe.style.display = 'block';
+    pg.innerHTML = '';
+    pg.appendChild(pe);
   } else {
-    pg.innerHTML = `<div class="home-empty" id="pinned-empty">No pinned cards yet — browse All Procedures and click &#128204; to pin your most-used ones.</div>`;
+    pe.style.display = 'none';
+    const html = pins.map(id => {
+      const idx = EVENTS.findIndex(e => e.title === id);
+      if(idx < 0) return '';
+      return homeCard(idx, {pinned:true});
+    }).join('');
+    pg.innerHTML = html + `<div style="display:flex;align-items:center;justify-content:center;border:1.5px dashed #e0e0e0;border-radius:12px;min-height:68px;cursor:pointer;color:#bbb;font-size:12px" onclick="showBrowse()">+ Browse all</div>`;
   }
 
-  const recentCards = recents
-    .map(r => ({...r, idx: EVENTS.findIndex(e => e.title === r.id)}))
-    .filter(r => r.idx >= 0)
-    .map(r => homeCard(r.idx, {recent:true, ts:r.ts}))
-    .join('');
-
-  if(recentCards){
-    rg.innerHTML = recentCards;
-    if(cb) cb.style.display = 'inline';
+  // Recents
+  const rg = document.getElementById('recents-grid');
+  const re = document.getElementById('recents-empty');
+  const cb = document.getElementById('recents-clear-btn');
+  if(recents.length === 0){
+    re.style.display = 'block';
+    rg.innerHTML = '';
+    rg.appendChild(re);
+    cb.style.display = 'none';
   } else {
-    rg.innerHTML = `<div class="home-empty" id="recents-empty">No recent cards yet — open a procedure and it will appear here.</div>`;
-    if(cb) cb.style.display = 'none';
+    re.style.display = 'none';
+    cb.style.display = 'inline';
+    rg.innerHTML = recents.map(r => {
+      const idx = EVENTS.findIndex(e => e.title === r.id);
+      if(idx < 0) return '';
+      return homeCard(idx, {recent:true, ts:r.ts});
+    }).join('');
   }
 }
+
 function secLabel(s){const f=SECS.find(x=>x.id===s);return f?f.label:s;}
 
 function render(){
@@ -1401,11 +1384,6 @@ function buildChips(){
 
 function setChip(id){activeSec=id;buildChips();render();}
 
-function openCardByTitle(title){
-  const idx = EVENTS.findIndex(e => e.title === title);
-  if(idx >= 0) openModal(idx);
-}
-
 function openModal(idx){
   const e=EVENTS[idx];
   const st=SS[e.sec]||{bg:'#F3F4F6',color:'#374151'};
@@ -1413,7 +1391,7 @@ function openModal(idx){
   document.getElementById('m-sec').style.background=st.bg;
   document.getElementById('m-sec').style.color=st.color;
   document.getElementById('m-title').textContent=e.title;
-  CTX={driver:'',auth:'',old:'',nw:'',dot:'',drvKey:''};
+  CTX={driver:'',auth:'',old:'',nw:'',dot:''};
   if(e.isDriver){
     curBodyFn=function(){
       const full=e.body();
@@ -1425,7 +1403,6 @@ function openModal(idx){
     curBodyFn=null;
   }
   document.getElementById('m-body').innerHTML=e.body();
-  updateCtxLinks();
   document.getElementById('mbg').classList.add('open');
   addRecent(idx);
 }
@@ -1437,355 +1414,69 @@ function closeModal(){
   if(document.getElementById('home-view').style.display !== 'none') renderHome();
 }
 
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeLinkPopup();}});
 
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
+// ── Per-item link editor ────────────────────────────────────
+let customLinks = {};  // key: item text, value: url
+let _editingKey = null;
 
-function setAuthStatus(msg,cls){
-  const el=document.getElementById('ms-status');
-  if(el){el.textContent=msg;el.className='auth-status '+(cls||'');}
+function loadCustomLinks(){
+  try{ const s=localStorage.getItem('ul_item_links'); if(s) customLinks=JSON.parse(s); }catch(e){}
 }
-function setAuthButtons(signedIn){
-  const signIn=document.getElementById('ms-signin'), signOut=document.getElementById('ms-signout');
-  if(signIn) signIn.style.display=signedIn?'none':'inline-block';
-  if(signOut) signOut.style.display=signedIn?'inline-block':'none';
-}
-function initMsal(){
-  if(msalApp || !window.msal) return msalApp;
-  msalApp = new msal.PublicClientApplication({
-    auth:{
-      clientId: MS_CLIENT_ID,
-      authority: `https://login.microsoftonline.com/${MS_TENANT_ID}`,
-      redirectUri: MS_REDIRECT_URI,
-      postLogoutRedirectUri: MS_REDIRECT_URI,
-      navigateToLoginRequestUrl: false
-    },
-    cache:{cacheLocation:'localStorage',storeAuthStateInCookie:false}
-  });
-  return msalApp;
-}
-function friendlyErr(err){
-  const msg=(err&&err.message?err.message:String(err||'')).replace(/\s+/g,' ').trim();
-  if(!msg) return 'Unknown error';
-  return msg.length>180 ? msg.slice(0,180)+'…' : msg;
-}
-async function handleMicrosoftRedirect(){
-  try{
-    const app=initMsal();
-    if(!app) return;
-    const res=await app.handleRedirectPromise();
-    const accounts=app.getAllAccounts();
-    msAccount = (res&&res.account) || accounts[0] || null;
-    setAuthButtons(!!msAccount);
-    if(msAccount){
-      setAuthStatus('Signed in. Loading live Current Trucks & Drivers...', 'warn');
-      try{
-        await loadLiveDriverTruckData();
-      }catch(loadErr){
-        console.warn('Live sheet load failed:', loadErr);
-        setAuthStatus('Signed in, but live sheet failed: '+friendlyErr(loadErr)+' Using embedded snapshot.', 'warn');
-      }
-    } else {
-      setAuthStatus('Using embedded driver/truck snapshot.', '');
-    }
-  }catch(err){
-    console.warn('Microsoft sign-in redirect failed:', err);
-    setAuthButtons(false);
-    setAuthStatus('Microsoft sign-in failed: '+friendlyErr(err)+' Using embedded snapshot.', 'warn');
-  }
-}
-function signInMicrosoft(){
-  const app=initMsal();
-  if(!app){setAuthStatus('MSAL did not load. Check internet/CDN access.', 'warn');return;}
-  app.loginRedirect({scopes: MS_SCOPES, prompt:'select_account'});
-}
-function signOutMicrosoft(){
-  const app=initMsal();
-  if(!app || !msAccount) return;
-  app.logoutRedirect({account:msAccount, postLogoutRedirectUri:MS_REDIRECT_URI});
-}
-async function getGraphToken(){
-  const app=initMsal();
-  if(!app) throw new Error('MSAL not loaded');
-  if(!msAccount){
-    const accounts=app.getAllAccounts();
-    msAccount=accounts[0]||null;
-  }
-  if(!msAccount) throw new Error('Not signed in');
-  try{
-    const res=await app.acquireTokenSilent({account:msAccount, scopes:MS_SCOPES});
-    return res.accessToken;
-  }catch(err){
-    if(err instanceof msal.InteractionRequiredAuthError){
-      await app.acquireTokenRedirect({scopes:MS_SCOPES, account:msAccount});
-      return null;
-    }
-    throw err;
-  }
-}
-async function graphGet(path,token){
-  const res=await fetch(`https://graph.microsoft.com/v1.0${path}`,{headers:{Authorization:`Bearer ${token}`}});
-  if(!res.ok){
-    const text=await res.text();
-    let msg=text;
-    try{
-      const j=JSON.parse(text);
-      msg=(j.error&&j.error.message)||text;
-    }catch(e){}
-    throw new Error(`Graph ${res.status}: ${msg.slice(0,500)}`);
-  }
-  return res.json();
-}
-async function graphDownload(path,token){
-  const res=await fetch(`https://graph.microsoft.com/v1.0${path}`,{headers:{Authorization:`Bearer ${token}`}});
-  if(!res.ok){
-    const text=await res.text();
-    let msg=text;
-    try{
-      const j=JSON.parse(text);
-      msg=(j.error&&j.error.message)||text;
-    }catch(e){}
-    throw new Error(`Graph download ${res.status}: ${msg.slice(0,500)}`);
-  }
-  return res.arrayBuffer();
-}
-function graphPathEncode(path){
-  return String(path||'').split('/').filter(Boolean).map(encodeURIComponent).join('/');
-}
-function readWorkbookRowsFromArrayBuffer(buf){
-  if(!window.XLSX) throw new Error('XLSX parser did not load. Refresh or check that jsDelivr is allowed.');
-  const wb=XLSX.read(buf,{type:'array'});
-  let rows=[];
-  for(const sheetName of wb.SheetNames){
-    const ws=wb.Sheets[sheetName];
-    const values=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-    rows=rows.concat(parseDriverRowsFromValues(values));
-  }
-  return rows;
-}
-async function readWorkbookRowsFromDriveItem(item,token){
-  if(!item || !item.id) throw new Error('Drive item not found for Current Trucks & Drivers.xlsx');
-  let downloadPath;
-  const driveId=item.parentReference && item.parentReference.driveId;
-  if(driveId){
-    downloadPath=`/drives/${encodeURIComponent(driveId)}/items/${encodeURIComponent(item.id)}/content`;
-  }else{
-    downloadPath=`/me/drive/items/${encodeURIComponent(item.id)}/content`;
-  }
-  const buf=await graphDownload(downloadPath,token);
-  return readWorkbookRowsFromArrayBuffer(buf);
-}
-function b64UrlEncode(str){
-  const bytes=new TextEncoder().encode(str);
-  let bin='';
-  bytes.forEach(b=>bin+=String.fromCharCode(b));
-  return btoa(bin).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
-}
-function normCell(v){return String(v??'').trim();}
-function normHeader(v){return normCell(v).toLowerCase().replace(/[^a-z0-9#]+/g,' ');}
-function colIndex(headers,patterns){
-  return headers.findIndex(h=>patterns.some(p=>h.includes(p)));
-}
-function splitDriverName(name){
-  const n=normCell(name).replace(/^(Was|Shop)\s+/i,'').trim();
-  if(n.includes(',')){
-    const [last,...rest]=n.split(',');
-    const first=rest.join(',').trim();
-    return {f:first,l:last.trim(),folder:`${last.trim()}, ${first}`.trim()};
-  }
-  const parts=n.split(/\s+/).filter(Boolean);
-  if(parts.length>1){const last=parts.pop(); const first=parts.join(' '); return {f:first,l:last,folder:`${last}, ${first}`};}
-  return {f:n,l:'',folder:n};
-}
-function isCurrentDateOut(v){
-  const s=normCell(v).toLowerCase();
-  if(!s) return true; // if a sheet lacks Date Out, don't accidentally hide everyone
-  return s.includes('current');
-}
-function parseDriverRowsFromValues(values){
-  if(!Array.isArray(values)) return [];
-  let best={score:0,idx:-1,map:null};
-  for(let r=0;r<Math.min(values.length,40);r++){
-    const headers=(values[r]||[]).map(normHeader);
-    const unit=colIndex(headers,['unit #','unit','truck','tractor','vehicle']);
-    const first=colIndex(headers,['first name','first']);
-    const last=colIndex(headers,['last name','last']);
-    const driver=colIndex(headers,['driver name','driver']);
-    const authority=colIndex(headers,['fmcsa authority','authority','company','carrier','llc']);
-    const dateOut=colIndex(headers,['date out','out']);
-    const notes=colIndex(headers,['notes','note']);
-    const dot=colIndex(headers,['dot','usdot']);
-    let score=(unit>=0?2:0)+(first>=0?2:0)+(last>=0?2:0)+(driver>=0?2:0)+(authority>=0?1:0)+(dateOut>=0?2:0);
-    if(score>best.score) best={score,idx:r,map:{unit,first,last,driver,authority,dateOut,notes,dot}};
-  }
-  if(best.idx<0 || !best.map || (best.map.driver<0 && (best.map.first<0 || best.map.last<0))) return [];
-  const out=[];
-  for(const row of values.slice(best.idx+1)){
-    const unit=best.map.unit>=0?normTruck(row[best.map.unit]):'';
-    const firstRaw=best.map.first>=0?normCell(row[best.map.first]):'';
-    const lastRaw=best.map.last>=0?normCell(row[best.map.last]):'';
-    const driverRaw=best.map.driver>=0?normCell(row[best.map.driver]):'';
-    const dateOut=best.map.dateOut>=0?normCell(row[best.map.dateOut]):'';
-    const notes=best.map.notes>=0?normCell(row[best.map.notes]):'';
-    const auth=best.map.authority>=0?normCell(row[best.map.authority]):'';
-    const dot=best.map.dot>=0?normCell(row[best.map.dot]):'';
-    if(!unit && !firstRaw && !lastRaw && !driverRaw) continue;
-    if(!isCurrentDateOut(dateOut)) continue;
-    if(/^was\b/i.test(firstRaw) || /^was\b/i.test(driverRaw)) continue;
-    if(/^shop\b/i.test(firstRaw) || /^shop\b/i.test(driverRaw) || /\bshop\b/i.test(notes)) continue;
-    let f=firstRaw,l=lastRaw,folder='';
-    if(driverRaw && (!f || !l)){
-      const parts=splitDriverName(driverRaw); f=parts.f; l=parts.l; folder=parts.folder;
-    }else{
-      f=f.replace(/^(Was|Shop)\s+/i,'').trim();
-      folder=(l&&f)?`${l}, ${f}`:driverRaw;
-    }
-    if(!f && !l) continue;
-    const display=(l&&f)?`${l}, ${f}`:(driverRaw||`${f} ${l}`.trim());
-    out.push({n:display,f,l,a:auth,t:unit,dot,dateOut,notes,folder});
-  }
-  return out;
-}
-function dedupeDrivers(rows){
-  const map=new Map();
-  for(const r of rows){
-    const key=(r.folder||r.n||'').toLowerCase()+'|'+normTruck(r.t);
-    if(!map.has(key)) map.set(key,r);
-  }
-  return [...map.values()].sort((a,b)=>a.n.localeCompare(b.n));
-}
-function indexFolders(items,type){
-  const map=new Map();
-  (items||[]).forEach(it=>{
-    if(!it || !it.folder || !it.name) return;
-    const name=String(it.name).trim();
-    if(type==='driver'){
-      const low=name.toLowerCase();
-      if(low.includes('old driver') || low.includes('template') || low.includes('package') || low.includes('current trucks') || low.includes('authority driver') || low.includes('drivers to do')) return;
-      map.set(normKey(name),{name,webUrl:it.webUrl});
-    }else if(type==='tractor'){
-      const m=name.match(/\d{3,4}/);
-      if(m) map.set(m[0],{name,webUrl:it.webUrl});
-    }
-  });
-  return map;
-}
-async function listDriveChildren(siteId,path,token){
-  const j=await graphGet(`/sites/${encodeURIComponent(siteId)}/drive/root:/${graphPathEncode(path)}:/children?$select=name,webUrl,folder,file&$top=999`,token);
-  return j.value||[];
-}
-function reconcileRowsWithFolders(rows){
-  // Sheet = who is assigned to what truck. Folders = the clickable/current file locations.
-  // Keep rows that are current in the sheet; attach folder links when exact folder matches exist.
-  return dedupeDrivers(rows).map(r=>{
-    const folderName=r.folder||r.n;
-    const folderHit=DRIVER_FOLDER_MAP.get(normKey(folderName));
-    const truckHit=TRACTOR_FOLDER_MAP.get(normTruck(r.t));
-    return {...r,driverFolderUrl:folderHit&&folderHit.webUrl,truckFolderUrl:truckHit&&truckHit.webUrl};
-  });
-}
-async function loadLiveDriverTruckData(){
-  if(liveSheetLoaded) return;
-  const token=await getGraphToken();
-  if(!token) return;
-
-  let rows=[];
-  let lastErr=null;
-  let site=null;
-
-  try{
-    site=await graphGet(`/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:`, token);
-  }catch(err){
-    lastErr=err;
-    console.warn('Could not resolve SharePoint site.',err);
-  }
-
-  // Pull folder lists first. These are used for accurate links and truck-number autocomplete.
-  if(site&&site.id){
-    try{
-      const [driverRes,tractorRes]=await Promise.allSettled([
-        listDriveChildren(site.id,'Driver Documents',token),
-        listDriveChildren(site.id,'Equipment/Tractors',token)
-      ]);
-      if(driverRes.status==='fulfilled') DRIVER_FOLDER_MAP=indexFolders(driverRes.value,'driver');
-      if(tractorRes.status==='fulfilled') TRACTOR_FOLDER_MAP=indexFolders(tractorRes.value,'tractor');
-    }catch(folderErr){
-      console.warn('Folder index load failed; continuing with sheet data.',folderErr);
-    }
-  }
-
-  // Resolve the SharePoint file, download the .xlsx, and parse the current rows in the browser.
-  try{
-    if(!site||!site.id) throw new Error('SharePoint site was not resolved.');
-    const item=await graphGet(`/sites/${encodeURIComponent(site.id)}/drive/root:/${graphPathEncode(CURRENT_TRUCKS_DRIVE_PATH)}:`, token);
-    rows=await readWorkbookRowsFromDriveItem(item, token);
-  }catch(err){
-    lastErr=err;
-    console.warn('Site/path xlsx download failed; trying shared-link route.', err);
-  }
-
-  // Fallback route: use the full SharePoint sharing/open URL to resolve the DriveItem, then download content.
-  if(!rows.length){
-    try{
-      const shareId='u!'+b64UrlEncode(CURRENT_TRUCKS_URL);
-      const item=await graphGet(`/shares/${shareId}/driveItem`, token);
-      rows=await readWorkbookRowsFromDriveItem(item, token);
-    }catch(err){
-      lastErr=err;
-      console.warn('Shared-link xlsx download failed.', err);
-    }
-  }
-
-  const parsed=reconcileRowsWithFolders(rows);
-  if(parsed.length){
-    DRIVER_DATA=parsed;
-    liveSheetLoaded=true;
-    const folderNote=[];
-    if(DRIVER_FOLDER_MAP.size) folderNote.push(`${DRIVER_FOLDER_MAP.size} driver folders`);
-    if(TRACTOR_FOLDER_MAP.size) folderNote.push(`${TRACTOR_FOLDER_MAP.size} tractor folders`);
-    setAuthStatus(`Signed in. Live sheet loaded: ${parsed.length} current assignments${folderNote.length?' + '+folderNote.join(' / '):''}.`, 'ok');
-    setAuthButtons(true);
-    const note=document.getElementById('ctx-source-note');
-    if(note) note.textContent='(live dropdowns loaded from Current Trucks & Drivers; folder links loaded from SharePoint)';
-    refreshOpenContextForm();
-  } else {
-    if(lastErr) throw lastErr;
-    setAuthStatus('Signed in, but no current driver/truck rows were found. Using embedded snapshot.', 'warn');
-  }
-}
-function refreshOpenContextForm(){
-  const sel=document.getElementById('ctx-drv');
-  const datalist=document.getElementById('ctx-truck-options');
-  if(sel){
-    const prev=sel.value;
-    sel.innerHTML=dOpts();
-    if([...sel.options].some(o=>o.value===prev)) sel.value=prev;
-  }
-  if(datalist) datalist.innerHTML=truckOpts();
-  updateCtxLinks();
+function saveCustomLinks(){
+  try{ localStorage.setItem('ul_item_links', JSON.stringify(customLinks)); }catch(e){}
 }
 
-let dashboardInitialized = false;
-function initDashboard(){
-  if(dashboardInitialized) return;
-  dashboardInitialized = true;
-  loadStorage();
-  buildChips();
-  showHome();
-  handleMicrosoftRedirect();
+function openLinkEditor(key, currentUrl, btnEl){
+  _editingKey = key;
+  const popup = document.getElementById('link-popup');
+  const input = document.getElementById('link-popup-input');
+  input.value = customLinks[key] || currentUrl || '';
+  // position near the button
+  const rect = btnEl.getBoundingClientRect();
+  popup.style.top  = Math.min(rect.bottom + 6, window.innerHeight - 180) + 'px';
+  popup.style.left = Math.max(8, Math.min(rect.left - 160, window.innerWidth - 350)) + 'px';
+  popup.classList.add('open');
+  input.focus();
+  input.select();
 }
-
-if(document.readyState === 'loading'){
-  document.addEventListener('DOMContentLoaded', initDashboard);
-} else {
-  initDashboard();
+function closeLinkPopup(){
+  document.getElementById('link-popup').classList.remove('open');
+  _editingKey = null;
 }
-
-// Normal reloads, back/forward cache restores, SharePoint embeds, and same-browser tabs
-// can leave the page alive without rerunning the full script. Re-read storage whenever
-// the page is shown again so pinned/recent cards appear without a hard refresh.
-window.addEventListener('pageshow', refreshSavedCards);
-window.addEventListener('focus', refreshSavedCards);
-window.addEventListener('storage', refreshSavedCards);
+function saveItemLink(){
+  if(!_editingKey) return;
+  const val = document.getElementById('link-popup-input').value.trim();
+  if(val) customLinks[_editingKey] = val;
+  else delete customLinks[_editingKey];
+  saveCustomLinks();
+  closeLinkPopup();
+  // re-render the modal body if open
+  if(activeIdx !== null){
+    const e = EVENTS[activeIdx];
+    document.getElementById('m-body').innerHTML = e.body();
+  }
+}
+function clearItemLink(){
+  if(!_editingKey) return;
+  delete customLinks[_editingKey];
+  saveCustomLinks();
+  closeLinkPopup();
+  if(activeIdx !== null){
+    const e = EVENTS[activeIdx];
+    document.getElementById('m-body').innerHTML = e.body();
+  }
+}
+// Close popup when clicking outside
+document.addEventListener('click', function(e){
+  const popup = document.getElementById('link-popup');
+  if(popup && popup.classList.contains('open') && !popup.contains(e.target) && !e.target.classList.contains('link-edit-btn'))
+    closeLinkPopup();
+});
+loadCustomLinks();
+loadStorage();
+buildChips();
+showHome();
 </script>
 </body>
 </html>
