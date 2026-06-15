@@ -57,6 +57,8 @@ body{font-family:system-ui,sans-serif;background:#f9f9f9;color:#111}
 .ctx-links{display:none;gap:6px;flex-wrap:wrap;margin-top:8px}
 .ctx-link-btn{font-size:12px;padding:4px 10px;border-radius:14px;background:#e6f1fb;color:#185fa5;border:0.5px solid #b5d4f4;text-decoration:none;display:inline-flex;align-items:center;gap:4px}
 .ctx-link-btn:hover{background:#d0e6f8}
+.ob-link-chip{font-size:11px;background:#f0f4ff;color:#3a5a9a;border-radius:4px;padding:2px 6px;font-family:monospace;text-decoration:none;display:inline-block;border:0.5px solid #c5d4f0}
+.ob-link-chip:hover{background:#e0ebff}
 /* link editor */
 .ob-item-wrap{position:relative;display:flex;align-items:flex-start;gap:0}
 .ob-item-wrap .ob-item{flex:1}
@@ -136,10 +138,13 @@ body{font-family:system-ui,sans-serif;background:#f9f9f9;color:#111}
 </div>
 </div>
 <div class="link-popup" id="link-popup">
-  <div class="link-popup-title">Set link for this item</div>
-  <input type="text" id="link-popup-input" placeholder="https://... (leave blank to remove)">
+  <div class="link-popup-title">Edit link chip</div>
+  <div style="font-size:11px;color:#888;margin-bottom:4px">Label (what shows in the blue chip)</div>
+  <input type="text" id="link-popup-label" placeholder="e.g. Current Quartix.xlsx">
+  <div style="font-size:11px;color:#888;margin-bottom:4px">URL (where it goes)</div>
+  <input type="text" id="link-popup-input" placeholder="https://... (leave blank to remove link)">
   <div class="link-popup-btns">
-    <button class="clear-btn" onclick="clearItemLink()">Remove link</button>
+    <button class="clear-btn" onclick="clearItemLink()">Remove</button>
     <button onclick="closeLinkPopup()">Cancel</button>
     <button class="save-btn" onclick="saveItemLink()">Save</button>
   </div>
@@ -153,7 +158,75 @@ body{font-family:system-ui,sans-serif;background:#f9f9f9;color:#111}
 <div class="mbody" id="m-body"></div>
 </div>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
 <script>
+// ── Microsoft Auth & Live Driver List ──────────────────────
+const MSAL_CFG={auth:{clientId:'fd8d0730-6d5c-4ac6-aa95-bfdb5dfb7385',authority:'https://login.microsoftonline.com/2c6b3d13-b98c-4605-8fcc-d8eed3579136',redirectUri:window.location.href.split('?')[0].split('#')[0]},cache:{cacheLocation:'localStorage',storeAuthStateInCookie:true}};
+const FILE_ID='01GO434OQNT6EVQH2RDRAIQJFE2PCVA4P2';
+const DRIVE_ID='b!C0W6AbLA70CaBrk6u9hU-fC2B-6QZHZEtrtGS_wNp0iHaZgFvWYnQZKhJjFss_W2';
+const SCOPES=['Files.Read','Sites.Read.All'];
+let msalApp;
+try{msalApp=new msal.PublicClientApplication(MSAL_CFG);}catch(e){}
+
+async function getToken(){
+  if(!msalApp)return null;
+  const accs=msalApp.getAllAccounts();
+  if(accs.length){try{const r=await msalApp.acquireTokenSilent({scopes:SCOPES,account:accs[0]});return r.accessToken;}catch(e){}}
+  try{const r=await msalApp.acquireTokenPopup({scopes:SCOPES});return r.accessToken;}catch(e){return null;}
+}
+
+async function fetchLiveDrivers(){
+  const el=document.getElementById('drv-status');
+  const setStatus=t=>{if(el)el.textContent=t;};
+  try{
+    setStatus('Connecting to SharePoint...');
+    const token=await getToken();
+    if(!token){setStatus('');return false;}
+    setStatus('Loading driver list...');
+    const res=await fetch('https://graph.microsoft.com/v1.0/drives/'+DRIVE_ID+'/items/'+FILE_ID+'/content',{headers:{Authorization:'Bearer '+token}});
+    if(!res.ok)throw new Error(res.status);
+    const buf=await res.arrayBuffer();
+    if(typeof XLSX==='undefined'){
+      await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+    }
+    const wb=XLSX.read(buf,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    // Find the LAST "Unit # First Last FMCSA Authority" header — that's the current snapshot
+    let headerIdx=-1;
+    for(let i=rows.length-1;i>=0;i--){
+      const r=rows[i].map(c=>String(c).trim());
+      if(r.includes('Unit #')&&r.includes('First')&&r.includes('Last')&&r.includes('FMCSA Authority')){headerIdx=i;break;}
+    }
+    if(headerIdx<0)throw new Error('header not found');
+    const hdr=rows[headerIdx].map(c=>String(c).trim());
+    const ui=hdr.indexOf('Unit #'),fi=hdr.indexOf('First'),li=hdr.indexOf('Last'),ai=hdr.indexOf('FMCSA Authority');
+    const fresh=[];
+    for(let i=headerIdx+1;i<rows.length;i++){
+      const r=rows[i];
+      let unit=String(r[ui]||'').trim(),first=String(r[fi]||'').trim(),last=String(r[li]||'').trim(),auth=String(r[ai]||'').trim();
+      if(!unit||!first||!last||!/^\d+$/.test(unit))continue;
+      if(first.startsWith('Was ')||last.startsWith('Was '))continue;
+      const cf=first.replace(/^(Temp |Shop )/i,'').trim();
+      const dn=last+', '+cf;
+      if(fresh.some(d=>d.n===dn&&d.t===unit))continue;
+      fresh.push({n:dn,f:cf,l:last,a:auth,t:unit,folder:last+', '+cf});
+    }
+    if(fresh.length<5)throw new Error('too few: '+fresh.length);
+    fresh.sort((a,b)=>a.n.localeCompare(b.n));
+    DR.length=0;fresh.forEach(d=>DR.push(d));
+    setStatus('✓ '+DR.length+' drivers (live)');
+    setTimeout(()=>setStatus(''),4000);
+    return true;
+  }catch(e){
+    console.warn('Live drivers failed:',e);
+    setStatus('');
+    return false;
+  }
+}
+</script>
+<script>
+// Fallback static list — used if SharePoint unavailable
 const DR=[
   {n:"Acosta Luna, Adan",f:"Adan",l:"Acosta Luna",a:"Moon Transportation LLC",t:"759",folder:"Acosta Luna, Adan"},
   {n:"Alcala, Ernesto",f:"Ernesto",l:"Alcala",a:"Ernie's Logistics LLC",t:"841",folder:"Alcala, Ernesto"},
@@ -162,9 +235,9 @@ const DR=[
   {n:"Britton, Phillip",f:"Phillip",l:"Britton",a:"Joel Lamb Transport LLC",t:"793",folder:"Britton, Phillip"},
   {n:"Brown, Todd",f:"Todd",l:"Brown",a:"Popa Toad Trucking LLC",t:"749",folder:"Brown, Todd"},
   {n:"Bueno, Luis",f:"Luis",l:"Bueno",a:"MAG LLC",t:"865",folder:"Bueno, Luis"},
-  {n:"Burleigh, Lloyd",f:"Lloyd",l:"Burleigh",a:"Bannon Trucking LLC",t:"859",folder:"Burleigh, Lloyd"},
   {n:"Burrow, James",f:"James",l:"Burrow",a:"Tex-Mex Express LLC",t:"875",folder:"Burrow, James"},
-  {n:"Cameron, Charles",f:"Charles",l:"Cameron",a:"Pug Trucking LLC",t:"803",folder:"Cameron, Charles"},
+  {n:"Cameron, Charles",f:"Charles",l:"Cameron",a:"Pug Trucking LLC",t:"873",folder:"Cameron, Charles"},
+  {n:"Cardenas, Emanuel",f:"Emanuel",l:"Cardenas",a:"Joel Lamb Transport LLC",t:"763",folder:"Cardenas, Emanuel"},
   {n:"Cardenas, Efrain",f:"Efrain",l:"Cardenas",a:"Wallflower Express LLC",t:"745",folder:"Cardenas, Efrain"},
   {n:"Carver, Leroy",f:"Leroy",l:"Carver",a:"GLC Trucking LLC",t:"725",folder:"Carver, Leroy"},
   {n:"Chavez-Hernandez, Gustavo",f:"Gustavo",l:"Chavez-Hernandez",a:"King Gus Transportation LLC",t:"715",folder:"Chavez-Hernandez, Gustavo"},
@@ -173,40 +246,38 @@ const DR=[
   {n:"Da Silva Filho, Edgard",f:"Edgard",l:"Da Silva Filho",a:"Eddie Haul Express LLC",t:"871",folder:"Da Silva Filho, Edgard"},
   {n:"Danaila, Neculai",f:"Neculai",l:"Danaila",a:"Nova Transport LLC",t:"829",folder:"Danaila, Neculai"},
   {n:"DeForest, Scott",f:"Scott",l:"DeForest",a:"Ace Express LLC",t:"821",folder:"DeForest, Scott"},
-  {n:"Edgington, Mark",f:"Mark",l:"Edgington",a:"R&M GAF Trucking LLC",t:"761",folder:"Edgington, Mark"},
-  {n:"Garland, Sean",f:"Sean",l:"Garland",a:"S&K Garland Express LLC",t:"851",folder:"Garland, Sean"},
+  {n:"Garland, Sean",f:"Sean",l:"Garland",a:"S&K Garland Express LLC",t:"831",folder:"Garland, Sean"},
   {n:"Garlington, Leslie",f:"Leslie",l:"Garlington",a:"Buck's Trucking LLC",t:"855",folder:"Garlington, Leslie"},
-  {n:"Gonzalez, Fernando",f:"Fernando",l:"Gonzalez",a:"FCG Logistics LLC",t:"825",folder:"Gonzalez, Fernando"},
+  {n:"Gonzalez, Fernando",f:"Fernando",l:"Gonzalez",a:"FCG Logistics LLC",t:"877",folder:"Gonzalez, Fernando"},
   {n:"Grishchuk, Grigoriy",f:"Grigoriy",l:"Grishchuk",a:"Bannon Trucking LLC",t:"683",folder:"Grishchuk, Grigoriy"},
   {n:"Grishchuk, Pavel",f:"Pavel",l:"Grishchuk",a:"Bannon Trucking LLC",t:"857",folder:"Grishchuk, Pavel"},
   {n:"Heinrich, Victor",f:"Victor",l:"Heinrich",a:"Circle H Trucking LLC",t:"847",folder:"Heinrich, Victor"},
   {n:"Henson, Lois",f:"Lois",l:"Henson",a:"Shortstack Logistics LLC",t:"863",folder:"Henson, Lois"},
   {n:"Hogenkamp, James",f:"James",l:"Hogenkamp",a:"JH Hogen Trucking LLC",t:"751",folder:"Hogenkamp, James"},
   {n:"Huerta, Patrick",f:"Patrick",l:"Huerta",a:"Blue Diamond Logistics, LLC",t:"773",folder:"Huerta, Patrick"},
-  {n:"Jennings, John",f:"John",l:"Jennings",a:"Joel Lamb Transport LLC",t:"831",folder:"Jennings, John"},
   {n:"Karpekin, David",f:"David",l:"Karpekin",a:"Bannon Trucking LLC",t:"813",folder:"Karpekin, David"},
   {n:"Kilgore, Jacob",f:"Jacob",l:"Kilgore",a:"Ultimate Innovations LLC",t:"861",folder:"Kilgore, Jacob"},
-  {n:"King, James",f:"James",l:"King",a:"Abundant Transport LLC",t:"811",folder:"King, James"},
-  {n:"Kyle, Janette",f:"Janette",l:"Kyle",a:"Pug Trucking LLC",t:"785",folder:"Kyle, Janette"},
-  {n:"Lamb, Joel",f:"Joel",l:"Lamb",a:"Joel Lamb Transport LLC",t:"873",folder:"Lamb, Joel"},
+  {n:"King, James",f:"James",l:"King",a:"Abundant Transport LLC",t:"859",folder:"King, James"},
+  {n:"Kyle, Janette",f:"Janette",l:"Kyle",a:"Pug Trucking LLC",t:"803",folder:"Kyle, Janette"},
+  {n:"Lamb, Joel",f:"Joel",l:"Lamb",a:"Joel Lamb Transport LLC",t:"843",folder:"Lamb, Joel"},
   {n:"Lisby, Jeremiah",f:"Jeremiah",l:"Lisby",a:"Shortstack Logistics LLC",t:"817",folder:"Lisby, Jeremiah"},
   {n:"Lopez, Felipe",f:"Felipe",l:"Lopez",a:"Carry Your Cross Trucking LLC",t:"765",folder:"Lopez, Felipe"},
   {n:"McGowan, James",f:"James",l:"McGowan",a:"Godric Trucking LLC",t:"699",folder:"McGowan, James"},
   {n:"Means, Johnny",f:"Johnny",l:"Means",a:"Klassic Knights Logistics LLC",t:"867",folder:"Means, Johnny"},
   {n:"Montoya, Michael",f:"Michael",l:"Montoya",a:"MC Monty Transport LLC",t:"667",folder:"Montoya, Michael"},
-  {n:"Moses, Peter",f:"Peter",l:"Moses",a:"Load 2 Go, LLC",t:"791",folder:"Moses, Peter"},
+  {n:"Moses, Peter",f:"Peter",l:"Moses",a:"Load 2 Go, LLC",t:"809",folder:"Moses, Peter"},
   {n:"Perez, Ricardo",f:"Ricardo",l:"Perez",a:"RP Trucking LLC",t:"741",folder:"Perez, Ricardo"},
   {n:"Reyes, Eleazar",f:"Eleazar",l:"Reyes",a:"Tres Hijas Transportation LLC",t:"689",folder:"Reyes, Eleazar"},
   {n:"Robertson, Lauren",f:"Lauren",l:"Robertson",a:"N and P International LLC",t:"837",folder:"Robertson, Lauren"},
   {n:"Robertson, Leona",f:"Leona",l:"Robertson",a:"N and P International LLC",t:"837",folder:"Robertson, Leona"},
   {n:"Sanchez, Danny",f:"Danny",l:"Sanchez",a:"Dan's 808 Express LLC",t:"777",folder:"Sanchez, Danny"},
-  {n:"Scott, Tommie",f:"Tommie",l:"Scott",a:"S.C.Y. Trucking LLC",t:"739",folder:"Scott, Tommie"},
-  {n:"Ston, Karl",f:"Karl",l:"Ston",a:"K&R Express LLC",t:"843",folder:"Ston, Karl"},
   {n:"Tadic, Goran",f:"Goran",l:"Tadic",a:"Gemini Logistics LLC",t:"827",folder:"Tadic, Goran"},
   {n:"Thomas, Torry",f:"Torry",l:"Thomas",a:"Torry Thomas Trucking LLC",t:"797",folder:"Thomas, Torry"},
-  {n:"Tracy, Ed",f:"Ed",l:"Tracy",a:"Flying Eagle Transport LLC",t:"831",folder:"Tracy, Ed"},
+  {n:"Torres, Ricardo",f:"Ricardo",l:"Torres",a:"Joel Lamb Transport LLC",t:"795",folder:"Torres, Ricardo"},
+  {n:"Tracy, Ed",f:"Ed",l:"Tracy",a:"Flying Eagle Transport LLC",t:"807",folder:"Tracy, Ed"},
   {n:"Wallman, Jason",f:"Jason",l:"Wallman",a:"Cthulhu Actual Transport LLC",t:"849",folder:"Wallman, Jason"},
   {n:"Werner, Paul",f:"Paul",l:"Werner",a:"S.C.Y. Trucking LLC",t:"823",folder:"Werner, Paul"},
+  {n:"Witherspoon, Malcolm",f:"Malcolm",l:"Witherspoon",a:"Joel Lamb Transport LLC",t:"791",folder:"Witherspoon, Malcolm"},
   {n:"Young, Samuel",f:"Samuel",l:"Young",a:"S.C.Y. Trucking LLC",t:"869",folder:"Young, Samuel"},
 ];
 
@@ -299,21 +370,29 @@ function fl(path,url){return `<a href="${url}" target="_blank" class="filepath" 
 function ob(label,st,items){
   const rows=items.map(raw=>{
     const filled=fc(raw);
-    // extract plain text key (strip any fl() wrapper to get label)
+    // extract key for custom link lookup
     const keyMatch=raw.match(/fl\('([^']+)'/);
     const key=(keyMatch?keyMatch[1]:raw).replace(/\[\w+\]/g,'').trim().substring(0,80);
-    const customUrl=customLinks[key];
-    // determine base url (from fl() call or custom)
+    const custom=customLinks[key]; // {label,url} or null
+    // parse built-in fl() link
     const flMatch=filled.match(/^<a href="([^"]+)"[^>]*>(.+)<\/a>$/);
     const baseUrl=flMatch?flMatch[1]:'';
-    const displayUrl=customUrl||baseUrl;
-    const displayText=flMatch?flMatch[2]:filled;
-    const itemHtml=displayUrl
-      ? `<a href="${displayUrl}" target="_blank" style="color:inherit;text-decoration:underline;text-decoration-color:#ccc">${displayText}</a>`
-      : displayText;
-    const btnTitle=customUrl?'Edit link (custom)':baseUrl?'Edit link':'Add link';
-    const btnStyle=customUrl?'background:#fef3c7;border-color:#e0a800;color:#7a5200;opacity:1':baseUrl?'':'';
-    return `<div class="ob-item-wrap"><div class="ob-item" style="color:${st.tc}">${itemHtml}</div><button class="link-edit-btn" style="${btnStyle}" onclick="openLinkEditor('${key.replace(/'/g,"\'")}','${displayUrl}',this)" title="${btnTitle}">✎ link</button></div>`;
+    const baseLabel=flMatch?flMatch[2]:filled;
+    // resolve final label and url
+    const finalUrl=custom?custom.url:baseUrl;
+    const finalLabel=custom?custom.label:baseLabel;
+    const hasLink=!!finalUrl;
+    const isCustom=!!custom;
+    // render: if has link, show as blue chip; otherwise plain text
+    const itemHtml=hasLink
+      ? `<a href="${finalUrl}" target="_blank" class="ob-link-chip">${finalLabel}</a>`
+      : filled;
+    const btnTitle=isCustom?'Edit link (custom)':hasLink?'Edit link':'Add link';
+    const btnStyle=isCustom?'background:#fef3c7;border-color:#e0a800;color:#7a5200;opacity:1':'';
+    const safeKey=key.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    const safeUrl=finalUrl.replace(/'/g,"\\'");
+    const safeLabel=finalLabel.replace(/'/g,"\\'");
+    return `<div class="ob-item-wrap"><div class="ob-item" style="color:${st.tc}">${itemHtml}</div><button class="link-edit-btn" style="${btnStyle}" onclick="openLinkEditor('${safeKey}','${safeUrl}','${safeLabel}',this)" title="${btnTitle}">✎</button></div>`;
   }).join('');
   return `<div class="ob" style="border:1px solid ${st.bd};border-left:4px solid ${st.bd}"><div class="ob-lbl" style="background:${st.bg};color:${st.lc};border-bottom:1px solid ${st.bd}">${label}</div><div class="ob-items" style="background:${st.bg}">${rows}</div></div>`;
 }
@@ -331,7 +410,7 @@ function ctxForm(fields){
     nw:`<div class="ctx-group"><label>New truck #</label><input type="text" id="ctx-new" placeholder="e.g. 835" value="${CTX.nw}"></div>`,
   };
   const rows=fields.map(row=>`<div class="ctx-row">${row.map(f=>map[f]).join('')}</div>`).join('');
-  return `<div class="ctx-form"><div class="ctx-title">Driver context — auto-fills checklist below</div>${rows}<button class="ctx-btn" onclick="applyCtx()">Apply to checklist &#8595;</button><div id="ctx-links" class="ctx-links"></div><div class="ctx-hint">List from <a href="https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1" target="_blank" style="color:#185fa5">Current Trucks &amp; Drivers.xlsx</a>. Select a driver to auto-fill and open their folders.</div></div>`;
+  return `<div class="ctx-form"><div class="ctx-title">Driver context — auto-fills checklist below</div>${rows}<button class="ctx-btn" onclick="applyCtx()">Apply to checklist &#8595;</button><div id="ctx-links" class="ctx-links"></div><div class="ctx-hint">List from <a href="https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1" target="_blank" style="color:#185fa5">Current Trucks &amp; Drivers.xlsx</a>. <span id="drv-status" style="color:#0F6E56;font-weight:500"></span></div></div>`;
 }
 
 const EVENTS=[
@@ -1427,18 +1506,19 @@ function saveCustomLinks(){
   try{ localStorage.setItem('ul_item_links', JSON.stringify(customLinks)); }catch(e){}
 }
 
-function openLinkEditor(key, currentUrl, btnEl){
+function openLinkEditor(key, currentUrl, currentLabel, btnEl){
   _editingKey = key;
   const popup = document.getElementById('link-popup');
-  const input = document.getElementById('link-popup-input');
-  input.value = customLinks[key] || currentUrl || '';
-  // position near the button
+  const urlInput = document.getElementById('link-popup-input');
+  const lblInput = document.getElementById('link-popup-label');
+  const custom = customLinks[key];
+  urlInput.value = custom ? custom.url : (currentUrl||'');
+  lblInput.value = custom ? custom.label : (currentLabel||'');
   const rect = btnEl.getBoundingClientRect();
-  popup.style.top  = Math.min(rect.bottom + 6, window.innerHeight - 180) + 'px';
+  popup.style.top  = Math.min(rect.bottom + 6, window.innerHeight - 220) + 'px';
   popup.style.left = Math.max(8, Math.min(rect.left - 160, window.innerWidth - 350)) + 'px';
   popup.classList.add('open');
-  input.focus();
-  input.select();
+  urlInput.focus();
 }
 function closeLinkPopup(){
   document.getElementById('link-popup').classList.remove('open');
@@ -1446,12 +1526,12 @@ function closeLinkPopup(){
 }
 function saveItemLink(){
   if(!_editingKey) return;
-  const val = document.getElementById('link-popup-input').value.trim();
-  if(val) customLinks[_editingKey] = val;
+  const url = document.getElementById('link-popup-input').value.trim();
+  const lbl = document.getElementById('link-popup-label').value.trim();
+  if(url) customLinks[_editingKey] = {url, label: lbl||_editingKey};
   else delete customLinks[_editingKey];
   saveCustomLinks();
   closeLinkPopup();
-  // re-render the modal body if open
   if(activeIdx !== null){
     const e = EVENTS[activeIdx];
     document.getElementById('m-body').innerHTML = e.body();
@@ -1467,6 +1547,10 @@ function clearItemLink(){
     document.getElementById('m-body').innerHTML = e.body();
   }
 }
+// handle Enter key in link popup
+document.addEventListener('keydown', function(e){
+  if(e.key==='Enter' && document.getElementById('link-popup').classList.contains('open')) saveItemLink();
+});
 // Close popup when clicking outside
 document.addEventListener('click', function(e){
   const popup = document.getElementById('link-popup');
@@ -1477,6 +1561,8 @@ loadCustomLinks();
 loadStorage();
 buildChips();
 showHome();
+// Fetch live driver list from SharePoint on load
+if(typeof fetchLiveDrivers === 'function') fetchLiveDrivers();
 </script>
 </body>
 </html>
