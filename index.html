@@ -9,19 +9,47 @@
 body{font-family:system-ui,sans-serif;background:#f9f9f9;color:#111}
 .dash{padding:1.25rem 1.5rem;max-width:1100px;margin:0 auto}
 .dash h2{font-size:18px;font-weight:500;margin-bottom:3px}
-.dash>p{font-size:13px;color:#666;margin-bottom:14px}
+.dash>p{font-size:13px;color:#666;margin-bottom:10px}
 .sp-note{font-size:11px;background:#e6f1fb;color:#185fa5;border:0.5px solid #b5d4f4;border-radius:6px;padding:5px 10px;margin-bottom:12px;display:inline-block}
+
+/* ── Tabs ── */
+.view-tabs{display:flex;gap:0;border-bottom:1px solid #e0e0e0;margin-bottom:16px}
+.view-tab{padding:8px 18px;font-size:13px;font-weight:500;cursor:pointer;color:#888;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all 0.15s;user-select:none}
+.view-tab.active{color:#185fa5;border-bottom-color:#3a85d8}
+.view-tab:hover:not(.active){color:#555}
+
+/* ── Home screen ── */
+.home-section{margin-bottom:24px}
+.home-section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.home-section-title{font-size:13px;font-weight:600;color:#444;text-transform:uppercase;letter-spacing:0.5px}
+.home-empty{font-size:13px;color:#bbb;padding:18px 0;font-style:italic}
+.home-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
+
+/* ── Cards ── */
+.card-wrap{position:relative}
+.card{background:#fff;border:0.5px solid #e0e0e0;border-radius:12px;padding:12px 14px;cursor:pointer;transition:border-color 0.15s,transform 0.1s;min-height:68px;display:flex;flex-direction:column;gap:4px}
+.card:hover{border-color:#aaa;transform:translateY(-1px)}
+.card.pinned-card{border-color:#3a85d8}
+.card.recent-card{border-left:3px solid #e0a800}
+.card .sec{font-size:10px;font-weight:500;padding:2px 7px;border-radius:10px;align-self:flex-start}
+.card .title{font-size:13px;font-weight:500;color:#111;line-height:1.3}
+.card .recent-time{font-size:10px;color:#bbb;margin-top:2px}
+.pin-btn{position:absolute;top:7px;right:7px;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,0.95);border:0.5px solid #ddd;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;color:#ccc;opacity:0;transition:all 0.15s;z-index:2;line-height:1}
+.card-wrap:hover .pin-btn{opacity:1}
+.pin-btn.pinned{opacity:1;color:#3a85d8;border-color:#3a85d8;background:#e6f1fb}
+.browse-add-btn{display:flex;align-items:center;justify-content:center;border:1.5px dashed #e0e0e0;border-radius:12px;min-height:68px;cursor:pointer;color:#bbb;font-size:12px;transition:border-color 0.15s}
+.browse-add-btn:hover{border-color:#aaa;color:#888}
+
+/* ── Browse ── */
 .search-row{display:flex;gap:8px;margin-bottom:1rem}
 .search-row input{flex:1;padding:8px 12px;border:0.5px solid #ccc;border-radius:8px;background:#fff;color:#111;font-size:14px}
 .filter-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:1rem}
 .chip{padding:4px 12px;border-radius:20px;font-size:12px;cursor:pointer;border:0.5px solid #ddd;background:#f5f5f5;color:#666;transition:all 0.15s;user-select:none}
 .chip.active{border-color:#3a85d8;background:#e6f1fb;color:#185fa5}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
-.card{background:#fff;border:0.5px solid #e0e0e0;border-radius:12px;padding:12px 14px;cursor:pointer;transition:border-color 0.15s,transform 0.1s;min-height:68px;display:flex;flex-direction:column;gap:4px}
-.card:hover{border-color:#aaa;transform:translateY(-1px)}
-.card .sec{font-size:10px;font-weight:500;padding:2px 7px;border-radius:10px;align-self:flex-start}
-.card .title{font-size:13px;font-weight:500;color:#111;line-height:1.3}
 .no-results{color:#888;font-size:14px;padding:2rem 0;text-align:center}
+
+/* ── Modal ── */
 .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.52);z-index:9999;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto}
 .modal-bg.open{display:flex}
 .modal{background:#fff;border-radius:12px;border:0.5px solid #ddd;width:100%;max-width:660px;overflow:hidden;margin:auto}
@@ -32,19 +60,30 @@ body{font-family:system-ui,sans-serif;background:#f9f9f9;color:#111}
 .mclose{background:#f0f0f0;border:0.5px solid #ddd;border-radius:6px;width:30px;height:30px;font-size:16px;cursor:pointer;color:#555;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .mclose:hover{background:#ddd}
 .mbody{padding:16px 20px;max-height:65vh;overflow-y:auto}
+
+/* ── Content ── */
 .ob{border-radius:8px;margin-bottom:10px;overflow:hidden}
 .ob-lbl{font-size:11px;font-weight:500;padding:5px 12px;letter-spacing:0.3px}
-.ob-items{padding:6px 12px 8px}
-.ob-item{font-size:13px;line-height:1.5;padding:2px 0 2px 14px;position:relative}
-.ob-item::before{content:"•";position:absolute;left:0}
-.note{border-left:3px solid #E0A800;border-radius:0 6px 6px 0;padding:7px 12px;margin:8px 0 10px;font-size:12px;line-height:1.5;background:#FFF9E6;color:#7A5200}
-.step{display:flex;gap:10px;margin-bottom:8px;align-items:flex-start}
+.ob-items{padding:4px 12px 8px}
+.ob-row{display:flex;align-items:flex-start;gap:6px;padding:3px 0}
+.ob-row input[type=checkbox]{margin-top:3px;flex-shrink:0;cursor:pointer;accent-color:#3a85d8;width:14px;height:14px}
+.ob-row-text{font-size:13px;line-height:1.5;flex:1;color:inherit}
+.ob-row-text.done{text-decoration:line-through;color:#aaa}
+.ob-link-chip{font-size:11px;background:#f0f4ff;color:#3a5a9a;border-radius:4px;padding:2px 6px;font-family:monospace;text-decoration:none;display:inline;border:0.5px solid #c5d4f0;white-space:nowrap;margin-left:4px}
+.ob-link-chip:hover{background:#e0ebff}
+.edit-btn{opacity:0.2;font-size:10px;padding:1px 5px;border-radius:3px;cursor:pointer;border:0.5px solid #ccc;background:#f5f5f5;color:#888;line-height:1.5;white-space:nowrap;flex-shrink:0;margin-top:2px;transition:opacity 0.15s}
+.ob-row:hover .edit-btn,.step-wrap:hover .edit-btn{opacity:1}
+.edit-btn:hover{background:#e6f1fb;color:#185fa5;border-color:#b5d4f4}
+.edit-btn.modified{background:#fef3c7;border-color:#e0a800;color:#7a5200;opacity:1!important}
+.step-wrap{display:flex;gap:10px;margin-bottom:8px;align-items:flex-start}
 .step-num{width:22px;height:22px;border-radius:50%;background:#e6f1fb;color:#185fa5;font-size:11px;font-weight:500;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
-.step-text{font-size:13px;color:#222;line-height:1.5}
+.step-text{font-size:13px;color:#222;line-height:1.5;flex:1}
+.note{border-left:3px solid #E0A800;border-radius:0 6px 6px 0;padding:7px 12px;margin:8px 0 10px;font-size:12px;line-height:1.5;background:#FFF9E6;color:#7A5200}
 .links-row{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
 .link-pill{font-size:12px;padding:4px 10px;border-radius:20px;background:#e6f1fb;color:#185fa5;border:0.5px solid #b5d4f4;text-decoration:none}
 .subh{font-size:11px;font-weight:500;color:#666;margin:10px 0 5px;text-transform:uppercase;letter-spacing:0.4px}
-.filepath{font-size:11px;background:#f0f4ff;color:#3a5a9a;border-radius:4px;padding:2px 6px;font-family:monospace;margin-left:4px}
+
+/* ── Context form ── */
 .ctx-form{background:#f7f7f7;border:0.5px solid #ddd;border-radius:8px;padding:12px 14px;margin-bottom:14px}
 .ctx-title{font-size:11px;font-weight:500;color:#555;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.4px}
 .ctx-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
@@ -53,188 +92,134 @@ body{font-family:system-ui,sans-serif;background:#f9f9f9;color:#111}
 .ctx-group select,.ctx-group input{width:100%;font-size:13px;padding:5px 8px;border:0.5px solid #ccc;border-radius:6px;background:#fff;color:#111;height:30px}
 .ctx-btn{font-size:12px;padding:5px 14px;border-radius:6px;cursor:pointer;border:0.5px solid #3a85d8;background:#e6f1fb;color:#185fa5;font-weight:500;margin-top:4px}
 .ctx-btn:hover{background:#d0e6f8}
-.ctx-hint{font-size:11px;color:#888;margin-top:6px;font-style:italic}
 .ctx-links{display:none;gap:6px;flex-wrap:wrap;margin-top:8px}
 .ctx-link-btn{font-size:12px;padding:4px 10px;border-radius:14px;background:#e6f1fb;color:#185fa5;border:0.5px solid #b5d4f4;text-decoration:none;display:inline-flex;align-items:center;gap:4px}
-.ctx-link-btn:hover{background:#d0e6f8}
-.ob-link-chip{font-size:11px;background:#f0f4ff;color:#3a5a9a;border-radius:4px;padding:2px 6px;font-family:monospace;text-decoration:none;display:inline-block;border:0.5px solid #c5d4f0;white-space:nowrap}
-.ob-link-chip:hover{background:#e0ebff}
-.ob-item-wrap{display:flex;align-items:flex-start;gap:6px;padding:3px 0}
-.ob-item-wrap input[type=checkbox]{margin-top:3px;flex-shrink:0;cursor:pointer;accent-color:#3a85d8;width:14px;height:14px}
-.ob-item-text{font-size:13px;line-height:1.5;flex:1}
-.ob-item-text.done{text-decoration:line-through;color:#aaa}
-.ob-item-actions{display:flex;align-items:center;gap:4px;flex-shrink:0;opacity:0;transition:opacity 0.1s}
-.ob-item-wrap:hover .ob-item-actions{opacity:1}
-.link-edit-btn{font-size:10px;padding:1px 5px;border-radius:3px;cursor:pointer;border:0.5px solid #ccc;background:#f5f5f5;color:#888;line-height:1.5;white-space:nowrap}
-.link-edit-btn:hover{background:#e6f1fb;color:#185fa5;border-color:#b5d4f4}
-.link-edit-btn.has-custom{background:#fef3c7;border-color:#e0a800;color:#7a5200;opacity:1!important}
-.step-wrap{display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;position:relative}
-.step-wrap:hover .step-edit-btn{opacity:1}
-.step-edit-btn{opacity:0.25;flex-shrink:0;font-size:10px;padding:1px 5px;border-radius:3px;cursor:pointer;border:0.5px solid #ccc;background:#f5f5f5;color:#888;line-height:1.5;transition:opacity 0.15s;margin-top:3px;white-space:nowrap}
-.step-edit-btn:hover{background:#e6f1fb;color:#185fa5;border-color:#b5d4f4}
-.step-edit-btn.has-edit{background:#fef3c7;border-color:#e0a800;color:#7a5200;opacity:1!important}
-.step-text.edited{color:#111}
-/* link editor */
-.ob-item-wrap{position:relative;display:flex;align-items:flex-start;gap:0}
-.ob-item-wrap .ob-item{flex:1}
-.link-edit-btn{opacity:0.2;flex-shrink:0;font-size:10px;padding:1px 4px;margin-left:4px;margin-top:2px;border-radius:3px;cursor:pointer;border:0.5px solid #ccc;background:#f5f5f5;color:#888;line-height:1.4;transition:opacity 0.15s;white-space:nowrap;text-decoration:none}
-.ob-item-wrap:hover .link-edit-btn{opacity:1}
-.link-edit-btn:hover{background:#e6f1fb;color:#185fa5;border-color:#b5d4f4}
-.link-popup{display:none;position:fixed;z-index:99999;background:#fff;border:0.5px solid #ddd;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.15);padding:12px 14px;width:340px}
-.link-popup.open{display:block}
-.link-popup-title{font-size:12px;font-weight:500;color:#111;margin-bottom:8px}
-.link-popup input{width:100%;font-size:12px;padding:5px 8px;border:0.5px solid #ccc;border-radius:5px;margin-bottom:8px}
-.link-popup-btns{display:flex;gap:6px}
-.link-popup-btns button{flex:1;font-size:12px;padding:4px 8px;border-radius:5px;cursor:pointer;border:0.5px solid #ccc;background:#f5f5f5}
-.link-popup-btns .save-btn{background:#e6f1fb;color:#185fa5;border-color:#b5d4f4}
-.link-popup-btns .clear-btn{color:#c00;border-color:#fca5a5;background:#fef2f2}
-/* ── HOME SCREEN ── */
-#home-view{display:block}
-#browse-view{display:none}
-.view-tabs{display:flex;gap:0;margin-bottom:16px;border-bottom:1px solid #e0e0e0}
-.view-tab{padding:8px 18px;font-size:13px;font-weight:500;cursor:pointer;color:#888;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all 0.15s;user-select:none}
-.view-tab.active{color:#185fa5;border-bottom-color:#3a85d8}
-.view-tab:hover:not(.active){color:#555}
-.home-section{margin-bottom:24px}
-.home-section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-.home-section-title{font-size:13px;font-weight:600;color:#444;text-transform:uppercase;letter-spacing:0.5px}
-.home-section-hint{font-size:11px;color:#aaa;font-style:italic}
-.home-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
-.home-empty{font-size:13px;color:#bbb;padding:18px 0;font-style:italic}
-.card-wrap{position:relative}
-.pin-btn{position:absolute;top:7px;right:7px;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,0.9);border:0.5px solid #ddd;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;color:#ccc;transition:all 0.15s;z-index:2;opacity:0;line-height:1}
-.card-wrap:hover .pin-btn{opacity:1}
-.pin-btn.pinned{opacity:1;color:#3a85d8;border-color:#3a85d8;background:#e6f1fb}
-.pin-btn:hover{color:#3a85d8;border-color:#3a85d8}
-.card.pinned-card{border-color:#3a85d8}
-.card.recent-card{border-left:3px solid #e0a800}
-.recent-time{font-size:10px;color:#bbb;margin-top:2px}
+.ctx-hint{font-size:11px;color:#888;margin-top:6px;font-style:italic}
+.ctx-status{color:#0F6E56;font-weight:500}
+
+/* ── Edit popup ── */
+.popup{display:none;position:fixed;z-index:99999;background:#fff;border:0.5px solid #ddd;border-radius:10px;box-shadow:0 4px 24px rgba(0,0,0,0.18);padding:14px 16px;width:360px}
+.popup.open{display:block}
+.popup h3{font-size:13px;font-weight:600;color:#111;margin-bottom:10px}
+.popup label{font-size:11px;color:#666;display:block;margin-bottom:3px;margin-top:8px}
+.popup textarea,.popup input[type=text]{width:100%;font-size:13px;padding:6px 8px;border:0.5px solid #ccc;border-radius:6px;font-family:system-ui;color:#111}
+.popup textarea{resize:vertical;min-height:60px}
+.popup-btns{display:flex;gap:6px;margin-top:12px}
+.popup-btns button{flex:1;font-size:12px;padding:5px 8px;border-radius:6px;cursor:pointer;border:0.5px solid #ccc;background:#f5f5f5;color:#333}
+.popup-btns .btn-save{background:#e6f1fb;color:#185fa5;border-color:#b5d4f4;font-weight:500}
+.popup-btns .btn-reset{color:#c00;border-color:#fca5a5;background:#fef2f2}
 </style>
 </head>
 <body>
 <div class="dash">
-<h2>Ultimate Logistics — Procedures Dashboard</h2>
-<p>Click any event for step-by-step instructions. Driver event cards let you select a driver to auto-fill the checklist.</p>
-<div class="sp-note">&#128279; All file paths refer to <strong>https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC</strong></div>
+  <h2>Ultimate Logistics — Procedures Dashboard</h2>
+  <p>Click any card for step-by-step instructions. Driver event cards auto-fill checklists with driver info.</p>
+  <div class="sp-note">&#128279; All file paths refer to <strong>https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC</strong></div>
 
-<div class="view-tabs">
-  <span class="view-tab active" id="tab-home" onclick="showHome()">&#127968; Home</span>
-  <span class="view-tab" id="tab-browse" onclick="showBrowse()">&#128196; All Procedures</span>
+  <div class="view-tabs">
+    <span class="view-tab active" id="tab-home" onclick="showHome()">&#127968; Home</span>
+    <span class="view-tab" id="tab-browse" onclick="showBrowse()">&#128196; All Procedures</span>
+  </div>
+
+  <div id="home-view">
+    <div class="home-section">
+      <div class="home-section-header">
+        <span class="home-section-title">&#128204; Pinned</span>
+        <span style="font-size:11px;color:#aaa;font-style:italic">Hover any card and click &#128204; to pin</span>
+      </div>
+      <div class="home-grid" id="pinned-grid"></div>
+    </div>
+    <div class="home-section">
+      <div class="home-section-header">
+        <span class="home-section-title">&#128336; Recently opened</span>
+        <span id="recents-clear" style="font-size:11px;color:#c00;cursor:pointer;display:none" onclick="clearRecents()">Clear</span>
+      </div>
+      <div class="home-grid" id="recents-grid"></div>
+    </div>
+  </div>
+
+  <div id="browse-view" style="display:none">
+    <div class="search-row"><input type="text" id="search" placeholder="Search... (e.g. CDL, fuel, quartix, permits)" oninput="render()"></div>
+    <div class="filter-row" id="chips"></div>
+    <div class="grid" id="grid"></div>
+    <div class="no-results" id="no-res" style="display:none">No matching procedures found.</div>
+  </div>
 </div>
 
-<!-- HOME VIEW -->
-<div id="home-view">
-  <div class="home-section">
-    <div class="home-section-header">
-      <span class="home-section-title">&#128204; Pinned</span>
-      <span class="home-section-hint">Click the pin icon on any card to pin it here</span>
-    </div>
-    <div class="home-grid" id="pinned-grid">
-      <div class="home-empty" id="pinned-empty">No pinned cards yet — browse All Procedures and click &#128204; to pin your most-used ones.</div>
-    </div>
-  </div>
-  <div class="home-section">
-    <div class="home-section-header">
-      <span class="home-section-title">&#128336; Recently opened</span>
-      <span class="home-section-hint" id="recents-clear-btn" onclick="clearRecents()" style="cursor:pointer;color:#c00;display:none">Clear</span>
-    </div>
-    <div class="home-grid" id="recents-grid">
-      <div class="home-empty" id="recents-empty">No recent cards yet — open a procedure and it will appear here.</div>
-    </div>
-  </div>
-</div>
-
-<!-- BROWSE VIEW -->
-<div id="browse-view">
-  <div class="search-row"><input type="text" id="search" placeholder="Search... (e.g. CDL, fuel, quartix, permits)" oninput="render()"></div>
-  <div class="filter-row" id="chips"></div>
-  <div class="grid" id="grid"></div>
-  <div class="no-results" id="no-res" style="display:none">No matching procedures found.</div>
-</div>
-</div>
-<div class="link-popup" id="link-popup">
-  <div class="link-popup-title" id="link-popup-title">Edit item</div>
-  <div id="link-popup-text-row">
-    <div style="font-size:11px;color:#888;margin-bottom:4px">Item text</div>
-    <textarea id="link-popup-text" placeholder="Step text..." style="width:100%;font-size:12px;padding:5px 8px;border:0.5px solid #ccc;border-radius:5px;margin-bottom:8px;resize:vertical;min-height:54px;font-family:system-ui"></textarea>
-  </div>
-  <div id="link-popup-chip-row">
-    <div style="font-size:11px;color:#888;margin-bottom:4px">Link chip label <span style="color:#bbb">(optional)</span></div>
-    <input type="text" id="link-popup-label" placeholder="e.g. ↗ SharePoint">
-    <div style="font-size:11px;color:#888;margin-bottom:4px">URL <span style="color:#bbb">(leave blank to remove link)</span></div>
-    <input type="text" id="link-popup-input" placeholder="https://...">
-  </div>
-  <div class="link-popup-btns">
-    <button class="clear-btn" id="link-popup-clear-btn" onclick="clearItemEdit()">Reset</button>
-    <button onclick="closeLinkPopup()">Cancel</button>
-    <button class="save-btn" onclick="saveItemEdit()">Save</button>
-  </div>
-</div>
+<!-- Modal -->
 <div class="modal-bg" id="mbg" onclick="if(event.target===this)closeModal()">
-<div class="modal">
-<div class="mhead">
-<div class="mhead-left"><span class="sec-badge" id="m-sec"></span><h2 id="m-title"></h2></div>
-<button class="mclose" onclick="closeModal()">&#x2715;</button>
+  <div class="modal">
+    <div class="mhead">
+      <div class="mhead-left"><span class="sec-badge" id="m-sec"></span><h2 id="m-title"></h2></div>
+      <button class="mclose" onclick="closeModal()">&#x2715;</button>
+    </div>
+    <div class="mbody" id="m-body"></div>
+  </div>
 </div>
-<div class="mbody" id="m-body"></div>
+
+<!-- Edit popup -->
+<div class="popup" id="edit-popup">
+  <h3 id="popup-title">Edit</h3>
+  <div id="popup-text-row">
+    <label>Text</label>
+    <textarea id="popup-text" rows="3"></textarea>
+  </div>
+  <div id="popup-link-row">
+    <label>Link label <span style="color:#bbb;font-weight:normal">(short — shows in blue chip)</span></label>
+    <input type="text" id="popup-link-label" placeholder="e.g. ↗ SharePoint">
+    <label>URL <span style="color:#bbb;font-weight:normal">(leave blank to remove)</span></label>
+    <input type="text" id="popup-link-url" placeholder="https://...">
+  </div>
+  <div class="popup-btns">
+    <button class="btn-reset" onclick="popupReset()">Reset</button>
+    <button onclick="closePopup()">Cancel</button>
+    <button class="btn-save" onclick="popupSave()">Save</button>
+  </div>
 </div>
-</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
 <script>
-// ── Microsoft Auth & Live Driver List ──────────────────────
+// ── MSAL / Live driver fetch ────────────────────────────────
 const MSAL_CFG={auth:{clientId:'2688e58a-1841-4c5b-8630-f92ff88238cc',authority:'https://login.microsoftonline.com/2c6b3d13-b98c-4605-8fcc-d8eed3579136',redirectUri:'https://mh-ultimateidaho.github.io/procedures-dashboard/'},cache:{cacheLocation:'localStorage',storeAuthStateInCookie:true}};
 const FILE_ID='01GO434OQNT6EVQH2RDRAIQJFE2PCVA4P2';
 const DRIVE_ID='b!C0W6AbLA70CaBrk6u9hU-fC2B-6QZHZEtrtGS_wNp0iHaZgFvWYnQZKhJjFss_W2';
 const SCOPES=['Files.Read','Files.ReadWrite','Sites.Read.All'];
 let msalApp;
 try{msalApp=new msal.PublicClientApplication(MSAL_CFG);}catch(e){}
-
-// Handle redirect on return from Microsoft login
-(async()=>{
-  if(msalApp){try{await msalApp.handleRedirectPromise();}catch(e){}}
-})();
+(async function init(){if(msalApp)try{await msalApp.handleRedirectPromise();}catch(e){}}());
 
 async function getToken(){
   if(!msalApp)return null;
   const accs=msalApp.getAllAccounts();
-  if(accs.length){
-    try{const r=await msalApp.acquireTokenSilent({scopes:SCOPES,account:accs[0]});return r.accessToken;}catch(e){}
-  }
-  // Redirect to Microsoft login — page returns here after sign-in
+  if(accs.length){try{const r=await msalApp.acquireTokenSilent({scopes:SCOPES,account:accs[0]});return r.accessToken;}catch(e){}}
   msalApp.loginRedirect({scopes:SCOPES});
   return null;
 }
-
 async function fetchLiveDrivers(){
   const el=document.getElementById('drv-status');
-  const setStatus=t=>{if(el)el.textContent=t;};
+  const set=t=>{if(el)el.textContent=t;};
   try{
-    setStatus('Connecting to SharePoint...');
+    set('Connecting...');
     const token=await getToken();
-    if(!token){setStatus('');return false;}
-    setStatus('Loading driver list...');
+    if(!token){set('');return;}
+    set('Loading drivers...');
     const res=await fetch('https://graph.microsoft.com/v1.0/drives/'+DRIVE_ID+'/items/'+FILE_ID+'/content',{headers:{Authorization:'Bearer '+token}});
     if(!res.ok)throw new Error(res.status);
     const buf=await res.arrayBuffer();
     if(typeof XLSX==='undefined'){
-      await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+      await new Promise((ok,err)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';s.onload=ok;s.onerror=err;document.head.appendChild(s);});
     }
     const wb=XLSX.read(buf,{type:'array'});
     const ws=wb.Sheets[wb.SheetNames[0]];
     const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-    // Find the LAST "Unit # First Last FMCSA Authority" header — that's the current snapshot
-    let headerIdx=-1;
-    for(let i=rows.length-1;i>=0;i--){
-      const r=rows[i].map(c=>String(c).trim());
-      if(r.includes('Unit #')&&r.includes('First')&&r.includes('Last')&&r.includes('FMCSA Authority')){headerIdx=i;break;}
-    }
-    if(headerIdx<0)throw new Error('header not found');
-    const hdr=rows[headerIdx].map(c=>String(c).trim());
+    let hi=-1;
+    for(let i=rows.length-1;i>=0;i--){const r=rows[i].map(c=>String(c).trim());if(r.includes('Unit #')&&r.includes('First')&&r.includes('Last')&&r.includes('FMCSA Authority')){hi=i;break;}}
+    if(hi<0)throw new Error('header not found');
+    const hdr=rows[hi].map(c=>String(c).trim());
     const ui=hdr.indexOf('Unit #'),fi=hdr.indexOf('First'),li=hdr.indexOf('Last'),ai=hdr.indexOf('FMCSA Authority');
     const fresh=[];
-    for(let i=headerIdx+1;i<rows.length;i++){
-      const r=rows[i];
-      let unit=String(r[ui]||'').trim(),first=String(r[fi]||'').trim(),last=String(r[li]||'').trim(),auth=String(r[ai]||'').trim();
+    for(let i=hi+1;i<rows.length;i++){
+      let unit=String(rows[i][ui]||'').trim(),first=String(rows[i][fi]||'').trim(),last=String(rows[i][li]||'').trim(),auth=String(rows[i][ai]||'').trim();
       if(!unit||!first||!last||!/^\d+$/.test(unit))continue;
       if(first.startsWith('Was ')||last.startsWith('Was '))continue;
       const cf=first.replace(/^(Temp |Shop )/i,'').trim();
@@ -242,21 +227,16 @@ async function fetchLiveDrivers(){
       if(fresh.some(d=>d.n===dn&&d.t===unit))continue;
       fresh.push({n:dn,f:cf,l:last,a:auth,t:unit,folder:last+', '+cf});
     }
-    if(fresh.length<5)throw new Error('too few: '+fresh.length);
+    if(fresh.length<5)throw new Error('too few rows');
     fresh.sort((a,b)=>a.n.localeCompare(b.n));
     DR.length=0;fresh.forEach(d=>DR.push(d));
-    setStatus('✓ '+DR.length+' drivers (live)');
-    setTimeout(()=>setStatus(''),4000);
-    return true;
-  }catch(e){
-    console.warn('Live drivers failed:',e);
-    setStatus('');
-    return false;
-  }
+    set('✓ '+DR.length+' drivers (live)');
+    setTimeout(()=>set(''),4000);
+  }catch(e){console.warn('Driver fetch:',e);const el=document.getElementById('drv-status');if(el)el.textContent='';}
 }
 </script>
 <script>
-// Fallback static list — used if SharePoint unavailable
+// ── Static fallback driver list ─────────────────────────────
 const DR=[
   {n:"Acosta Luna, Adan",f:"Adan",l:"Acosta Luna",a:"Moon Transportation LLC",t:"759",folder:"Acosta Luna, Adan"},
   {n:"Alcala, Ernesto",f:"Ernesto",l:"Alcala",a:"Ernie's Logistics LLC",t:"841",folder:"Alcala, Ernesto"},
@@ -311,85 +291,70 @@ const DR=[
   {n:"Young, Samuel",f:"Samuel",l:"Young",a:"S.C.Y. Trucking LLC",t:"869",folder:"Young, Samuel"},
 ];
 
+// ── Sections ────────────────────────────────────────────────
 const SECS=[
-{id:'all',label:'All'},
-{id:'daily',label:'Daily & Routine'},
-{id:'checklists',label:'Checklists'},
-{id:'updates',label:'Driver & Equipment Updates'},
-{id:'onboarding',label:'Driver Onboarding'},
-{id:'docs',label:'Documents & Carrier Package'},
-{id:'permits',label:'Permits & Accounts'},
-{id:'taxes',label:'Taxes'},
-{id:'compliance',label:'Audits & Compliance'},
-{id:'tracking',label:'Equipment Tracking'},
-{id:'fuel',label:'Fuel, EFS & Factoring'},
-{id:'motive',label:'Motive (ELD)'},
-{id:'payroll',label:'Payroll'},
-{id:'macros',label:'Excel Macros'},
-{id:'email',label:'Email Templates'},
+  {id:'all',label:'All'},
+  {id:'daily',label:'Daily & Routine'},
+  {id:'checklists',label:'Checklists'},
+  {id:'updates',label:'Driver & Equipment Updates'},
+  {id:'onboarding',label:'Driver Onboarding'},
+  {id:'docs',label:'Documents & Carrier Package'},
+  {id:'permits',label:'Permits & Accounts'},
+  {id:'taxes',label:'Taxes'},
+  {id:'compliance',label:'Audits & Compliance'},
+  {id:'tracking',label:'Equipment Tracking'},
+  {id:'fuel',label:'Fuel, EFS & Factoring'},
+  {id:'motive',label:'Motive (ELD)'},
+  {id:'payroll',label:'Payroll'},
+  {id:'macros',label:'Excel Macros'},
+  {id:'email',label:'Email Templates'},
 ];
-
 const SS={
-daily:{bg:'#E1F5EE',color:'#0F6E56'},
-checklists:{bg:'#FDE8D8',color:'#9A3412'},
-updates:{bg:'#E6F1FB',color:'#185FA5'},
-onboarding:{bg:'#FCE7F3',color:'#9D174D'},
-docs:{bg:'#FEF3C7',color:'#92400E'},
-permits:{bg:'#EEEDFE',color:'#3C3489'},
-taxes:{bg:'#FEE2E2',color:'#991B1B'},
-compliance:{bg:'#D1FAE5',color:'#065F46'},
-tracking:{bg:'#DBEAFE',color:'#1E3A8A'},
-fuel:{bg:'#FAEEDA',color:'#633806'},
-motive:{bg:'#F3E8FF',color:'#4A1060'},
-payroll:{bg:'#FFF3E0',color:'#7A3B00'},
-macros:{bg:'#F3F4F6',color:'#374151'},
-authority:{bg:'#E8F5E9',color:'#1B5E20'},
-email:{bg:'#F5F3FF',color:'#5B21B6'},
+  daily:{bg:'#E1F5EE',color:'#0F6E56'},
+  checklists:{bg:'#FDE8D8',color:'#9A3412'},
+  updates:{bg:'#E6F1FB',color:'#185FA5'},
+  onboarding:{bg:'#FCE7F3',color:'#9D174D'},
+  docs:{bg:'#FEF3C7',color:'#92400E'},
+  permits:{bg:'#EEEDFE',color:'#3C3489'},
+  taxes:{bg:'#FEE2E2',color:'#991B1B'},
+  compliance:{bg:'#D1FAE5',color:'#065F46'},
+  tracking:{bg:'#DBEAFE',color:'#1E3A8A'},
+  fuel:{bg:'#FAEEDA',color:'#633806'},
+  motive:{bg:'#F3E8FF',color:'#4A1060'},
+  payroll:{bg:'#FFF3E0',color:'#7A3B00'},
+  macros:{bg:'#F3F4F6',color:'#374151'},
+  email:{bg:'#F5F3FF',color:'#5B21B6'},
 };
-
 const KJS={bg:'#DBEAFE',bd:'#3B82F6',lc:'#1E3A5F',tc:'#1E3A5F'};
 const AMS={bg:'#F3E8FF',bd:'#9333EA',lc:'#4A1060',tc:'#4A1060'};
 const BLS={bg:'#FFF9C4',bd:'#E0A800',lc:'#7A5200',tc:'#7A5200'};
 const NRS={bg:'#F3F4F6',bd:'#9CA3AF',lc:'#374151',tc:'#374151'};
 
+// ── State ────────────────────────────────────────────────────
 let activeSec='all';
 let CTX={driver:'',auth:'',old:'',nw:'',dot:''};
-let sessionChecks={};  // key: cb_blockKey_i, value: true — per-session checkbox state
-let curBodyFn=null;
-let _cardTitle='';
+let activeCardTitle='';
+let sessionChecks={};
 
-function dOpts(){return '<option value="">Select driver...</option>'+DR.map(d=>`<option value="${d.n}">${d.n} (#${d.t})</option>`).join('');}
-function onDrvChange(){
-  const sel=document.getElementById('ctx-drv');if(!sel)return;
-  const d=DR.find(x=>x.n===sel.value);if(!d)return;
-  const fn=document.getElementById('ctx-dname'),auth=document.getElementById('ctx-auth'),ot=document.getElementById('ctx-old'),nt=document.getElementById('ctx-new');
-  if(fn)fn.value=d.f+' '+d.l;if(auth)auth.value=d.a;if(ot)ot.value=d.t;if(nt)nt.value='';
-  // Show folder links
-  const lnk=document.getElementById('ctx-links');
-  if(lnk){
-    const driverUrl='https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/'+encodeURIComponent(d.folder).replace(/%2C/g,',');
-    const truckUrl='https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Equipment/Tractors/'+d.t;
-    lnk.innerHTML=
-      '<a href="'+driverUrl+'" target="_blank" class="ctx-link-btn">&#128193; '+d.f+' '+d.l+' folder</a>'+
-      '<a href="'+truckUrl+'" target="_blank" class="ctx-link-btn">&#128666; Truck #'+d.t+' folder</a>';
-    lnk.style.display='flex';
-  }
+// ── Persistence ──────────────────────────────────────────────
+let pins=[],recents=[],customEdits={};
+// customEdits[key] = {text, linkLabel, linkUrl}
+// key for steps: 'S:CardTitle:index'
+// key for ob items: 'O:itemText'
+
+function loadStorage(){
+  try{pins=JSON.parse(localStorage.getItem('ul_pins')||'[]');}catch(e){pins=[];}
+  try{recents=JSON.parse(localStorage.getItem('ul_recents')||'[]');}catch(e){recents=[];}
+  try{customEdits=JSON.parse(localStorage.getItem('ul_edits')||'{}');}catch(e){customEdits={};}
 }
-function readCtx(){
-  const g=id=>document.getElementById(id);
-  CTX.driver=g('ctx-dname')?g('ctx-dname').value.trim():CTX.driver;
-  CTX.auth=g('ctx-auth')?g('ctx-auth').value.trim():CTX.auth;
-  CTX.old=g('ctx-old')?g('ctx-old').value.trim():CTX.old;
-  CTX.nw=g('ctx-new')?g('ctx-new').value.trim():CTX.nw;
-  CTX.dot=g('ctx-dot')?g('ctx-dot').value.trim():CTX.dot;
-}
-function applyCtx(){
-  readCtx();
-  const tgt=document.getElementById('ctx-cl');
-  if(tgt&&curBodyFn)tgt.innerHTML=curBodyFn();
-}
+function savePins(){try{localStorage.setItem('ul_pins',JSON.stringify(pins));}catch(e){}}
+function saveRecents(){try{localStorage.setItem('ul_recents',JSON.stringify(recents));}catch(e){}}
+function saveEdits(){try{localStorage.setItem('ul_edits',JSON.stringify(customEdits));}catch(e){}}
+
+// ── Token fill ───────────────────────────────────────────────
 function fc(t){
-  let s=t;
+  if(!t)return '';
+  let s=String(t);
   if(CTX.driver)s=s.replace(/\[DRIVER\]/g,CTX.driver);
   if(CTX.auth)s=s.replace(/\[AUTH\]/g,CTX.auth);
   if(CTX.old)s=s.replace(/\[OLD\]/g,'#'+CTX.old);
@@ -397,93 +362,113 @@ function fc(t){
   if(CTX.dot)s=s.replace(/\[DOT\]/g,CTX.dot);
   return s;
 }
-function fp(path){return `<span class="filepath">${path}</span>`;}
-function fl(path,url){return `<a href="${url}" target="_blank" class="filepath" style="text-decoration:none">${path} &#8599;</a>`;}
-function ob(label,st,items){
-  const blockKey=label.replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_]/g,'');
-  const rows=items.map((raw,i)=>{
-    // Parse item type — items starting with __FL__ have a built-in link
-    const flMatch=raw.startsWith('__FL__');
-    const pipeMatch=!flMatch&&raw.includes('|');
-    let plainText='', chipLabel='', linkUrl='';
 
-    if(flMatch){
-      const inner=raw.slice(6);
-      const sep=inner.indexOf('__SEP__');
-      const itemText=sep>=0?inner.slice(0,sep):inner;
-      linkUrl=sep>=0?inner.slice(sep+7):'';
-      plainText=fc(itemText);
-      const domain=linkUrl.replace(/https?:\/\//,'').split('/')[0]
-        .replace('ultimatecorp.sharepoint.com','SharePoint')
-        .replace('gogps.com','Quartix')
-        .replace('clearinghouse.fmcsa.dot.gov','Clearinghouse')
-        .replace('portal.fmcsa.dot.gov','FMCSA')
-        .replace('ai.fmcsa.dot.gov','FMCSA')
-        .replace('www.','');
-      chipLabel='↗ '+domain;
-    } else if(pipeMatch){
-      // 'Plain text|Chip label|shortcode'
-      const parts=raw.split('|');
-      plainText=fc(parts[0].trim());
-      chipLabel=fc(parts[1]?parts[1].trim():'Open');
-      const code=parts[2]?parts[2].trim():'';
-      if(code==='ct') linkUrl='https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1';
-    } else {
-      // Plain text, no link
-      plainText=fc(raw);
-    }
-
-    // Custom link override
-    const key=(flMatch?(()=>{const s=raw.slice(6);const p=s.indexOf('__SEP__');return p>=0?s.slice(0,p):s;})():raw).replace(/\[[\w]+\]/g,'').trim().substring(0,80);
-    const custom=customLinks[key];
-    const finalUrl=custom?custom.url:linkUrl;
-    const finalChipLabel=custom?custom.label:chipLabel;
-    const isCustom=!!custom;
-
-    // Checkbox state
-    const cbKey='cb_'+blockKey+'_'+i;
-    const checked=sessionChecks[cbKey]?'checked':'';
-    const doneClass=sessionChecks[cbKey]?' done':'';
-
-    // Chip — only shows if there's a URL
-    const chip=finalUrl
-      ? `<a href="${finalUrl}" target="_blank" class="ob-link-chip">${finalChipLabel||'↗'}</a>`
-      : '';
-
-    // Edit button
-    const safeKey=key.replace(/'/g,"\\'").replace(/"/g,'&quot;');
-    const safeUrl=(finalUrl||'').replace(/'/g,"\\'");
-    const safeChipLabel=(finalChipLabel||'').replace(/'/g,"\\'");
-    const btnClass=isCustom?' has-custom':'';
-    const editBtn=`<button class="link-edit-btn${btnClass}" onclick="openLinkEditor('${safeKey}','${safeUrl}','${safeChipLabel}',this)" title="${isCustom?'Edit custom link':'Add/edit link'}">✎</button>`;
-
-    return `<div class="ob-item-wrap">
-      <input type="checkbox" ${checked} onchange="toggleCheck('${cbKey}',this)">
-      <span class="ob-item-text${doneClass}">${plainText}${chip?' ':''}<span style="white-space:nowrap">${chip}</span></span>
-      <span class="ob-item-actions">${editBtn}</span>
-    </div>`;
-  }).join('');
-  return `<div class="ob" style="border:1px solid ${st.bd};border-left:4px solid ${st.bd}"><div class="ob-lbl" style="background:${st.bg};color:${st.lc};border-bottom:1px solid ${st.bd}">${label}</div><div class="ob-items" style="background:${st.bg};padding:4px 12px 8px">${rows}</div></div>`;
-}
-function steps(arr,blockKey){
-  blockKey=blockKey||'step_'+(_cardTitle||Math.random().toString(36).slice(2,6));
-  return arr.map((s,i)=>{
-    const key=blockKey+'_'+i;
-    const custom=customSteps[key];
-    const text=custom?custom.text:fc(s);
-    const hasEdit=!!custom;
-    const safeKey=key.replace(/'/g,"\'");
-    const safeOrig=fc(s).replace(/'/g,"\'").replace(/"/g,'&quot;');
-    return `<div class="step-wrap">
-      <div class="step-num">${i+1}</div>
-      <div class="step-text${hasEdit?' edited':''}" id="st_${key}">${text}</div>
-      <button class="step-edit-btn${hasEdit?' has-edit':''}" onclick="openStepEditor('${safeKey}','${safeOrig}',this)" title="${hasEdit?'Edited — click to change':'Edit this step'}">✎</button>
-    </div>`;
-  }).join('');
-}
+// ── Helpers ──────────────────────────────────────────────────
+function fp(p){return `<span style="font-size:11px;background:#f0f4ff;color:#3a5a9a;border-radius:4px;padding:2px 6px;font-family:monospace;border:0.5px solid #c5d4f0">${p}</span>`;}
+function fl(p,u){return `__FL__${p}__SEP__${u}`;}
+function subh(t){return `<div class="subh">${t}</div>`;}
 function note(t){return `<div class="note"><strong>Note:</strong> ${t}</div>`;}
 function links(arr){return `<div class="links-row">${arr.map(l=>`<a class="link-pill" href="${l.url}" target="_blank">${l.label}</a>`).join('')}</div>`;}
-function subh(t){return `<div class="subh">${t}</div>`;}
+
+// ob() — colored owner block with checkboxes and edit buttons
+function ob(label,st,items){
+  const rows=items.map((raw,i)=>{
+    // Parse __FL__ items: text + link, stored as tagged string
+    let plainText='',chipLabel='',chipUrl='';
+    if(typeof raw==='string'&&raw.startsWith('__FL__')){
+      const inner=raw.slice(6);
+      const sep=inner.indexOf('__SEP__');
+      plainText=fc(sep>=0?inner.slice(0,sep):inner);
+      chipUrl=sep>=0?inner.slice(sep+7):'';
+      // Auto chip label from domain
+      const domain=chipUrl.replace(/https?:\/\//,'').split('/')[0]
+        .replace('ultimatecorp.sharepoint.com','SharePoint')
+        .replace('gogps.com','Quartix').replace('clearinghouse.fmcsa.dot.gov','Clearinghouse')
+        .replace('portal.fmcsa.dot.gov','FMCSA').replace('www.','');
+      chipLabel='↗ '+domain;
+    } else {
+      plainText=fc(raw);
+    }
+    // Check for custom edit
+    const key='O:'+plainText.replace(/[^a-zA-Z0-9 ]/g,'').trim().slice(0,60);
+    const edit=customEdits[key];
+    if(edit){
+      if(edit.text) plainText=edit.text;
+      if(edit.linkLabel) chipLabel=edit.linkLabel;
+      if(edit.linkUrl!==undefined) chipUrl=edit.linkUrl;
+    }
+    const chip=chipUrl?`<a href="${chipUrl}" target="_blank" class="ob-link-chip">${chipLabel||'↗'}</a>`:'';
+    const cbKey='cb_'+label.replace(/\W/g,'')+'_'+i;
+    const checked=sessionChecks[cbKey]?'checked':'';
+    const doneClass=sessionChecks[cbKey]?' done':'';
+    const modified=edit?' modified':'';
+    const safeKey=encodeURIComponent(key).replace(/'/g,'%27');
+    const safePlain=encodeURIComponent(plainText).replace(/'/g,'%27');
+    const safeChipLabel=encodeURIComponent(chipLabel||'').replace(/'/g,'%27');
+    const safeChipUrl=encodeURIComponent(chipUrl||'').replace(/'/g,'%27');
+    return `<div class="ob-row">
+      <input type="checkbox" ${checked} onchange="toggleCb('${cbKey}',this)">
+      <span class="ob-row-text${doneClass}" style="color:${st.tc}">${plainText} ${chip}</span>
+      <button class="edit-btn${modified}" onclick="openEdit('ob','${safeKey}','${safePlain}','${safeChipLabel}','${safeChipUrl}',this)" title="Edit">✎</button>
+    </div>`;
+  }).join('');
+  return `<div class="ob" style="border:1px solid ${st.bd};border-left:4px solid ${st.bd}">
+    <div class="ob-lbl" style="background:${st.bg};color:${st.lc};border-bottom:1px solid ${st.bd}">${label}</div>
+    <div class="ob-items" style="background:${st.bg}">${rows}</div>
+  </div>`;
+}
+
+// steps() — numbered steps with edit buttons
+function steps(arr){
+  return arr.map((s,i)=>{
+    const rawText=fc(s);
+    const key='S:'+activeCardTitle+':'+i;
+    const edit=customEdits[key];
+    const text=edit&&edit.text?edit.text:rawText;
+    const modified=edit?' modified':'';
+    const safeKey=encodeURIComponent(key).replace(/'/g,'%27');
+    const safeOrig=encodeURIComponent(rawText).replace(/'/g,'%27');
+    return `<div class="step-wrap">
+      <div class="step-num">${i+1}</div>
+      <div class="step-text" id="st_${i}_${activeCardTitle.replace(/\W/g,'')}">${text}</div>
+      <button class="edit-btn${modified}" onclick="openEdit('step','${safeKey}','${safeOrig}','','',this)" title="Edit this step">✎</button>
+    </div>`;
+  }).join('');
+}
+
+// ── Context form ─────────────────────────────────────────────
+function dOpts(){return '<option value="">Select driver...</option>'+DR.map(d=>`<option value="${d.n}">${d.n} (#${d.t})</option>`).join('');}
+function onDrvChange(){
+  const sel=document.getElementById('ctx-drv');if(!sel)return;
+  const d=DR.find(x=>x.n===sel.value);if(!d)return;
+  const g=id=>document.getElementById(id);
+  if(g('ctx-dname'))g('ctx-dname').value=d.f+' '+d.l;
+  if(g('ctx-auth'))g('ctx-auth').value=d.a;
+  if(g('ctx-old'))g('ctx-old').value=d.t;
+  if(g('ctx-new'))g('ctx-new').value='';
+  // Show folder links
+  const lnk=document.getElementById('ctx-links');
+  if(lnk){
+    const base='https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents';
+    const dUrl=base+'/Driver%20Documents/'+encodeURIComponent(d.folder).replace(/%2C/g,',');
+    const tUrl=base+'/Equipment/Tractors/'+d.t;
+    lnk.innerHTML=`<a href="${dUrl}" target="_blank" class="ctx-link-btn">📁 ${d.f} ${d.l}</a><a href="${tUrl}" target="_blank" class="ctx-link-btn">🚛 Truck #${d.t}</a>`;
+    lnk.style.display='flex';
+  }
+}
+function readCtx(){
+  const g=id=>{const e=document.getElementById(id);return e?e.value.trim():'';};
+  CTX.driver=g('ctx-dname')||CTX.driver;
+  CTX.auth=g('ctx-auth')||CTX.auth;
+  CTX.old=g('ctx-old')||CTX.old;
+  CTX.nw=g('ctx-new')||CTX.nw;
+  CTX.dot=g('ctx-dot')||CTX.dot;
+}
+function applyCtx(){
+  readCtx();
+  const tgt=document.getElementById('ctx-cl');
+  if(tgt&&_curBodyFn)tgt.innerHTML=_curBodyFn();
+}
 function ctxForm(fields){
   const map={
     driverSel:`<div class="ctx-group"><label>Driver</label><select id="ctx-drv" onchange="onDrvChange()">${dOpts()}</select></div>`,
@@ -494,9 +479,16 @@ function ctxForm(fields){
     nw:`<div class="ctx-group"><label>New truck #</label><input type="text" id="ctx-new" placeholder="e.g. 835" value="${CTX.nw}"></div>`,
   };
   const rows=fields.map(row=>`<div class="ctx-row">${row.map(f=>map[f]).join('')}</div>`).join('');
-  return `<div class="ctx-form"><div class="ctx-title">Driver context — auto-fills checklist below</div>${rows}<button class="ctx-btn" onclick="applyCtx()">Apply to checklist &#8595;</button><div id="ctx-links" class="ctx-links"></div><div class="ctx-hint">List from <a href="https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1" target="_blank" style="color:#185fa5">Current Trucks &amp; Drivers.xlsx</a>. <span id="drv-status" style="color:#0F6E56;font-weight:500"></span></div></div>`;
+  return `<div class="ctx-form">
+    <div class="ctx-title">Driver context — auto-fills checklist below</div>
+    ${rows}
+    <button class="ctx-btn" onclick="applyCtx()">Apply to checklist ↓</button>
+    <div id="ctx-links" class="ctx-links"></div>
+    <div class="ctx-hint">Select a driver to auto-fill, or type directly, then click Apply. <span class="ctx-status" id="drv-status"></span></div>
+  </div>`;
 }
 
+// ── Events ───────────────────────────────────────────────────
 const EVENTS=[
 // ── SECTION 1: DAILY & ROUTINE ──────────────────────────────
 {title:'Trippaks — Receiving',sec:'daily',body:()=>steps([
@@ -1386,157 +1378,209 @@ Thanks!
 </div></div>`},
 ];
 
-// activeSec already declared above
+// ── Edit popup ────────────────────────────────────────────────
+let _popupMode=''; // 'step' or 'ob'
+let _popupKey='';
+let _popupOrig='';
+let _popupBtn=null;
 
-let pins = [];
-let recents = [];
-const MAX_RECENTS = 8;
-
-// ── Persistence (localStorage) ──────────────────────────
-function loadStorage(){
-  try {
-    const p = localStorage.getItem('ul_pins');
-    const r = localStorage.getItem('ul_recents');
-    if(p) pins = JSON.parse(p);
-    if(r) recents = JSON.parse(r);
-  } catch(e){}
-}
-function savePins(){ try{ localStorage.setItem('ul_pins', JSON.stringify(pins)); }catch(e){} }
-function saveRecents(){ try{ localStorage.setItem('ul_recents', JSON.stringify(recents)); }catch(e){} }
-
-// ── Pin logic ────────────────────────────────────────────
-function togglePin(idx, ev){
-  ev.stopPropagation();
-  const id = EVENTS[idx].title;
-  if(pins.includes(id)){
-    pins = pins.filter(p => p !== id);
+function openEdit(mode, key, origText, chipLabel, chipUrl, btn){
+  _popupMode=mode;
+  _popupKey=decodeURIComponent(key);
+  _popupOrig=decodeURIComponent(origText);
+  _popupBtn=btn;
+  const popup=document.getElementById('edit-popup');
+  const edit=customEdits[key];
+  document.getElementById('popup-title').textContent=mode==='step'?'Edit step':'Edit checklist item';
+  document.getElementById('popup-text').value=edit&&edit.text?edit.text:origText;
+  const linkRow=document.getElementById('popup-link-row');
+  if(mode==='ob'){
+    linkRow.style.display='block';
+    document.getElementById('popup-link-label').value=edit&&edit.linkLabel!==undefined?edit.linkLabel:decodeURIComponent(chipLabel);
+    document.getElementById('popup-link-url').value=edit&&edit.linkUrl!==undefined?edit.linkUrl:decodeURIComponent(chipUrl);
   } else {
-    pins.push(id);
+    linkRow.style.display='none';
   }
-  savePins();
-  renderHome();
-  render(); // refresh pin icons in browse view
+  // Position near the button
+  const rect=btn.getBoundingClientRect();
+  const pw=360, ph=300;
+  let top=rect.bottom+6, left=rect.left-pw+btn.offsetWidth;
+  if(top+ph>window.innerHeight) top=rect.top-ph-6;
+  if(left<8) left=8;
+  if(left+pw>window.innerWidth) left=window.innerWidth-pw-8;
+  popup.style.top=top+'px'; popup.style.left=left+'px';
+  popup.classList.add('open');
+  document.getElementById('popup-text').focus();
 }
-function isPinned(idx){ return pins.includes(EVENTS[idx].title); }
 
-// ── Recents logic ────────────────────────────────────────
+function closePopup(){
+  document.getElementById('edit-popup').classList.remove('open');
+  _popupKey=''; _popupBtn=null;
+}
+
+function popupSave(){
+  if(!_popupKey) return;
+  const text=document.getElementById('popup-text').value.trim();
+  const linkLabel=_popupMode==='ob'?document.getElementById('popup-link-label').value.trim():'';
+  const linkUrl=_popupMode==='ob'?document.getElementById('popup-link-url').value.trim():'';
+  // Only save if something actually changed
+  const changed=(text&&text!==_popupOrig)||(linkLabel)||linkUrl;
+  if(changed){
+    customEdits[_popupKey]={text:text||_popupOrig};
+    if(_popupMode==='ob'){customEdits[_popupKey].linkLabel=linkLabel;customEdits[_popupKey].linkUrl=linkUrl;}
+  } else {
+    delete customEdits[_popupKey];
+  }
+  saveEdits();
+  closePopup();
+  // Update the DOM in-place
+  if(_popupMode==='step'){
+    // Find the step text element by its index in the current card
+    const parts=_popupKey.split(':');
+    const idx=parts[parts.length-1];
+    const cardSlug=activeCardTitle.replace(/\W/g,'');
+    const el=document.getElementById('st_'+idx+'_'+cardSlug);
+    if(el){
+      el.textContent=customEdits[_popupKey]?customEdits[_popupKey].text:_popupOrig;
+      if(_popupBtn) _popupBtn.classList.toggle('modified',!!customEdits[_popupKey]);
+    }
+  } else {
+    // Re-render the full modal to pick up ob changes
+    const ev=EVENTS.find(e=>e.title===activeCardTitle);
+    if(ev) document.getElementById('m-body').innerHTML=ev.body();
+  }
+}
+
+function popupReset(){
+  if(!_popupKey) return;
+  delete customEdits[_popupKey];
+  saveEdits();
+  closePopup();
+  if(_popupMode==='step'){
+    const parts=_popupKey.split(':');
+    const idx=parts[parts.length-1];
+    const cardSlug=activeCardTitle.replace(/\W/g,'');
+    const el=document.getElementById('st_'+idx+'_'+cardSlug);
+    if(el){el.textContent=_popupOrig;if(_popupBtn)_popupBtn.classList.remove('modified');}
+  } else {
+    const ev=EVENTS.find(e=>e.title===activeCardTitle);
+    if(ev) document.getElementById('m-body').innerHTML=ev.body();
+  }
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){closeModal();closePopup();}
+  if(e.key==='Enter'&&!e.shiftKey&&document.getElementById('edit-popup').classList.contains('open')&&_popupMode==='step') popupSave();
+});
+document.addEventListener('click',e=>{
+  const popup=document.getElementById('edit-popup');
+  if(popup.classList.contains('open')&&!popup.contains(e.target)&&!e.target.classList.contains('edit-btn')) closePopup();
+});
+
+// ── Checkbox ─────────────────────────────────────────────────
+function toggleCb(key,el){
+  sessionChecks[key]=el.checked;
+  const wrap=el.closest('.ob-row');
+  if(wrap){const t=wrap.querySelector('.ob-row-text');if(t)t.classList.toggle('done',el.checked);}
+}
+
+// ── Modal ─────────────────────────────────────────────────────
+let _curBodyFn=null;
+function openModal(idx){
+  const e=EVENTS[idx];
+  const st=SS[e.sec]||{bg:'#F3F4F6',color:'#374151'};
+  document.getElementById('m-sec').textContent=secLabel(e.sec);
+  document.getElementById('m-sec').style.cssText=`background:${st.bg};color:${st.color}`;
+  document.getElementById('m-title').textContent=e.title;
+  activeCardTitle=e.title;
+  sessionChecks={};
+  CTX={driver:'',auth:'',old:'',nw:'',dot:''};
+  _curBodyFn=e.isDriver?()=>{const full=e.body();const s=full.indexOf('<div id="ctx-cl">')+17;const en=full.lastIndexOf('</div>');return full.slice(s,en);}:null;
+  document.getElementById('m-body').innerHTML=e.body();
+  document.getElementById('mbg').classList.add('open');
+  addRecent(idx);
+}
+function closeModal(){
+  document.getElementById('mbg').classList.remove('open');
+  _curBodyFn=null;
+  closePopup();
+  if(document.getElementById('home-view').style.display!=='none') renderHome();
+}
+
+// ── Pins & recents ────────────────────────────────────────────
+function togglePin(idx,ev){
+  ev.stopPropagation();
+  const id=EVENTS[idx].title;
+  pins=pins.includes(id)?pins.filter(p=>p!==id):[...pins,id];
+  savePins(); renderHome(); render();
+}
+function isPinned(idx){return pins.includes(EVENTS[idx].title);}
 function addRecent(idx){
-  const id = EVENTS[idx].title;
-  recents = recents.filter(r => r.id !== id);
-  recents.unshift({id, ts: Date.now()});
-  if(recents.length > MAX_RECENTS) recents = recents.slice(0, MAX_RECENTS);
+  const id=EVENTS[idx].title;
+  recents=[{id,ts:Date.now()},...recents.filter(r=>r.id!==id)].slice(0,8);
   saveRecents();
-  // don't re-render home while modal is open — just keep state updated
 }
-function clearRecents(){
-  recents = [];
-  saveRecents();
-  renderHome();
-}
+function clearRecents(){recents=[];saveRecents();renderHome();}
 function timeAgo(ts){
-  const s = Math.floor((Date.now()-ts)/1000);
-  if(s < 60) return 'just now';
-  if(s < 3600) return Math.floor(s/60)+'m ago';
-  if(s < 86400) return Math.floor(s/3600)+'h ago';
-  if(s < 604800) return Math.floor(s/86400)+'d ago';
-  return new Date(ts).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  const s=Math.floor((Date.now()-ts)/1000);
+  if(s<60)return 'just now';if(s<3600)return Math.floor(s/60)+'m ago';
+  if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';
 }
 
-// ── View switching ───────────────────────────────────────
-function showHome(){
-  document.getElementById('home-view').style.display = 'block';
-  document.getElementById('browse-view').style.display = 'none';
-  document.getElementById('tab-home').classList.add('active');
-  document.getElementById('tab-browse').classList.remove('active');
-  renderHome();
-}
-function showBrowse(){
-  document.getElementById('home-view').style.display = 'none';
-  document.getElementById('browse-view').style.display = 'block';
-  document.getElementById('tab-home').classList.remove('active');
-  document.getElementById('tab-browse').classList.add('active');
-  render();
-}
-
-// ── Build a card for home screen ─────────────────────────
-function homeCard(idx, opts={}){
-  const e = EVENTS[idx];
-  const st = SS[e.sec]||{bg:'#F3F4F6',color:'#374151'};
-  const pinned = isPinned(idx);
-  const extraClass = opts.pinned ? ' pinned-card' : opts.recent ? ' recent-card' : '';
-  const timeStr = opts.ts ? `<span class="recent-time">${timeAgo(opts.ts)}</span>` : '';
+// ── Render helpers ────────────────────────────────────────────
+function secLabel(s){return(SECS.find(x=>x.id===s)||{label:s}).label;}
+function makeCard(idx,opts={}){
+  const e=EVENTS[idx];const st=SS[e.sec]||{bg:'#F3F4F6',color:'#374151'};
+  const pinned=isPinned(idx);
+  const timeStr=opts.ts?`<div class="recent-time">${timeAgo(opts.ts)}</div>`:'';
   return `<div class="card-wrap">
-    <div class="card${extraClass}" onclick="openModal(${idx})">
+    <div class="card${pinned?' pinned-card':''}${opts.recent?' recent-card':''}" onclick="openModal(${idx})">
       <span class="sec" style="background:${st.bg};color:${st.color}">${secLabel(e.sec)}</span>
-      <span class="title">${e.title}</span>
-      ${timeStr}
+      <span class="title">${e.title}</span>${timeStr}
     </div>
-    <button class="pin-btn${pinned?' pinned':''}" onclick="togglePin(${idx},event)" title="${pinned?'Unpin':'Pin to home'}">&#128204;</button>
+    <button class="pin-btn${pinned?' pinned':''}" onclick="togglePin(${idx},event)" title="${pinned?'Unpin':'Pin'}">📌</button>
   </div>`;
 }
 
-// ── Render home screen ───────────────────────────────────
 function renderHome(){
+  const pg=document.getElementById('pinned-grid');
+  const rg=document.getElementById('recents-grid');
+  const rc=document.getElementById('recents-clear');
+  if(!pg||!rg) return;
   // Pinned
-  const pg = document.getElementById('pinned-grid');
-  const pe = document.getElementById('pinned-empty');
-  if(pins.length === 0){
-    pe.style.display = 'block';
-    pg.innerHTML = '';
-    pg.appendChild(pe);
+  if(pins.length===0){
+    pg.innerHTML='<div class="home-empty">No pinned cards yet.</div>';
   } else {
-    pe.style.display = 'none';
-    const html = pins.map(id => {
-      const idx = EVENTS.findIndex(e => e.title === id);
-      if(idx < 0) return '';
-      return homeCard(idx, {pinned:true});
-    }).join('');
-    pg.innerHTML = html + `<div style="display:flex;align-items:center;justify-content:center;border:1.5px dashed #e0e0e0;border-radius:12px;min-height:68px;cursor:pointer;color:#bbb;font-size:12px" onclick="showBrowse()">+ Browse all</div>`;
+    const cards=pins.map(id=>{const idx=EVENTS.findIndex(e=>e.title===id);return idx>=0?makeCard(idx,{pinned:true}):''}).join('');
+    pg.innerHTML=cards+`<div class="browse-add-btn" onclick="showBrowse()">+ Browse all</div>`;
   }
-
   // Recents
-  const rg = document.getElementById('recents-grid');
-  const re = document.getElementById('recents-empty');
-  const cb = document.getElementById('recents-clear-btn');
-  if(recents.length === 0){
-    re.style.display = 'block';
-    rg.innerHTML = '';
-    rg.appendChild(re);
-    cb.style.display = 'none';
+  if(recents.length===0){
+    rg.innerHTML='<div class="home-empty">No recently opened cards yet.</div>';
+    if(rc) rc.style.display='none';
   } else {
-    re.style.display = 'none';
-    cb.style.display = 'inline';
-    rg.innerHTML = recents.map(r => {
-      const idx = EVENTS.findIndex(e => e.title === r.id);
-      if(idx < 0) return '';
-      return homeCard(idx, {recent:true, ts:r.ts});
-    }).join('');
+    rg.innerHTML=recents.map(r=>{const idx=EVENTS.findIndex(e=>e.title===r.id);return idx>=0?makeCard(idx,{recent:true,ts:r.ts}):''}).join('');
+    if(rc) rc.style.display='inline';
   }
 }
 
-function secLabel(s){const f=SECS.find(x=>x.id===s);return f?f.label:s;}
-
 function render(){
-  const q=document.getElementById('search').value.toLowerCase();
-  const filtered=EVENTS.filter(e=>{
-    const sm=activeSec==='all'||e.sec===activeSec;
-    const qm=!q||e.title.toLowerCase().includes(q);
-    return sm&&qm;
-  });
+  const q=(document.getElementById('search')||{}).value?.toLowerCase()||'';
+  const filtered=EVENTS.filter(e=>(activeSec==='all'||e.sec===activeSec)&&(!q||e.title.toLowerCase().includes(q)));
   const grid=document.getElementById('grid');
   const noRes=document.getElementById('no-res');
-  if(!filtered.length){grid.innerHTML='';noRes.style.display='block';return;}
-  noRes.style.display='none';
+  if(!grid) return;
+  noRes.style.display=filtered.length?'none':'block';
   grid.innerHTML=filtered.map(e=>{
-    const st=SS[e.sec]||{bg:'#F3F4F6',color:'#374151'};
     const idx=EVENTS.indexOf(e);
+    const st=SS[e.sec]||{bg:'#F3F4F6',color:'#374151'};
     const pinned=isPinned(idx);
     return `<div class="card-wrap">
       <div class="card${pinned?' pinned-card':''}" onclick="openModal(${idx})">
         <span class="sec" style="background:${st.bg};color:${st.color}">${secLabel(e.sec)}</span>
         <span class="title">${e.title}</span>
       </div>
-      <button class="pin-btn${pinned?' pinned':''}" onclick="togglePin(${idx},event)" title="${pinned?'Unpin':'Pin to home'}">&#128204;</button>
+      <button class="pin-btn${pinned?' pinned':''}" onclick="togglePin(${idx},event)" title="${pinned?'Unpin':'Pin'}">📌</button>
     </div>`;
   }).join('');
 }
@@ -1544,211 +1588,27 @@ function render(){
 function buildChips(){
   document.getElementById('chips').innerHTML=SECS.map(s=>`<span class="chip${activeSec===s.id?' active':''}" onclick="setChip('${s.id}')">${s.label}</span>`).join('');
 }
-
 function setChip(id){activeSec=id;buildChips();render();}
 
-function openModal(idx){
-  const e=EVENTS[idx];
-  const st=SS[e.sec]||{bg:'#F3F4F6',color:'#374151'};
-  document.getElementById('m-sec').textContent=secLabel(e.sec);
-  document.getElementById('m-sec').style.background=st.bg;
-  document.getElementById('m-sec').style.color=st.color;
-  document.getElementById('m-title').textContent=e.title;
-  _cardTitle=e.title.replace(/[^a-zA-Z0-9]/g,'_');
-  CTX={driver:'',auth:'',old:'',nw:'',dot:''};
-  if(e.isDriver){
-    curBodyFn=function(){
-      const full=e.body();
-      const start=full.indexOf('<div id="ctx-cl">')+17;
-      const end=full.lastIndexOf('</div>');
-      return full.slice(start,end);
-    };
-  } else {
-    curBodyFn=null;
-  }
-  document.getElementById('m-body').innerHTML=e.body();
-  document.getElementById('mbg').classList.add('open');
-  addRecent(idx);
+function showHome(){
+  document.getElementById('home-view').style.display='block';
+  document.getElementById('browse-view').style.display='none';
+  document.getElementById('tab-home').classList.add('active');
+  document.getElementById('tab-browse').classList.remove('active');
+  renderHome();
+}
+function showBrowse(){
+  document.getElementById('home-view').style.display='none';
+  document.getElementById('browse-view').style.display='block';
+  document.getElementById('tab-home').classList.remove('active');
+  document.getElementById('tab-browse').classList.add('active');
+  buildChips(); render();
 }
 
-function closeModal(){
-  document.getElementById('mbg').classList.remove('open');
-  curBodyFn=null;
-  // refresh home recents if home is visible
-  if(document.getElementById('home-view').style.display !== 'none') renderHome();
-}
-
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeLinkPopup();}});
-
-// ── Per-item link editor ────────────────────────────────────
-let customLinks = {};  // key: item text, value: {label, url}
-let customSteps = {};  // key: step_blockKey_i, value: {text}
-let _editingKey = null;
-
-function loadCustomLinks(){
-  try{ const s=localStorage.getItem('ul_item_links'); if(s) customLinks=JSON.parse(s); }catch(e){}
-  try{ const s=localStorage.getItem('ul_step_edits'); if(s) customSteps=JSON.parse(s); }catch(e){}
-}
-function saveCustomSteps(){
-  try{ localStorage.setItem('ul_step_edits', JSON.stringify(customSteps)); }catch(e){}
-}
-function toggleCheck(key, el){
-  sessionChecks[key] = el.checked;
-  // strike through the text
-  const wrap = el.closest('.ob-item-wrap');
-  if(wrap){
-    const txt = wrap.querySelector('.ob-item-text');
-    if(txt) txt.classList.toggle('done', el.checked);
-  }
-}
-function saveCustomLinks(){
-  try{ localStorage.setItem('ul_item_links', JSON.stringify(customLinks)); }catch(e){}
-}
-
-let _editingType='link'; // 'link' or 'step'
-let _editingStepKey=null;
-let _editingStepOriginal='';
-
-function openStepEditor(key, originalText, btnEl){
-  _editingType='step';
-  _editingStepKey=key;
-  _editingStepOriginal=originalText;
-  const popup=document.getElementById('link-popup');
-  document.getElementById('link-popup-title').textContent='Edit step text';
-  document.getElementById('link-popup-text-row').style.display='block';
-  document.getElementById('link-popup-chip-row').style.display='none';
-  document.getElementById('link-popup-clear-btn').textContent='Reset to original';
-  const custom=customSteps[key];
-  document.getElementById('link-popup-text').value=custom?custom.text:originalText;
-  const rect=btnEl.getBoundingClientRect();
-  popup.style.top=Math.min(rect.bottom+6,window.innerHeight-280)+'px';
-  popup.style.left=Math.max(8,Math.min(rect.left-160,window.innerWidth-360))+'px';
-  popup.classList.add('open');
-  document.getElementById('link-popup-text').focus();
-}
-
-function openLinkEditor(key, currentUrl, currentLabel, btnEl){
-  _editingType='link';
-  _editingKey = key;
-  const popup = document.getElementById('link-popup');
-  document.getElementById('link-popup-title').textContent='Edit link chip';
-  document.getElementById('link-popup-text-row').style.display='none';
-  document.getElementById('link-popup-chip-row').style.display='block';
-  document.getElementById('link-popup-clear-btn').textContent='Remove link';
-  const urlInput = document.getElementById('link-popup-input');
-  const lblInput = document.getElementById('link-popup-label');
-  const custom = customLinks[key];
-  urlInput.value = custom ? custom.url : (currentUrl||'');
-  lblInput.value = custom ? custom.label : (currentLabel||'');
-  const rect = btnEl.getBoundingClientRect();
-  popup.style.top  = Math.min(rect.bottom + 6, window.innerHeight - 220) + 'px';
-  popup.style.left = Math.max(8, Math.min(rect.left - 160, window.innerWidth - 350)) + 'px';
-  popup.classList.add('open');
-  urlInput.focus();
-}
-function closeLinkPopup(){
-  document.getElementById('link-popup').classList.remove('open');
-  _editingKey = null;
-}
-function saveItemEdit(){
-  if(_editingType==='step'){
-    if(!_editingStepKey) return;
-    const text=document.getElementById('link-popup-text').value.trim();
-    if(text && text!==_editingStepOriginal) customSteps[_editingStepKey]={text};
-    else delete customSteps[_editingStepKey];
-    saveCustomSteps();
-    closeLinkPopup();
-    // Update the step text in-place
-    const el=document.getElementById('st_'+_editingStepKey);
-    const btn=el?el.nextElementSibling:null;
-    if(el){
-      el.innerHTML=customSteps[_editingStepKey]?customSteps[_editingStepKey].text:_editingStepOriginal;
-      el.classList.toggle('edited',!!customSteps[_editingStepKey]);
-    }
-    if(btn) btn.classList.toggle('has-edit',!!customSteps[_editingStepKey]);
-  } else {
-    if(!_editingKey) return;
-    const url=document.getElementById('link-popup-input').value.trim();
-    const lbl=document.getElementById('link-popup-label').value.trim();
-    if(url) customLinks[_editingKey]={url,label:lbl||_editingKey};
-    else delete customLinks[_editingKey];
-    saveCustomLinks();
-    closeLinkPopup();
-    updateItemChip(_editingKey);
-  }
-}
-function saveItemLink(){ saveItemEdit(); }
-function clearItemEdit(){
-  if(_editingType==='step'){
-    if(!_editingStepKey) return;
-    delete customSteps[_editingStepKey];
-    saveCustomSteps();
-    closeLinkPopup();
-    const el=document.getElementById('st_'+_editingStepKey);
-    const btn=el?el.nextElementSibling:null;
-    if(el){ el.innerHTML=_editingStepOriginal; el.classList.remove('edited'); }
-    if(btn) btn.classList.remove('has-edit');
-  } else {
-    if(!_editingKey) return;
-    delete customLinks[_editingKey];
-    saveCustomLinks();
-    closeLinkPopup();
-    updateItemChip(_editingKey);
-  }
-}
-function clearItemLink(){ clearItemEdit(); }
-// Update just the chip on a single item without re-rendering the whole modal
-function updateItemChip(key){
-  // Find the button with this key and update its parent item
-  const btns = document.querySelectorAll('.link-edit-btn');
-  btns.forEach(btn => {
-    const onclick = btn.getAttribute('onclick')||'';
-    if(onclick.includes(key.replace(/'/g,"\\'").substring(0,30))){
-      const wrap = btn.closest('.ob-item-wrap');
-      if(!wrap) return;
-      const custom = customLinks[key];
-      // Update chip if present, or add one
-      let chip = wrap.querySelector('.ob-link-chip');
-      if(custom){
-        if(!chip){
-          chip = document.createElement('a');
-          chip.className = 'ob-link-chip';
-          chip.target = '_blank';
-          const textSpan = wrap.querySelector('.ob-item-text');
-          if(textSpan) textSpan.appendChild(document.createTextNode('\u00a0'));
-          if(textSpan) { const sp=document.createElement('span');sp.style.whiteSpace='nowrap';sp.appendChild(chip);textSpan.appendChild(sp); }
-        }
-        chip.href = custom.url;
-        chip.textContent = custom.label;
-        btn.classList.add('has-custom');
-      } else {
-        if(chip) chip.closest('span[style]')?.remove();
-        btn.classList.remove('has-custom');
-      }
-      // Update onclick with new values
-      const safeUrl = (custom?.url||'').replace(/'/g,"\\'");
-      const safeLabel = (custom?.label||'').replace(/'/g,"\\'");
-      const safeKey = key.replace(/'/g,"\\'").replace(/"/g,'&quot;');
-      btn.setAttribute('onclick', `openLinkEditor('${safeKey}','${safeUrl}','${safeLabel}',this)`);
-    }
-  });
-}
-// handle Enter key in link popup
-document.addEventListener('keydown', function(e){
-  if(e.key==='Enter' && document.getElementById('link-popup').classList.contains('open') && _editingType!=='step') saveItemEdit();
-});
-// Close popup when clicking outside
-document.addEventListener('click', function(e){
-  const popup = document.getElementById('link-popup');
-  if(popup && popup.classList.contains('open') && !popup.contains(e.target) && !e.target.classList.contains('link-edit-btn'))
-    closeLinkPopup();
-});
-loadCustomLinks();
+// ── Init ──────────────────────────────────────────────────────
 loadStorage();
-buildChips();
 showHome();
-// Fetch live driver list from SharePoint on load
-if(typeof fetchLiveDrivers === 'function') fetchLiveDrivers();
+if(typeof fetchLiveDrivers==='function') fetchLiveDrivers();
 </script>
 </body>
 </html>
