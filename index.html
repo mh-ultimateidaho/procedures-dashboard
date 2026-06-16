@@ -97,6 +97,21 @@ body{font-family:system-ui,sans-serif;background:#f9f9f9;color:#111}
 .ctx-hint{font-size:11px;color:#888;margin-top:6px;font-style:italic}
 .ctx-status{color:#0F6E56;font-weight:500}
 
+/* ── In Progress ── */
+.inprog-card{background:#fff;border:0.5px solid #e0e0e0;border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:5px;position:relative}
+.inprog-card:hover{border-color:#aaa}
+.inprog-label{font-size:12px;font-weight:600;color:#111}
+.inprog-sub{font-size:11px;color:#666}
+.inprog-progress{font-size:11px;color:#0F6E56;font-weight:500}
+.inprog-meta{font-size:10px;color:#bbb}
+.inprog-btns{display:flex;gap:6px;margin-top:6px}
+.inprog-btns button{font-size:11px;padding:3px 10px;border-radius:5px;cursor:pointer;border:0.5px solid #ccc;background:#f5f5f5;color:#333}
+.inprog-btns .btn-open{background:#e6f1fb;color:#185fa5;border-color:#b5d4f4;font-weight:500}
+.inprog-btns .btn-del{color:#c00;border-color:#fca5a5;background:#fef2f2}
+.inprog-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+.save-progress-btn{font-size:12px;padding:5px 14px;border-radius:6px;cursor:pointer;border:0.5px solid #059669;background:#D1FAE5;color:#065F46;font-weight:500;margin-left:8px}
+.save-progress-btn:hover{background:#A7F3D0}
+
 /* ── Edit popup ── */
 .popup{display:none;position:fixed;z-index:99999;background:#fff;border:0.5px solid #ddd;border-radius:10px;box-shadow:0 4px 24px rgba(0,0,0,0.18);padding:14px 16px;width:360px}
 .popup.open{display:block}
@@ -122,6 +137,15 @@ body{font-family:system-ui,sans-serif;background:#f9f9f9;color:#111}
   </div>
 
   <div id="home-view">
+    <div class="home-section">
+      <div class="home-section-header">
+        <span class="home-section-title">&#9881; In Progress</span>
+        <span style="font-size:11px;color:#aaa;font-style:italic">Saved checklists — click Open to continue where you left off</span>
+      </div>
+      <div class="inprog-grid" id="inprog-grid">
+        <div class="home-empty" id="inprog-empty">No saved checklists. Open a driver event card, fill in the driver, and click "Save progress".</div>
+      </div>
+    </div>
     <div class="home-section">
       <div class="home-section-header">
         <span class="home-section-title">&#128204; Pinned</span>
@@ -151,7 +175,10 @@ body{font-family:system-ui,sans-serif;background:#f9f9f9;color:#111}
   <div class="modal">
     <div class="mhead">
       <div class="mhead-left"><span class="sec-badge" id="m-sec"></span><h2 id="m-title"></h2></div>
-      <button class="mclose" onclick="closeModal()">&#x2715;</button>
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <button class="save-progress-btn" id="save-prog-btn" style="display:none" onclick="saveProgress()" title="Save checklist progress to home screen">&#128190; Save progress</button>
+        <button class="mclose" onclick="closeModal()">&#x2715;</button>
+      </div>
     </div>
     <div class="mbody" id="m-body"></div>
   </div>
@@ -334,22 +361,128 @@ const NRS={bg:'#F3F4F6',bd:'#9CA3AF',lc:'#374151',tc:'#374151'};
 let activeSec='all';
 let CTX={driver:'',auth:'',old:'',nw:'',dot:''};
 let activeCardTitle='';
+let activeCardIdx=-1;
 let sessionChecks={};
 
 // ── Persistence ──────────────────────────────────────────────
-let pins=[],recents=[],customEdits={};
-// customEdits[key] = {text, linkLabel, linkUrl}
-// key for steps: 'S:CardTitle:index'
-// key for ob items: 'O:itemText'
+let pins=[],recents=[],customEdits={},inProgress=[];
+// inProgress items: {id, cardTitle, cardIdx, ctx, checks, savedAt, label}
 
 function loadStorage(){
   try{pins=JSON.parse(localStorage.getItem('ul_pins')||'[]');}catch(e){pins=[];}
   try{recents=JSON.parse(localStorage.getItem('ul_recents')||'[]');}catch(e){recents=[];}
-  try{customEdits=JSON.parse(localStorage.getItem('ul_edits')||'{}');}catch(e){customEdits={};}
+  try{inProgress=JSON.parse(localStorage.getItem('ul_inprog')||'[]');}catch(e){inProgress=[];}
+  try{
+    customEdits=JSON.parse(localStorage.getItem('ul_edits')||'{}');
+    const fixed={};
+    for(const k in customEdits){
+      const dk=decodeURIComponent(k);
+      const edit=customEdits[k];
+      if(edit.text&&edit.text.includes('%20')) edit.text=decodeURIComponent(edit.text);
+      fixed[dk]=edit;
+    }
+    customEdits=fixed;
+  }catch(e){customEdits={};}
 }
 function savePins(){try{localStorage.setItem('ul_pins',JSON.stringify(pins));}catch(e){}}
 function saveRecents(){try{localStorage.setItem('ul_recents',JSON.stringify(recents));}catch(e){}}
 function saveEdits(){try{localStorage.setItem('ul_edits',JSON.stringify(customEdits));}catch(e){}}
+function saveInProgress(){try{localStorage.setItem('ul_inprog',JSON.stringify(inProgress));}catch(e){}}
+
+// ── In Progress sessions ──────────────────────────────────────
+function saveProgress(){
+  readCtx();
+  const e=EVENTS[activeCardIdx];
+  if(!e) return;
+  // Build a human-readable label
+  const driverPart=CTX.driver?CTX.driver:'(no driver selected)';
+  const truckPart=CTX.old?'#'+CTX.old:CTX.nw?'→#'+CTX.nw:'';
+  const label=e.title+' — '+driverPart+(truckPart?' '+truckPart:'');
+  // Count checked items
+  const checked=Object.values(sessionChecks).filter(Boolean).length;
+  const total=document.querySelectorAll('.ob-row input[type=checkbox]').length;
+  // Check if session already exists for this card+driver — update it
+  const existingIdx=inProgress.findIndex(s=>s.cardIdx===activeCardIdx&&s.ctx.driver===CTX.driver);
+  const session={
+    id: existingIdx>=0?inProgress[existingIdx].id:Date.now(),
+    cardTitle:e.title, cardIdx:activeCardIdx,
+    ctx:{...CTX}, checks:{...sessionChecks},
+    savedAt:Date.now(), label, checked, total
+  };
+  if(existingIdx>=0) inProgress[existingIdx]=session;
+  else inProgress.unshift(session);
+  saveInProgress();
+  // Visual feedback
+  const btn=document.getElementById('save-prog-btn');
+  if(btn){const orig=btn.innerHTML;btn.innerHTML='✓ Saved!';btn.style.background='#D1FAE5';setTimeout(()=>{btn.innerHTML=orig;},1800);}
+  if(document.getElementById('home-view').style.display!=='none') renderHome();
+}
+
+function openProgress(id){
+  const session=inProgress.find(s=>s.id===id);
+  if(!session) return;
+  // Restore context
+  CTX={...session.ctx};
+  sessionChecks={...session.checks};
+  // Open the card
+  openModal(session.cardIdx);
+  // After modal renders, restore ctx fields
+  setTimeout(()=>{
+    const g=id=>document.getElementById(id);
+    if(g('ctx-dname')) g('ctx-dname').value=CTX.driver||'';
+    if(g('ctx-auth'))  g('ctx-auth').value=CTX.auth||'';
+    if(g('ctx-old'))   g('ctx-old').value=CTX.old||'';
+    if(g('ctx-new'))   g('ctx-new').value=CTX.nw||'';
+    if(g('ctx-dot'))   g('ctx-dot').value=CTX.dot||'';
+    // Apply so tokens fill in
+    if(CTX.driver) applyCtx();
+    // Restore checkboxes
+    for(const [k,v] of Object.entries(sessionChecks)){
+      const cb=document.querySelector(`input[onchange*="${k}"]`);
+      if(cb&&v){cb.checked=true;const wrap=cb.closest('.ob-row');if(wrap){const t=wrap.querySelector('.ob-row-text');if(t)t.classList.add('done');}}
+    }
+  },80);
+}
+
+function deleteProgress(id,ev){
+  ev.stopPropagation();
+  inProgress=inProgress.filter(s=>s.id!==id);
+  saveInProgress();
+  renderHome();
+}
+
+function renderInProgress(){
+  const grid=document.getElementById('inprog-grid');
+  const empty=document.getElementById('inprog-empty');
+  if(!grid) return;
+  if(inProgress.length===0){
+    grid.innerHTML='';
+    if(empty){empty.style.display='block';grid.appendChild(empty);}
+    return;
+  }
+  if(empty) empty.style.display='none';
+  const ST=inProgress.map(s=>{
+    const pct=s.total>0?Math.round((s.checked/s.total)*100):0;
+    const bar=s.total>0?`<div style="height:3px;background:#e0e0e0;border-radius:2px;margin:4px 0"><div style="height:3px;background:#059669;border-radius:2px;width:${pct}%"></div></div>`:'';
+    const ago=timeAgo(s.savedAt);
+    const checkedStr=s.total>0?`${s.checked}/${s.total} checked`:'';
+    // Get section color
+    const e=EVENTS[s.cardIdx];
+    const st=e?SS[e.sec]||{bg:'#F3F4F6',color:'#374151'}:{bg:'#F3F4F6',color:'#374151'};
+    return `<div class="inprog-card">
+      <span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:10px;align-self:flex-start;background:${st.bg};color:${st.color}">${s.cardTitle}</span>
+      <span class="inprog-label">${s.ctx.driver||'(no driver)'}</span>
+      <span class="inprog-sub">${[s.ctx.auth,s.ctx.old?'Truck #'+s.ctx.old:'',s.ctx.nw?'→ #'+s.ctx.nw:''].filter(Boolean).join(' · ')}</span>
+      ${bar}
+      <span class="inprog-meta">${[checkedStr,'Saved '+ago].filter(Boolean).join(' · ')}</span>
+      <div class="inprog-btns">
+        <button class="btn-open" onclick="openProgress(${s.id})">Open</button>
+        <button class="btn-del" onclick="deleteProgress(${s.id},event)">Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+  grid.innerHTML=ST;
+}
 
 // ── Token fill ───────────────────────────────────────────────
 function fc(t){
@@ -1390,9 +1523,9 @@ function openEdit(mode, key, origText, chipLabel, chipUrl, btn){
   _popupOrig=decodeURIComponent(origText);
   _popupBtn=btn;
   const popup=document.getElementById('edit-popup');
-  const edit=customEdits[key];
+  const edit=customEdits[_popupKey];
   document.getElementById('popup-title').textContent=mode==='step'?'Edit step':'Edit checklist item';
-  document.getElementById('popup-text').value=edit&&edit.text?edit.text:origText;
+  document.getElementById('popup-text').value=edit&&edit.text?edit.text:_popupOrig;
   const linkRow=document.getElementById('popup-link-row');
   if(mode==='ob'){
     linkRow.style.display='block';
@@ -1493,10 +1626,14 @@ function openModal(idx){
   document.getElementById('m-sec').style.cssText=`background:${st.bg};color:${st.color}`;
   document.getElementById('m-title').textContent=e.title;
   activeCardTitle=e.title;
+  activeCardIdx=idx;
   sessionChecks={};
   CTX={driver:'',auth:'',old:'',nw:'',dot:''};
   _curBodyFn=e.isDriver?()=>{const full=e.body();const s=full.indexOf('<div id="ctx-cl">')+17;const en=full.lastIndexOf('</div>');return full.slice(s,en);}:null;
   document.getElementById('m-body').innerHTML=e.body();
+  // Show save progress button only for checklist cards
+  const saveBtn=document.getElementById('save-prog-btn');
+  if(saveBtn) saveBtn.style.display=e.isDriver?'inline-flex':'none';
   document.getElementById('mbg').classList.add('open');
   addRecent(idx);
 }
@@ -1543,6 +1680,7 @@ function makeCard(idx,opts={}){
 }
 
 function renderHome(){
+  renderInProgress();
   const pg=document.getElementById('pinned-grid');
   const rg=document.getElementById('recents-grid');
   const rc=document.getElementById('recents-clear');
