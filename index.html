@@ -68,6 +68,12 @@ body{font-family:system-ui,sans-serif;background:#f9f9f9;color:#111}
 .link-edit-btn{font-size:10px;padding:1px 5px;border-radius:3px;cursor:pointer;border:0.5px solid #ccc;background:#f5f5f5;color:#888;line-height:1.5;white-space:nowrap}
 .link-edit-btn:hover{background:#e6f1fb;color:#185fa5;border-color:#b5d4f4}
 .link-edit-btn.has-custom{background:#fef3c7;border-color:#e0a800;color:#7a5200;opacity:1!important}
+.step-wrap{display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;position:relative}
+.step-wrap:hover .step-edit-btn{opacity:1}
+.step-edit-btn{opacity:0;flex-shrink:0;font-size:10px;padding:1px 5px;border-radius:3px;cursor:pointer;border:0.5px solid #ccc;background:#f5f5f5;color:#888;line-height:1.5;transition:opacity 0.1s;margin-top:3px;white-space:nowrap}
+.step-edit-btn:hover{background:#e6f1fb;color:#185fa5;border-color:#b5d4f4}
+.step-edit-btn.has-edit{background:#fef3c7;border-color:#e0a800;color:#7a5200;opacity:1!important}
+.step-text.edited{color:#111}
 /* link editor */
 .ob-item-wrap{position:relative;display:flex;align-items:flex-start;gap:0}
 .ob-item-wrap .ob-item{flex:1}
@@ -147,15 +153,21 @@ body{font-family:system-ui,sans-serif;background:#f9f9f9;color:#111}
 </div>
 </div>
 <div class="link-popup" id="link-popup">
-  <div class="link-popup-title">Edit link chip</div>
-  <div style="font-size:11px;color:#888;margin-bottom:4px">Label (what shows in the blue chip)</div>
-  <input type="text" id="link-popup-label" placeholder="e.g. Current Quartix.xlsx">
-  <div style="font-size:11px;color:#888;margin-bottom:4px">URL (where it goes)</div>
-  <input type="text" id="link-popup-input" placeholder="https://... (leave blank to remove link)">
+  <div class="link-popup-title" id="link-popup-title">Edit item</div>
+  <div id="link-popup-text-row">
+    <div style="font-size:11px;color:#888;margin-bottom:4px">Item text</div>
+    <textarea id="link-popup-text" placeholder="Step text..." style="width:100%;font-size:12px;padding:5px 8px;border:0.5px solid #ccc;border-radius:5px;margin-bottom:8px;resize:vertical;min-height:54px;font-family:system-ui"></textarea>
+  </div>
+  <div id="link-popup-chip-row">
+    <div style="font-size:11px;color:#888;margin-bottom:4px">Link chip label <span style="color:#bbb">(optional)</span></div>
+    <input type="text" id="link-popup-label" placeholder="e.g. ↗ SharePoint">
+    <div style="font-size:11px;color:#888;margin-bottom:4px">URL <span style="color:#bbb">(leave blank to remove link)</span></div>
+    <input type="text" id="link-popup-input" placeholder="https://...">
+  </div>
   <div class="link-popup-btns">
-    <button class="clear-btn" onclick="clearItemLink()">Remove</button>
+    <button class="clear-btn" id="link-popup-clear-btn" onclick="clearItemEdit()">Reset</button>
     <button onclick="closeLinkPopup()">Cancel</button>
-    <button class="save-btn" onclick="saveItemLink()">Save</button>
+    <button class="save-btn" onclick="saveItemEdit()">Save</button>
   </div>
 </div>
 <div class="modal-bg" id="mbg" onclick="if(event.target===this)closeModal()">
@@ -389,17 +401,24 @@ function fl(path,url){return `<a href="${url}" target="_blank" class="filepath" 
 function ob(label,st,items){
   const blockKey=label.replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_]/g,'');
   const rows=items.map((raw,i)=>{
-    // Parse item type
-    const flMatch=raw.match(/^fl\('([^']+)','([^']+)'\)$/);
+    // Parse item type — items starting with __FL__ have a built-in link
+    const flMatch=raw.startsWith('__FL__');
     const pipeMatch=!flMatch&&raw.includes('|');
     let plainText='', chipLabel='', linkUrl='';
 
     if(flMatch){
-      // fl('Full sentence text','url') — text is black, chip is a short link icon
-      plainText=fc(flMatch[1]);
-      linkUrl=flMatch[2];
-      // Short chip label: just the domain or a generic open icon
-      const domain=linkUrl.replace(/https?:\/\//,'').split('/')[0].replace('ultimatecorp.sharepoint.com','SharePoint').replace('gogps.com','Quartix').replace('www.','');
+      const inner=raw.slice(6);
+      const sep=inner.indexOf('__SEP__');
+      const itemText=sep>=0?inner.slice(0,sep):inner;
+      linkUrl=sep>=0?inner.slice(sep+7):'';
+      plainText=fc(itemText);
+      const domain=linkUrl.replace(/https?:\/\//,'').split('/')[0]
+        .replace('ultimatecorp.sharepoint.com','SharePoint')
+        .replace('gogps.com','Quartix')
+        .replace('clearinghouse.fmcsa.dot.gov','Clearinghouse')
+        .replace('portal.fmcsa.dot.gov','FMCSA')
+        .replace('ai.fmcsa.dot.gov','FMCSA')
+        .replace('www.','');
       chipLabel='↗ '+domain;
     } else if(pipeMatch){
       // 'Plain text|Chip label|shortcode'
@@ -414,7 +433,7 @@ function ob(label,st,items){
     }
 
     // Custom link override
-    const key=(flMatch?flMatch[1]:raw).replace(/\[[\w]+\]/g,'').trim().substring(0,80);
+    const key=(flMatch?(()=>{const s=raw.slice(6);const p=s.indexOf('__SEP__');return p>=0?s.slice(0,p):s;})():raw).replace(/\[[\w]+\]/g,'').trim().substring(0,80);
     const custom=customLinks[key];
     const finalUrl=custom?custom.url:linkUrl;
     const finalChipLabel=custom?custom.label:chipLabel;
@@ -445,7 +464,22 @@ function ob(label,st,items){
   }).join('');
   return `<div class="ob" style="border:1px solid ${st.bd};border-left:4px solid ${st.bd}"><div class="ob-lbl" style="background:${st.bg};color:${st.lc};border-bottom:1px solid ${st.bd}">${label}</div><div class="ob-items" style="background:${st.bg};padding:4px 12px 8px">${rows}</div></div>`;
 }
-function steps(arr){return arr.map((s,i)=>`<div class="step"><div class="step-num">${i+1}</div><div class="step-text">${fc(s)}</div></div>`).join('');}
+function steps(arr,blockKey){
+  blockKey=blockKey||'step_'+Math.random().toString(36).slice(2,6);
+  return arr.map((s,i)=>{
+    const key='step_'+blockKey+'_'+i;
+    const custom=customSteps[key];
+    const text=custom?custom.text:fc(s);
+    const hasEdit=!!custom;
+    const safeKey=key.replace(/'/g,"\'");
+    const safeOrig=fc(s).replace(/'/g,"\'").replace(/"/g,'&quot;');
+    return `<div class="step-wrap">
+      <div class="step-num">${i+1}</div>
+      <div class="step-text${hasEdit?' edited':''}" id="st_${key}">${text}</div>
+      <button class="step-edit-btn${hasEdit?' has-edit':''}" onclick="openStepEditor('${safeKey}','${safeOrig}',this)" title="${hasEdit?'Edited — click to change':'Edit this step'}">✎</button>
+    </div>`;
+  }).join('');
+}
 function note(t){return `<div class="note"><strong>Note:</strong> ${t}</div>`;}
 function links(arr){return `<div class="links-row">${arr.map(l=>`<a class="link-pill" href="${l.url}" target="_blank">${l.label}</a>`).join('')}</div>`;}
 function subh(t){return `<div class="subh">${t}</div>`;}
@@ -541,11 +575,11 @@ const EVENTS=[
 }},
 {title:'ID Cards — Renewals',sec:'daily',body:()=>steps([
   'When Amie forwards an insurance cab card, rename it: [truck#] ID Card [Authority] [Year]. Example: 777 ID Card MAG 2026.',
-  'Upload to the truck\'s folder at '+fl('Equipment > Tractors > [truck#]','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Equipment/Tractors')+'. Do NOT move the old card to Old yet.',
+  'Upload to the truck\'s folder at '+'__FL__Equipment > Tractors > [truck#]__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Equipment/Tractors'+'. Do NOT move the old card to Old yet.',
   'Snooze the email from Amie to the effective date of the new ID card.',
   'When the snoozed email returns, move the old insurance card to the Old subfolder in the truck\'s folder.',
   'Double-check the new ID card has been uploaded.',
-  'Replace the ID card in the driver\'s Carrier Package at '+fl('Driver Documents > [Last, First] > 01 Operational','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents')+'.',
+  'Replace the ID card in the driver\'s Carrier Package at '+'__FL__Driver Documents > [Last, First] > 01 Operational__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents'+'.',
   'Move the email to the ID Cards folder in Outlook.',
 ])},
 
@@ -554,18 +588,18 @@ const EVENTS=[
   'Check the issue state and CDL number.',
   'Change the expiration date in ITS.',
   'Email a copy to Kathryn and Amie.',
-  'Add to the driver\'s folder at '+fl('Driver Documents > [Last, First] > 01 Operational','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents')+'.',
+  'Add to the driver\'s folder at '+'__FL__Driver Documents > [Last, First] > 01 Operational__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents'+'.',
   'File a clear (edited) paper copy.',
 ])},
 {title:'Medical Update',sec:'updates',body:()=>steps([
   'Change the expiration date in ITS.',
-  'Add to the driver\'s folder at '+fl('Driver Documents > [Last, First] > 01 Operational','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents')+'.',
+  'Add to the driver\'s folder at '+'__FL__Driver Documents > [Last, First] > 01 Operational__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents'+'.',
   'Send a copy to the state DMV using the "… St. Instr." sheet (attached in the Safety Excel).',
   'File a clear (edited) paper copy.',
 ])},
 {title:'DOT Inspection Update',sec:'updates',body:()=>steps([
   'Add to ITS and change the expiration date.',
-  'Add to '+fl('Equipment > Tractors > [truck#]','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Equipment/Tractors')+' (or trailer folder if applicable).',
+  'Add to '+'__FL__Equipment > Tractors > [truck#]__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Equipment/Tractors'+' (or trailer folder if applicable).',
   'Change the expiration date in the Safety Excel.',
   'File in the truck/trailer physical file.',
 ])},
@@ -593,14 +627,14 @@ const EVENTS=[
     'Check truck [NEW] cloud file has DOT, reg & ID card',
     'Carrier package — upload to cloud',
     'Enter NM transaction in QuickBooks for truck [NEW]',
-    fl('Update permit folders on cloud','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits'),
-    fl('Update permit sheets on cloud','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits'),
-    fl('Update Quartix — add truck [NEW] to dispatch and active group, add [DRIVER] name to truck name','https://gogps.com'),
+    '__FL__Update permit folders on cloud__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits',
+    '__FL__Update permit sheets on cloud__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits',
+    '__FL__Update Quartix — add truck [NEW] to dispatch and active group, add [DRIVER] name to truck name__SEP__https://gogps.com',
     'Scan in & upload 2-pg lease to driver cloud folder',
     'Scan in & upload DOP to driver cloud folder',
     'Scan in & upload [DRIVER] POA to driver cloud folder',
     'Move [DRIVER] cloud from Potential to Current',
-    fl('Update Current Trucks & Drivers.xlsx','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1'),
+    '__FL__Update Current Trucks & Drivers.xlsx__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1',
     'Add [DRIVER] to Driver Authority sheet',
     'Add [DRIVER] to Safety sheet (CDL/Med/MVR checklist)',
     'Add [DRIVER] to Drivers Information on Drivers & Locations',
@@ -648,9 +682,9 @@ const EVENTS=[
     'Update Embark scheduled MVR date for [DRIVER]',
     'Carrier package for [AUTH] — upload to cloud, move old package to old folder',
     'Enter NM transaction in QuickBooks for truck [OLD]',
-    fl('Update permit folders on cloud','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits'),
-    fl('Update permit sheets on cloud','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits'),
-    fl('Update Current Trucks & Drivers.xlsx','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1'),
+    '__FL__Update permit folders on cloud__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits',
+    '__FL__Update permit sheets on cloud__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits',
+    '__FL__Update Current Trucks & Drivers.xlsx__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1',
     'Update Driver Authority sheet',
   ])+
   '<details style="margin-top:10px"><summary style="font-size:11px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:0.4px;cursor:pointer;user-select:none">▸ KJ & Amie tasks (covering only)</summary>'+
@@ -685,14 +719,14 @@ const EVENTS=[
     'Update permit sheets',
     'Move [DRIVER] cloud folder to old',
     'Move ID card on truck [OLD] cloud to Old Docs',
-    fl('Update Current Trucks & Drivers.xlsx','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1'),
+    '__FL__Update Current Trucks & Drivers.xlsx__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1',
     'Update Driver Authority sheet — remove [AUTH]',
     'Remove [DRIVER] from Safety Excel sheet (CDL/Med/MVR checklist)',
     'Remove [DRIVER] from email contacts and contact lists',
     'Remove [DRIVER] from Drivers Information on Drivers & Locations',
     'Disable auto-run and deactivate [DRIVER] on Embark',
     'Remove mailbox tag for [DRIVER]',
-    fl('Quartix — remove truck [OLD] from all groups except Ultimate Logistics All Vehicles and Trucks No Driver. Change name to No Driver.','https://gogps.com'),
+    '__FL__Quartix — remove truck [OLD] from all groups except Ultimate Logistics All Vehicles and Trucks No Driver. Change name to No Driver.__SEP__https://gogps.com',
   ])+
   '<details style="margin-top:10px"><summary style="font-size:11px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:0.4px;cursor:pointer;user-select:none">▸ Amie tasks (covering only)</summary>'+
   '<div style="margin-top:8px">'+
@@ -717,12 +751,12 @@ const EVENTS=[
   ob('No rush — your tasks',NRS,[
     'Check truck [NEW] cloud file has DOT, reg & ID card',
     'Carrier package — upload to cloud, move old package for truck [OLD] to old folder',
-    fl('Quartix — truck [OLD]: remove from all groups except Ultimate Logistics All Vehicles, rename to No Driver. Truck [NEW]: add to dispatch and active group, add [DRIVER] name.','https://gogps.com'),
+    '__FL__Quartix — truck [OLD]: remove from all groups except Ultimate Logistics All Vehicles, rename to No Driver. Truck [NEW]: add to dispatch and active group, add [DRIVER] name.__SEP__https://gogps.com',
     'Scan in & upload 2-pg lease for truck [NEW] to cloud. Move old truck [OLD] lease to old folder.',
     'Enter NM transaction in QuickBooks for truck [NEW]',
-    fl('Update permit folders on cloud','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits'),
+    '__FL__Update permit folders on cloud__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits',
     'Update permit sheets on cloud',
-    fl('Update Current Trucks & Drivers.xlsx','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1'),
+    '__FL__Update Current Trucks & Drivers.xlsx__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1',
   ])+
   '<details style="margin-top:10px"><summary style="font-size:11px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:0.4px;cursor:pointer;user-select:none">▸ KJ & Amie tasks (covering only)</summary>'+
   '<div style="margin-top:8px">'+
@@ -750,11 +784,11 @@ const EVENTS=[
   ob('No rush — your tasks',NRS,[
     'Check truck [NEW] cloud file has DOT, reg & ID card',
     'Carrier package — upload to cloud, move old package to old folder',
-    fl('Quartix — truck [OLD]: add "Shop" in front of name. Truck [NEW]: add to dispatch and active group, add [DRIVER] name, add "Temp" in front of name.','https://gogps.com'),
+    '__FL__Quartix — truck [OLD]: add "Shop" in front of name. Truck [NEW]: add to dispatch and active group, add [DRIVER] name, add "Temp" in front of name.__SEP__https://gogps.com',
     'Scan in & upload 2-pg lease for truck [NEW] to cloud. Add "TEMP" to end of file name.',
     'Enter NM transaction in QuickBooks for truck [NEW]',
-    fl('Update permit folders on cloud','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits'),
-    fl('Update permit sheets on cloud — add "in shop (date)" to truck [OLD] notes, "temp truck" to truck [NEW] notes.','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits'),
+    '__FL__Update permit folders on cloud__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits',
+    '__FL__Update permit sheets on cloud — add "in shop (date)" to truck [OLD] notes, "temp truck" to truck [NEW] notes.__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits',
     'Update Current Trucks & Drivers.xlsx | mark truck [OLD] as in shop, truck [NEW] as temp truck for [DRIVER].|ct',
   ])+
   '<details style="margin-top:10px"><summary style="font-size:11px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:0.4px;cursor:pointer;user-select:none">▸ KJ & Amie tasks (covering only)</summary>'+
@@ -781,8 +815,8 @@ const EVENTS=[
     'Move/rename temp truck [OLD] lease to old folder (if there is one)',
     'Quartix — truck [OLD]: remove from all groups except Ultimate Logistics All Vehicles, rename to No Driver. Truck [NEW]: remove "Shop" from name.',
     'Check truck [NEW] cloud file has DOT, reg & ID card',
-    fl('Update permit folders on cloud','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits'),
-    fl('Update permit sheets on cloud — leave notes until next tax period.','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits'),
+    '__FL__Update permit folders on cloud__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits',
+    '__FL__Update permit sheets on cloud — leave notes until next tax period.__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits',
     'Update Current Trucks & Drivers.xlsx | mark truck [OLD] as "was", remove shop notes from truck [NEW].|ct',
   ])+
   '</div>'
@@ -793,7 +827,7 @@ const EVENTS=[
   note('For a finished example, see Driver Documents > Bueno, Luis > 01 Operational.')+
   links([{label:'Authority POA folder',url:'https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Compliance/Permits/Authority%20POA'},{label:'Driver Documents',url:'https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents'}])+
   subh('Admin tasks')+steps([
-    fl('Update Authority Driver List.xlsx','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Authority%20Driver%20List.xlsx?web=1')+' and '+fl('Current Trucks & Drivers.xlsx','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1')+'.',
+    '__FL__Update Authority Driver List.xlsx__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Authority%20Driver%20List.xlsx?web=1'+' and '+'__FL__Current Trucks & Drivers.xlsx__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1'+'.',
     'Create the authority files and labels. Process the authority file from Amie.',
     'Grab the old authority folder. Create copies of the application and previous employer sheets — put behind the new ones.',
     "Take out anything specific to the old authority and put it into the new authority's Ultimate Program Docs file.",
@@ -884,7 +918,7 @@ const EVENTS=[
   'Account Type: Weight Distance (Permit & Tax). Continue to Authorization page. Click Attach Completed Form ACD-31102 Tax Information Authorization and continue.',
 ])+note('Only process 10 authorities per day or the card will get declined.')},
 {title:'Greenlight (PrePass)',sec:'onboarding',body:()=>steps([
-  'Log in to PrePass. Also open '+fl('Driver Documents > Current Trucks & Drivers.xlsx','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1')+' (Scale/Toll Transponders tab) and the OR Accounts & Passwords sheet (PrePass tab).',
+  'Log in to PrePass. Also open '+'__FL__Driver Documents > Current Trucks & Drivers.xlsx__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1'+' (Scale/Toll Transponders tab) and the OR Accounts & Passwords sheet (PrePass tab).',
   'Using the PrePass tab, copy/paste the OLD authority\'s PrePass # into the PrePass search bar. If the truck is NOT yet assigned to anything, skip removing it.',
   'After selecting, go to Equipment Management, select the old truck. Click Unassign Transponder → Return to Customer Inventory. If not the last truck on the account, also check "delete the source equipment." Click Save. Don\'t assign a new transponder on the next page — just Cancel and Save again.',
   'Go back to My PrePass. Paste the NEW authority\'s PrePass # into the search bar.',
@@ -893,7 +927,7 @@ const EVENTS=[
   'Click Jurisdiction States. If not filled: select all EXCEPT AK, HI, PR, NF, NT, PQ, YT. For Canada, check the checkbox and put 36287 in the dropdown.',
   'Need a transponder: No. (Click Yes if ordering new — when prompted, select the address with Amie\'s name.) Equipment hauls hazmat: No.',
   'Search for a transponder by transponder ID (or add 3rd party, Best Pass). Enter the transponder ID, select, OK on Device Transfer Warning, Save. Complete equipment submission. Close.',
-  'Update '+fl('Driver Documents > Current Trucks & Drivers.xlsx','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1')+': cut/paste transponder # from old to new truck. Add a note: updated MM/DD/YY. Confirm the authority on the new truck is correct.',
+  'Update '+'__FL__Driver Documents > Current Trucks & Drivers.xlsx__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1'+': cut/paste transponder # from old to new truck. Add a note: updated MM/DD/YY. Confirm the authority on the new truck is correct.',
 ])},
 {title:'Best Pass — White Bar',sec:'onboarding',body:()=>subh('Best Pass')+steps([
   'Take a picture of the white bar and send to Amie to edit the Current Trucks & Drivers sheet.',
@@ -915,7 +949,7 @@ const EVENTS=[
   'BestPass → Vehicles & Devices → Edit Vehicle.',
   'Enter the BestPass # (BP Horizon) into the Quick Assign Device.',
   'It will say the transponder comes as a pair (white box) and will remove the old transponder IDs. Click Yes.',
-  'Update '+fl('Driver Documents > Current Trucks & Drivers.xlsx','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1')+': cut/paste transponder # from old to new truck. Add note: updated MM/DD/YY. Confirm the authority is correct.',
+  'Update '+'__FL__Driver Documents > Current Trucks & Drivers.xlsx__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1'+': cut/paste transponder # from old to new truck. Add note: updated MM/DD/YY. Confirm the authority is correct.',
 ])},
 {title:'Driver Packages — New Driver',sec:'onboarding',body:()=>subh('Paper parts')+
   ob('Documents needed',NRS,['60/40 package — contains 1-pg lease with Temp Authority (need all info from Bill or emails from Kathryn to complete)','Two Page Lease — between Ultimate Logistics and the driver\'s LLC','Idaho LLC Operating Agreement — for the bank, with LLC and IRS letter from Kathryn. Change the D&A policy date to current date.','Blank insurance cancellation request — driver signs as named insured. Do NOT date.','Safety Responsibility Statement for temp authority','Truck Docs (see Truck Docs)'])+
@@ -929,7 +963,7 @@ const EVENTS=[
     'Input driver\'s Last and First name, plus email. Send.',
     'If they email back about additional county records — always say yes (extra cost, worth it).',
   ])+links([{label:'bluelinebackgrounds.com',url:'https://www.bluelinebackgrounds.com'},{label:'MVRcheck.com',url:'https://www.mvrcheck.com'}])+subh('Update systems')+steps([
-    'Update '+fl('Driver Documents > Current Trucks & Drivers.xlsx','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1')+'.',
+    'Update '+'__FL__Driver Documents > Current Trucks & Drivers.xlsx__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1'+'.',
     'Add driver to ITS: Admin → Drivers → Add. Copy/paste from 60/40 package. Notes box: Temp Authority [auth] and CDL State. Pay tab: Pay Type = %, Standard 60%, FSC 60%, Additional Charges 0%. Save.',
     'Add driver to Motive: Admin → Drivers → Add Driver. Fill out Name, Email, Phone, CDL, Username (simplified auth name). Select Electronic Logs Required and Compliance Mode ELD. Home Terminal Time: Mountain. Check Yard Move and Personal Conveyance (NOT Manual Drive). Select DOT # for Temporary Authority. Home Terminal Address: 4663 S Enterprise St. Cycle: 70HR USA, 34hr reset, 30min break. Save.',
     'Run Full Pre-employment Query on DACH under Temporary Authority (see Run Query on DACH).',
@@ -957,12 +991,12 @@ const EVENTS=[
   ob('Required documents',NRS,['Cover page (remove EIN #)','Registration','Lease Agreement — Redact: total equipment cost, number of months, all dollar amounts including early termination fee. Total of 10 redactions.','Designation of Payment — if no date, use the date the lease was signed','ID Card','Authorization to Drive — Redact CDL # and state','Trailer Lease','Picture of truck with graphics'])+
   subh('Naming and filing')+steps([
     'Name the file [truck#] First Last (e.g., 781 Tim Ruman).',
-    'Upload to the driver\'s 01 Operational folder: '+fl('Driver Documents > [Last, First] > 01 Operational','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents')+'.',
+    'Upload to the driver\'s 01 Operational folder: '+'__FL__Driver Documents > [Last, First] > 01 Operational__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents'+'.',
     'Move the previous carrier package (if any) to the Old subfolder.',
   ])+links([{label:'Driver Documents folder',url:'https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents'}])},
 {title:'Truck Docs',sec:'docs',body:()=>steps([
   'Start with the new cover sheet for the truck. Open in a web browser for copy/paste, and also in PDFsam to start adding pages.',
-  'Go to '+fl('Equipment > Tractors > [truck#]','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Equipment/Tractors')+' and download the most recent registration. Edit the carrier name (Arial, font 9, bold) and US-DOT # (Arial, font 9).',
+  'Go to '+'__FL__Equipment > Tractors > [truck#]__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Equipment/Tractors'+' and download the most recent registration. Edit the carrier name (Arial, font 9, bold) and US-DOT # (Arial, font 9).',
   'Add the insurance card. (May come in later — can skip and add later.)',
   'Add the certificate of liability insurance file.',
   'Add Equipment Lease Agreement, Authorization to Drive Tractor, and Trailer Lease – Interchange Agreement (all signed by Bill).',
@@ -1036,7 +1070,7 @@ const EVENTS=[
 
 // ── SECTION 7: AUDITS & COMPLIANCE ─────────────────────────
 {title:'Audits',sec:'compliance',body:()=>steps([
-  'Driver audit files are at '+fl('Driver Documents > [Last, First] > 02 Compliance','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents')+'. Open the sample audit in a separate tab and download everything from the authority audit folder.',
+  'Driver audit files are at '+'__FL__Driver Documents > [Last, First] > 02 Compliance__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents'+'. Open the sample audit in a separate tab and download everything from the authority audit folder.',
   'From the driver\'s 02 Compliance and 03 Confidential folders, download their MVR, CDL, and Medical.',
   'Download the driver\'s Fuel Report for the first 30 days of the audit month.',
   'Open the truck docs in PDFsam and delete/add files until it matches the sample. Double-check the DOT is current.',
@@ -1082,7 +1116,7 @@ const EVENTS=[
 
 // ── SECTION 8: EQUIPMENT TRACKING ──────────────────────────
 {title:'Quartix Check',sec:'tracking',body:()=>steps([
-  'Go to '+fl('Equipment > Quartix > Quartix Check Template','https://gogps.com')+' and add a new sheet.',
+  'Go to '+'__FL__Equipment > Quartix > Quartix Check Template__SEP__https://gogps.com'+' and add a new sheet.',
   'In Quartix, go to Live Tracking. Group: All, Vehicle: All.',
   'Copy and paste (without formatting — Ctrl+Shift+V) the entire text of data into the Quartix sheet.',
   'Clean up: delete everything besides the description (has driver name), unit number, and date/time/location column.',
@@ -1212,21 +1246,21 @@ const EVENTS=[
   'Run ActualServiceSTEP3. Adds names and totals.',
   'Delete the Hours column (until the macro gets fixed).',
   'Highlight anyone over $1000 using Highlight Rows macro.',
-  'Save highlighted copy to '+fl('Office Documents > Payroll > [current year] Payroll Files','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Office%20Documents/Payroll')+'.',
+  'Save highlighted copy to '+'__FL__Office Documents > Payroll > [current year] Payroll Files__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Office%20Documents/Payroll'+'.',
   'Delete non-highlighted (under $1k) drivers. Save and print for Bill.',
 ])+links([{label:'Payroll Files folder',url:'https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Office%20Documents/Payroll'}])},
 {title:'Fuel Report',sec:'payroll',body:()=>steps([
   'Go to the EFS website and log in.',
   'Transaction Report, select the payroll date range (1st–15th or 16th–31st), page break, show discount detail, group and sort by driver name. View format: PDF. Submit.',
   'Open the PDF in PDF-XChange Editor. Top right, use Search to highlight data.',
-  'Open the Fuel Report Highlight notes ('+fl('Office Documents > Payroll > Templates Forms Instructions etc','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Office%20Documents/Templates%20%26%20Forms')+') and copy/paste each one into the search bar. After each, click Options → Annotate Search Results → Highlight.',
+  'Open the Fuel Report Highlight notes ('+'__FL__Office Documents > Payroll > Templates Forms Instructions etc__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Office%20Documents/Templates%20%26%20Forms'+') and copy/paste each one into the search bar. After each, click Options → Annotate Search Results → Highlight.',
   'Once done, save and re-open in PDFsam.',
   'For each driver\'s report, add up the total Scales amount with the fees (fees are highlighted; total Scales is in the bottom-left box). Write: scales: 13 + 1 = 14.',
   'If the scale amount has cents (like 11.78), there\'s tax (STAX underneath) — add it. E.g., 11.78 + 0.72 = 12.50.',
   'If there\'s a green highlight, that\'s a cash advance. Subtract the total cash advance amount from the bottom-left box.',
   'If no scales and no cash advances, skip.',
   'Email to KJ and Carol (along with the bonus miles report).',
-  'Upload to '+fl('Office Documents > Payroll > [current year] Payroll Files','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Office%20Documents/Payroll')+'.',
+  'Upload to '+'__FL__Office Documents > Payroll > [current year] Payroll Files__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Office%20Documents/Payroll'+'.',
 ])+links([{label:'Payroll Files folder',url:'https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Office%20Documents/Payroll'},{label:'Templates Forms Instructions etc',url:'https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Office%20Documents/Templates%20%26%20Forms'}])},
 {title:'Entering Fuel (QuickBooks)',sec:'payroll',body:()=>steps([
   'Open the fuel report.',
@@ -1248,7 +1282,7 @@ const EVENTS=[
   'Check notes for extra charges. If there\'s a dash next to load # and no note, check the split pay for each driver in the ITS load.',
   'If adding pay, enter 60% of the pay (not total) for flat rate. No flat rate for non-60/40 drivers.',
   'After checking, print double-sided and save as driver last name.',
-  'Put statement PDFs in '+fl('Office Documents > Payroll > [current year] Payroll Files','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Office%20Documents/Payroll')+'.',
+  'Put statement PDFs in '+'__FL__Office Documents > Payroll > [current year] Payroll Files__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Office%20Documents/Payroll'+'.',
 ])+links([{label:'Payroll Files folder',url:'https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Office%20Documents/Payroll'}])},
 {title:'Entering Income (QuickBooks)',sec:'payroll',body:()=>steps([
   'Open the ITS Statements.',
@@ -1274,7 +1308,7 @@ const EVENTS=[
   'Click Visual Basic on the top left.',
   'Right-click on Module (in your Personal workbook, so it works on all other workbooks).',
   'Click Insert → Module to create a new one.',
-  'Paste in the code from the text file (Excel Macros file — likely in '+fl('Office Documents > Payroll > Templates Forms Instructions etc','https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Office%20Documents/Templates%20%26%20Forms')+').',
+  'Paste in the code from the text file (Excel Macros file — likely in '+'__FL__Office Documents > Payroll > Templates Forms Instructions etc__SEP__https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Office%20Documents/Templates%20%26%20Forms'+').',
   'Rename the macro by changing the line at the top that says Sub Macroname.',
   'To run a macro: Developer → Macros and select from the list.',
 ])+links([{label:'Excel Macros folder',url:'https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Office%20Documents/Payroll/Templates%20Forms%20Instructions%20etc/Excel%20Macros'}])},
@@ -1546,10 +1580,15 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeL
 
 // ── Per-item link editor ────────────────────────────────────
 let customLinks = {};  // key: item text, value: {label, url}
+let customSteps = {};  // key: step_blockKey_i, value: {text}
 let _editingKey = null;
 
 function loadCustomLinks(){
   try{ const s=localStorage.getItem('ul_item_links'); if(s) customLinks=JSON.parse(s); }catch(e){}
+  try{ const s=localStorage.getItem('ul_step_edits'); if(s) customSteps=JSON.parse(s); }catch(e){}
+}
+function saveCustomSteps(){
+  try{ localStorage.setItem('ul_step_edits', JSON.stringify(customSteps)); }catch(e){}
 }
 function toggleCheck(key, el){
   sessionChecks[key] = el.checked;
@@ -1564,9 +1603,36 @@ function saveCustomLinks(){
   try{ localStorage.setItem('ul_item_links', JSON.stringify(customLinks)); }catch(e){}
 }
 
+let _editingType='link'; // 'link' or 'step'
+let _editingStepKey=null;
+let _editingStepOriginal='';
+
+function openStepEditor(key, originalText, btnEl){
+  _editingType='step';
+  _editingStepKey=key;
+  _editingStepOriginal=originalText;
+  const popup=document.getElementById('link-popup');
+  document.getElementById('link-popup-title').textContent='Edit step text';
+  document.getElementById('link-popup-text-row').style.display='block';
+  document.getElementById('link-popup-chip-row').style.display='none';
+  document.getElementById('link-popup-clear-btn').textContent='Reset to original';
+  const custom=customSteps[key];
+  document.getElementById('link-popup-text').value=custom?custom.text:originalText;
+  const rect=btnEl.getBoundingClientRect();
+  popup.style.top=Math.min(rect.bottom+6,window.innerHeight-280)+'px';
+  popup.style.left=Math.max(8,Math.min(rect.left-160,window.innerWidth-360))+'px';
+  popup.classList.add('open');
+  document.getElementById('link-popup-text').focus();
+}
+
 function openLinkEditor(key, currentUrl, currentLabel, btnEl){
+  _editingType='link';
   _editingKey = key;
   const popup = document.getElementById('link-popup');
+  document.getElementById('link-popup-title').textContent='Edit link chip';
+  document.getElementById('link-popup-text-row').style.display='none';
+  document.getElementById('link-popup-chip-row').style.display='block';
+  document.getElementById('link-popup-clear-btn').textContent='Remove link';
   const urlInput = document.getElementById('link-popup-input');
   const lblInput = document.getElementById('link-popup-label');
   const custom = customLinks[key];
@@ -1582,32 +1648,92 @@ function closeLinkPopup(){
   document.getElementById('link-popup').classList.remove('open');
   _editingKey = null;
 }
-function saveItemLink(){
-  if(!_editingKey) return;
-  const url = document.getElementById('link-popup-input').value.trim();
-  const lbl = document.getElementById('link-popup-label').value.trim();
-  if(url) customLinks[_editingKey] = {url, label: lbl||_editingKey};
-  else delete customLinks[_editingKey];
-  saveCustomLinks();
-  closeLinkPopup();
-  if(activeIdx !== null){
-    const e = EVENTS[activeIdx];
-    document.getElementById('m-body').innerHTML = e.body();
+function saveItemEdit(){
+  if(_editingType==='step'){
+    if(!_editingStepKey) return;
+    const text=document.getElementById('link-popup-text').value.trim();
+    if(text && text!==_editingStepOriginal) customSteps[_editingStepKey]={text};
+    else delete customSteps[_editingStepKey];
+    saveCustomSteps();
+    closeLinkPopup();
+    // Update the step text in-place
+    const el=document.getElementById('st_'+_editingStepKey);
+    const btn=el?el.nextElementSibling:null;
+    if(el){
+      el.innerHTML=customSteps[_editingStepKey]?customSteps[_editingStepKey].text:_editingStepOriginal;
+      el.classList.toggle('edited',!!customSteps[_editingStepKey]);
+    }
+    if(btn) btn.classList.toggle('has-edit',!!customSteps[_editingStepKey]);
+  } else {
+    if(!_editingKey) return;
+    const url=document.getElementById('link-popup-input').value.trim();
+    const lbl=document.getElementById('link-popup-label').value.trim();
+    if(url) customLinks[_editingKey]={url,label:lbl||_editingKey};
+    else delete customLinks[_editingKey];
+    saveCustomLinks();
+    closeLinkPopup();
+    updateItemChip(_editingKey);
   }
 }
-function clearItemLink(){
-  if(!_editingKey) return;
-  delete customLinks[_editingKey];
-  saveCustomLinks();
-  closeLinkPopup();
-  if(activeIdx !== null){
-    const e = EVENTS[activeIdx];
-    document.getElementById('m-body').innerHTML = e.body();
+function saveItemLink(){ saveItemEdit(); }
+function clearItemEdit(){
+  if(_editingType==='step'){
+    if(!_editingStepKey) return;
+    delete customSteps[_editingStepKey];
+    saveCustomSteps();
+    closeLinkPopup();
+    const el=document.getElementById('st_'+_editingStepKey);
+    const btn=el?el.nextElementSibling:null;
+    if(el){ el.innerHTML=_editingStepOriginal; el.classList.remove('edited'); }
+    if(btn) btn.classList.remove('has-edit');
+  } else {
+    if(!_editingKey) return;
+    delete customLinks[_editingKey];
+    saveCustomLinks();
+    closeLinkPopup();
+    updateItemChip(_editingKey);
   }
+}
+function clearItemLink(){ clearItemEdit(); }
+// Update just the chip on a single item without re-rendering the whole modal
+function updateItemChip(key){
+  // Find the button with this key and update its parent item
+  const btns = document.querySelectorAll('.link-edit-btn');
+  btns.forEach(btn => {
+    const onclick = btn.getAttribute('onclick')||'';
+    if(onclick.includes(key.replace(/'/g,"\\'").substring(0,30))){
+      const wrap = btn.closest('.ob-item-wrap');
+      if(!wrap) return;
+      const custom = customLinks[key];
+      // Update chip if present, or add one
+      let chip = wrap.querySelector('.ob-link-chip');
+      if(custom){
+        if(!chip){
+          chip = document.createElement('a');
+          chip.className = 'ob-link-chip';
+          chip.target = '_blank';
+          const textSpan = wrap.querySelector('.ob-item-text');
+          if(textSpan) textSpan.appendChild(document.createTextNode('\u00a0'));
+          if(textSpan) { const sp=document.createElement('span');sp.style.whiteSpace='nowrap';sp.appendChild(chip);textSpan.appendChild(sp); }
+        }
+        chip.href = custom.url;
+        chip.textContent = custom.label;
+        btn.classList.add('has-custom');
+      } else {
+        if(chip) chip.closest('span[style]')?.remove();
+        btn.classList.remove('has-custom');
+      }
+      // Update onclick with new values
+      const safeUrl = (custom?.url||'').replace(/'/g,"\\'");
+      const safeLabel = (custom?.label||'').replace(/'/g,"\\'");
+      const safeKey = key.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+      btn.setAttribute('onclick', `openLinkEditor('${safeKey}','${safeUrl}','${safeLabel}',this)`);
+    }
+  });
 }
 // handle Enter key in link popup
 document.addEventListener('keydown', function(e){
-  if(e.key==='Enter' && document.getElementById('link-popup').classList.contains('open')) saveItemLink();
+  if(e.key==='Enter' && document.getElementById('link-popup').classList.contains('open') && _editingType!=='step') saveItemEdit();
 });
 // Close popup when clicking outside
 document.addEventListener('click', function(e){
