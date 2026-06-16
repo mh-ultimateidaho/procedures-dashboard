@@ -161,18 +161,27 @@ body{font-family:system-ui,sans-serif;background:#f9f9f9;color:#111}
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
 <script>
 // ── Microsoft Auth & Live Driver List ──────────────────────
-const MSAL_CFG={auth:{clientId:'fd8d0730-6d5c-4ac6-aa95-bfdb5dfb7385',authority:'https://login.microsoftonline.com/2c6b3d13-b98c-4605-8fcc-d8eed3579136',redirectUri:window.location.href.split('?')[0].split('#')[0]},cache:{cacheLocation:'localStorage',storeAuthStateInCookie:true}};
+const MSAL_CFG={auth:{clientId:'fd8d0730-6d5c-4ac6-aa95-bfdb5dfb7385',authority:'https://login.microsoftonline.com/2c6b3d13-b98c-4605-8fcc-d8eed3579136',redirectUri:'https://mh-ultimateidaho.github.io/procedures-dashboard/'},cache:{cacheLocation:'localStorage',storeAuthStateInCookie:true}};
 const FILE_ID='01GO434OQNT6EVQH2RDRAIQJFE2PCVA4P2';
 const DRIVE_ID='b!C0W6AbLA70CaBrk6u9hU-fC2B-6QZHZEtrtGS_wNp0iHaZgFvWYnQZKhJjFss_W2';
 const SCOPES=['Files.Read','Sites.Read.All'];
 let msalApp;
 try{msalApp=new msal.PublicClientApplication(MSAL_CFG);}catch(e){}
 
+// Handle redirect on return from Microsoft login
+(async()=>{
+  if(msalApp){try{await msalApp.handleRedirectPromise();}catch(e){}}
+})();
+
 async function getToken(){
   if(!msalApp)return null;
   const accs=msalApp.getAllAccounts();
-  if(accs.length){try{const r=await msalApp.acquireTokenSilent({scopes:SCOPES,account:accs[0]});return r.accessToken;}catch(e){}}
-  try{const r=await msalApp.acquireTokenPopup({scopes:SCOPES});return r.accessToken;}catch(e){return null;}
+  if(accs.length){
+    try{const r=await msalApp.acquireTokenSilent({scopes:SCOPES,account:accs[0]});return r.accessToken;}catch(e){}
+  }
+  // Redirect to Microsoft login — page returns here after sign-in
+  msalApp.loginRedirect({scopes:SCOPES});
+  return null;
 }
 
 async function fetchLiveDrivers(){
