@@ -341,7 +341,8 @@ const BLS={bg:'#FFF9C4',bd:'#E0A800',lc:'#7A5200',tc:'#7A5200'};
 const NRS={bg:'#F3F4F6',bd:'#9CA3AF',lc:'#374151',tc:'#374151'};
 
 let activeSec='all';
-let CTX={driver:'',auth:'',old:'',nw:'',dot:''};sessionChecks={};
+let CTX={driver:'',auth:'',old:'',nw:'',dot:''};
+let sessionChecks={};  // key: cb_blockKey_i, value: true — per-session checkbox state
 let curBodyFn=null;
 
 function dOpts(){return '<option value="">Select driver...</option>'+DR.map(d=>`<option value="${d.n}">${d.n} (#${d.t})</option>`).join('');}
@@ -388,44 +389,57 @@ function fl(path,url){return `<a href="${url}" target="_blank" class="filepath" 
 function ob(label,st,items){
   const blockKey=label.replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_]/g,'');
   const rows=items.map((raw,i)=>{
-    const filled=fc(raw);
-    // Parse: does raw contain fl(...)?
+    // Parse item type
     const flMatch=raw.match(/^fl\('([^']+)','([^']+)'\)$/);
-    // Or pipe-separated "text|note|shortcode"
     const pipeMatch=!flMatch&&raw.includes('|');
-    let plainText=filled, linkLabel='', linkUrl='';
+    let plainText='', chipLabel='', linkUrl='';
+
     if(flMatch){
-      linkLabel=fc(flMatch[1]); linkUrl=flMatch[2];
-      plainText=''; // whole item IS the link
+      // fl('Full sentence text','url') — text is black, chip is a short link icon
+      plainText=fc(flMatch[1]);
+      linkUrl=flMatch[2];
+      // Short chip label: just the domain or a generic open icon
+      const domain=linkUrl.replace(/https?:\/\//,'').split('/')[0].replace('ultimatecorp.sharepoint.com','SharePoint').replace('gogps.com','Quartix').replace('www.','');
+      chipLabel='↗ '+domain;
     } else if(pipeMatch){
+      // 'Plain text|Chip label|shortcode'
       const parts=raw.split('|');
-      linkLabel=fc(parts[0].trim());
-      plainText=fc(parts[1]?parts[1].trim():'');
-      // shortcode in parts[2]: ct=current trucks, etc
+      plainText=fc(parts[0].trim());
+      chipLabel=fc(parts[1]?parts[1].trim():'Open');
       const code=parts[2]?parts[2].trim():'';
       if(code==='ct') linkUrl='https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared%20Documents/Driver%20Documents/Current%20Trucks%20%26%20Drivers.xlsx?web=1';
+    } else {
+      // Plain text, no link
+      plainText=fc(raw);
     }
-    // Check for custom link override
+
+    // Custom link override
     const key=(flMatch?flMatch[1]:raw).replace(/\[[\w]+\]/g,'').trim().substring(0,80);
     const custom=customLinks[key];
     const finalUrl=custom?custom.url:linkUrl;
-    const finalLabel=custom?custom.label:linkLabel;
+    const finalChipLabel=custom?custom.label:chipLabel;
     const isCustom=!!custom;
+
     // Checkbox state
     const cbKey='cb_'+blockKey+'_'+i;
     const checked=sessionChecks[cbKey]?'checked':'';
     const doneClass=sessionChecks[cbKey]?' done':'';
-    // Render chip
-    const chip=finalUrl?`<a href="${finalUrl}" target="_blank" class="ob-link-chip">${finalLabel}</a>`:'';
+
+    // Chip — only shows if there's a URL
+    const chip=finalUrl
+      ? `<a href="${finalUrl}" target="_blank" class="ob-link-chip">${finalChipLabel||'↗'}</a>`
+      : '';
+
     // Edit button
     const safeKey=key.replace(/'/g,"\\'").replace(/"/g,'&quot;');
     const safeUrl=(finalUrl||'').replace(/'/g,"\\'");
-    const safeLabel=(finalLabel||'').replace(/'/g,"\\'");
+    const safeChipLabel=(finalChipLabel||'').replace(/'/g,"\\'");
     const btnClass=isCustom?' has-custom':'';
-    const editBtn=`<button class="link-edit-btn${btnClass}" onclick="openLinkEditor('${safeKey}','${safeUrl}','${safeLabel}',this)" title="${isCustom?'Edit custom link':'Add/edit link'}">✎</button>`;
+    const editBtn=`<button class="link-edit-btn${btnClass}" onclick="openLinkEditor('${safeKey}','${safeUrl}','${safeChipLabel}',this)" title="${isCustom?'Edit custom link':'Add/edit link'}">✎</button>`;
+
     return `<div class="ob-item-wrap">
       <input type="checkbox" ${checked} onchange="toggleCheck('${cbKey}',this)">
-      <span class="ob-item-text${doneClass}">${plainText}${chip?'&nbsp;':''}${chip}</span>
+      <span class="ob-item-text${doneClass}">${plainText}${chip?' ':''}<span style="white-space:nowrap">${chip}</span></span>
       <span class="ob-item-actions">${editBtn}</span>
     </div>`;
   }).join('');
@@ -1532,7 +1546,6 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeL
 
 // ── Per-item link editor ────────────────────────────────────
 let customLinks = {};  // key: item text, value: {label, url}
-let sessionChecks = {};  // key: cb_blockKey_i, value: true — per-session checkbox state
 let _editingKey = null;
 
 function loadCustomLinks(){
