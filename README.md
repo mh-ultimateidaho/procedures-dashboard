@@ -72,3 +72,13 @@ The redirect URI `https://mh-ultimateidaho.github.io/procedures-dashboard/` must
 
 - [Dispatch Doc Lookup](https://mh-ultimateidaho.github.io/doc-lookup/) — search driver, tractor, trailer, and CA TRU certificate folders
 - [Office Doc Lookup](https://mh-ultimateidaho.github.io/doc-lookup-office/) — search office documents with category filtering
+
+---
+
+## Planned Updates
+Updates/ideas to implement.
+### Pending
+- 
+
+---
+
