@@ -112,6 +112,22 @@ body{font-family:system-ui,sans-serif;background:#f9f9f9;color:#111}
 .save-progress-btn{font-size:12px;padding:5px 14px;border-radius:6px;cursor:pointer;border:0.5px solid #059669;background:#D1FAE5;color:#065F46;font-weight:500;margin-left:8px}
 .save-progress-btn:hover{background:#A7F3D0}
 
+/* ── Card builder modal ── */
+#card-builder-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.52);z-index:10000;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto}
+#card-builder-modal.open{display:flex}
+.cb-modal{background:#fff;border-radius:12px;width:100%;max-width:600px;margin:auto;overflow:hidden}
+.cb-head{padding:16px 20px;border-bottom:0.5px solid #e5e5e5;display:flex;justify-content:space-between;align-items:center}
+.cb-head h2{font-size:16px;font-weight:500}
+.cb-body{padding:16px 20px;max-height:70vh;overflow-y:auto}
+.cb-label{font-size:12px;font-weight:500;color:#555;margin:12px 0 5px;display:block}
+.cb-input{width:100%;font-size:13px;padding:6px 9px;border:0.5px solid #ccc;border-radius:6px;margin-bottom:2px}
+.cb-select{font-size:13px;padding:6px 9px;border:0.5px solid #ccc;border-radius:6px;background:#fff}
+.cb-section{background:#f7f7f7;border-radius:8px;padding:10px 12px;margin-bottom:10px}
+.cb-section-title{font-size:11px;font-weight:600;color:#444;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:8px}
+.cb-footer{padding:12px 20px;border-top:0.5px solid #e5e5e5;display:flex;gap:8px;justify-content:flex-end}
+.cb-footer button{font-size:13px;padding:6px 16px;border-radius:6px;cursor:pointer;border:0.5px solid #ccc;background:#f5f5f5}
+.cb-footer .btn-save{background:#e6f1fb;color:#185fa5;border-color:#b5d4f4;font-weight:500}
+
 /* ── Edit popup ── */
 .popup{display:none;position:fixed;z-index:99999;background:#fff;border:0.5px solid #ddd;border-radius:10px;box-shadow:0 4px 24px rgba(0,0,0,0.18);padding:14px 16px;width:360px}
 .popup.open{display:block}
@@ -163,11 +179,71 @@ body{font-family:system-ui,sans-serif;background:#f9f9f9;color:#111}
   </div>
 
   <div id="browse-view" style="display:none">
-    <div class="search-row"><input type="text" id="search" placeholder="Search... (e.g. CDL, fuel, quartix, permits)" oninput="render()"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="search-row" style="margin-bottom:0;flex:1;margin-right:10px"><input type="text" id="search" placeholder="Search... (e.g. CDL, fuel, quartix, permits)" oninput="render()"></div>
+      <button onclick="showNewCardBuilder()" style="font-size:12px;padding:7px 14px;border-radius:8px;cursor:pointer;border:0.5px solid #3a85d8;background:#e6f1fb;color:#185fa5;font-weight:500;white-space:nowrap">+ New card</button>
+    </div>
     <div class="filter-row" id="chips"></div>
     <div class="grid" id="grid"></div>
     <div class="no-results" id="no-res" style="display:none">No matching procedures found.</div>
   </div>
+
+<!-- Card Builder Modal -->
+<div id="card-builder-modal">
+  <div class="cb-modal">
+    <div class="cb-head">
+      <h2>Create new card</h2>
+      <button class="mclose" onclick="hideNewCardBuilder()">&#x2715;</button>
+    </div>
+    <div class="cb-body">
+      <div class="cb-section">
+        <div class="cb-section-title">Card info</div>
+        <label class="cb-label">Title</label>
+        <input type="text" id="cb-title" class="cb-input" placeholder="e.g. Trailer Change">
+        <label class="cb-label" style="margin-top:8px">Section</label>
+        <select id="cb-sec" class="cb-select">
+          <option value="daily">Daily & Routine</option>
+          <option value="checklists">Checklists</option>
+          <option value="updates">Driver & Equipment Updates</option>
+          <option value="onboarding">Driver Onboarding</option>
+          <option value="docs">Documents & Carrier Package</option>
+          <option value="permits">Permits & Accounts</option>
+          <option value="taxes">Taxes</option>
+          <option value="compliance">Audits & Compliance</option>
+          <option value="tracking">Equipment Tracking</option>
+          <option value="fuel">Fuel, EFS & Factoring</option>
+          <option value="motive">Motive (ELD)</option>
+          <option value="payroll">Payroll</option>
+          <option value="macros">Excel Macros</option>
+          <option value="email">Email Templates</option>
+        </select>
+      </div>
+      <div class="cb-section">
+        <div class="cb-section-title">Numbered steps <span style="font-weight:400;text-transform:none;font-size:11px;color:#888">(shown at top of card)</span></div>
+        <div id="cb-steps"></div>
+        <button onclick="cbAddStepRow()" style="font-size:12px;padding:4px 12px;border-radius:6px;cursor:pointer;border:1px dashed #aaa;background:transparent;color:#666;width:100%;margin-top:4px">+ Add step</button>
+      </div>
+      <div class="cb-section">
+        <div class="cb-section-title">Owner blocks <span style="font-weight:400;text-transform:none;font-size:11px;color:#888">(KJ / Amie / Your tasks etc.)</span></div>
+        <div id="cb-blocks"></div>
+        <div style="display:flex;gap:8px;margin-top:6px;align-items:center">
+          <select id="cb-block-preset" class="cb-select" style="flex:1">
+            <option value="bls">Before driver leaves — your tasks</option>
+            <option value="nrs">No rush — your tasks</option>
+            <option value="kj">KJ does</option>
+            <option value="amie">Amie does</option>
+            <option value="custom">Custom label...</option>
+          </select>
+          <button onclick="cbAddBlock()" style="font-size:12px;padding:6px 14px;border-radius:6px;cursor:pointer;border:0.5px solid #3a85d8;background:#e6f1fb;color:#185fa5;font-weight:500">+ Add block</button>
+        </div>
+      </div>
+    </div>
+    <div class="cb-footer">
+      <button onclick="hideNewCardBuilder()">Cancel</button>
+      <button class="btn-save" onclick="cbSaveCard()">Create card</button>
+    </div>
+  </div>
+</div>
 </div>
 
 <!-- Modal -->
@@ -554,17 +630,34 @@ function ob(label,st,items){
 // steps() — numbered steps with edit buttons
 function steps(arr){
   return arr.map((s,i)=>{
-    const rawText=fc(s);
+    // Strip __FL__ tag if present (fl() items in steps show as plain text with chip)
+    let rawText=s, builtinChipUrl='', builtinChipLabel='';
+    if(typeof s==='string'&&s.startsWith('__FL__')){
+      const inner=s.slice(6);
+      const sep=inner.indexOf('__SEP__');
+      rawText=sep>=0?inner.slice(0,sep):inner;
+      builtinChipUrl=sep>=0?inner.slice(sep+7):'';
+      const domain=builtinChipUrl.replace(/https?:\/\//,'').split('/')[0]
+        .replace('ultimatecorp.sharepoint.com','SharePoint')
+        .replace('gogps.com','Quartix').replace('www.','');
+      builtinChipLabel='↗ '+domain;
+    }
+    rawText=fc(rawText);
     const key='S:'+activeCardTitle+':'+i;
     const edit=customEdits[key];
-    const text=edit&&edit.text?edit.text:rawText;
+    const displayText=edit&&edit.text?edit.text:rawText;
+    const chipUrl=edit&&edit.linkUrl?edit.linkUrl:builtinChipUrl;
+    const chipLabel=edit&&edit.linkLabel?edit.linkLabel:builtinChipLabel;
+    const chip=chipUrl?` <a href="${chipUrl}" target="_blank" class="ob-link-chip">${chipLabel||'↗'}</a>`:'';
     const modified=edit?' modified':'';
     const safeKey=encodeURIComponent(key).replace(/'/g,'%27');
     const safeOrig=encodeURIComponent(rawText).replace(/'/g,'%27');
+    const safeChipLabel=encodeURIComponent(chipLabel||builtinChipLabel).replace(/'/g,'%27');
+    const safeChipUrl=encodeURIComponent(chipUrl||builtinChipUrl).replace(/'/g,'%27');
     return `<div class="step-wrap">
       <div class="step-num">${i+1}</div>
-      <div class="step-text" id="st_${i}_${activeCardTitle.replace(/\W/g,'')}">${text}</div>
-      <button class="edit-btn${modified}" onclick="openEdit('step','${safeKey}','${safeOrig}','','',this)" title="Edit this step">✎</button>
+      <div class="step-text" id="st_${i}_${activeCardTitle.replace(/\W/g,'')}">${displayText}${chip}</div>
+      <button class="edit-btn${modified}" onclick="openEdit('step','${safeKey}','${safeOrig}','${safeChipLabel}','${safeChipUrl}',this)" title="Edit this step">✎</button>
     </div>`;
   }).join('');
 }
@@ -1526,14 +1619,10 @@ function openEdit(mode, key, origText, chipLabel, chipUrl, btn){
   const edit=customEdits[_popupKey];
   document.getElementById('popup-title').textContent=mode==='step'?'Edit step':'Edit checklist item';
   document.getElementById('popup-text').value=edit&&edit.text?edit.text:_popupOrig;
-  const linkRow=document.getElementById('popup-link-row');
-  if(mode==='ob'){
-    linkRow.style.display='block';
-    document.getElementById('popup-link-label').value=edit&&edit.linkLabel!==undefined?edit.linkLabel:decodeURIComponent(chipLabel);
-    document.getElementById('popup-link-url').value=edit&&edit.linkUrl!==undefined?edit.linkUrl:decodeURIComponent(chipUrl);
-  } else {
-    linkRow.style.display='none';
-  }
+  // Always show link fields — both steps and ob items can have links
+  document.getElementById('popup-link-row').style.display='block';
+  document.getElementById('popup-link-label').value=edit&&edit.linkLabel?edit.linkLabel:decodeURIComponent(chipLabel);
+  document.getElementById('popup-link-url').value=edit&&edit.linkUrl?edit.linkUrl:decodeURIComponent(chipUrl);
   // Position near the button
   const rect=btn.getBoundingClientRect();
   const pw=360, ph=300;
@@ -1554,31 +1643,39 @@ function closePopup(){
 function popupSave(){
   if(!_popupKey) return;
   const text=document.getElementById('popup-text').value.trim();
-  const linkLabel=_popupMode==='ob'?document.getElementById('popup-link-label').value.trim():'';
-  const linkUrl=_popupMode==='ob'?document.getElementById('popup-link-url').value.trim():'';
-  // Only save if something actually changed
-  const changed=(text&&text!==_popupOrig)||(linkLabel)||linkUrl;
-  if(changed){
-    customEdits[_popupKey]={text:text||_popupOrig};
-    if(_popupMode==='ob'){customEdits[_popupKey].linkLabel=linkLabel;customEdits[_popupKey].linkUrl=linkUrl;}
+  const linkLabel=document.getElementById('popup-link-label').value.trim();
+  const linkUrl=document.getElementById('popup-link-url').value.trim();
+  // Save if text changed OR any link value set
+  const textChanged=text&&text!==_popupOrig;
+  const hasLink=linkUrl||linkLabel;
+  if(textChanged||hasLink){
+    customEdits[_popupKey]={
+      text:text||_popupOrig,
+      linkLabel:linkLabel,
+      linkUrl:linkUrl
+    };
   } else {
     delete customEdits[_popupKey];
   }
   saveEdits();
   closePopup();
-  // Update the DOM in-place
+  // Update DOM in-place
   if(_popupMode==='step'){
-    // Find the step text element by its index in the current card
     const parts=_popupKey.split(':');
     const idx=parts[parts.length-1];
     const cardSlug=activeCardTitle.replace(/\W/g,'');
     const el=document.getElementById('st_'+idx+'_'+cardSlug);
     if(el){
-      el.textContent=customEdits[_popupKey]?customEdits[_popupKey].text:_popupOrig;
-      if(_popupBtn) _popupBtn.classList.toggle('modified',!!customEdits[_popupKey]);
+      const edit=customEdits[_popupKey];
+      const displayText=edit?edit.text:_popupOrig;
+      const chipUrl=edit?edit.linkUrl:'';
+      const chipLabel=edit?edit.linkLabel:'';
+      const chip=chipUrl?` <a href="${chipUrl}" target="_blank" class="ob-link-chip">${chipLabel||'↗'}</a>`:'';
+      el.innerHTML=displayText+chip;
+      if(_popupBtn) _popupBtn.classList.toggle('modified',!!edit);
     }
   } else {
-    // Re-render the full modal to pick up ob changes
+    // Re-render full modal for ob items
     const ev=EVENTS.find(e=>e.title===activeCardTitle);
     if(ev) document.getElementById('m-body').innerHTML=ev.body();
   }
@@ -1594,7 +1691,7 @@ function popupReset(){
     const idx=parts[parts.length-1];
     const cardSlug=activeCardTitle.replace(/\W/g,'');
     const el=document.getElementById('st_'+idx+'_'+cardSlug);
-    if(el){el.textContent=_popupOrig;if(_popupBtn)_popupBtn.classList.remove('modified');}
+    if(el){el.innerHTML=_popupOrig;if(_popupBtn)_popupBtn.classList.remove('modified');}
   } else {
     const ev=EVENTS.find(e=>e.title===activeCardTitle);
     if(ev) document.getElementById('m-body').innerHTML=ev.body();
@@ -1634,6 +1731,21 @@ function openModal(idx){
   // Show save progress button only for checklist cards
   const saveBtn=document.getElementById('save-prog-btn');
   if(saveBtn) saveBtn.style.display=e.isDriver?'inline-flex':'none';
+  // Show delete button only for custom cards
+  let delBtn=document.getElementById('delete-card-btn');
+  if(!delBtn){
+    delBtn=document.createElement('button');
+    delBtn.id='delete-card-btn';
+    delBtn.style.cssText='font-size:11px;padding:3px 10px;border-radius:5px;cursor:pointer;border:0.5px solid #fca5a5;background:#fef2f2;color:#c00';
+    delBtn.textContent='Delete card';
+    document.querySelector('.mhead').insertBefore(delBtn, document.getElementById('save-prog-btn'));
+  }
+  if(e.id&&e.id.startsWith('custom_')){
+    delBtn.style.display='inline-block';
+    delBtn.onclick=()=>deleteCustomCard(e.id);
+  } else {
+    delBtn.style.display='none';
+  }
   document.getElementById('mbg').classList.add('open');
   addRecent(idx);
 }
@@ -1743,10 +1855,318 @@ function showBrowse(){
   buildChips(); render();
 }
 
+// ── SharePoint Config Sync ────────────────────────────────────
+// Config stored as JSON at Office Documents/dashboard-config.json
+// Schema: {edits:{}, customCards:[], stepAdditions:{cardTitle:[{text,linkLabel,linkUrl}]}, stepDeletions:{cardTitle:[index]}}
+const CONFIG_PATH='Office%20Documents/dashboard-config.json';
+let _configEtag='';
+let customCards=[];      // [{id,title,sec,isDriver,blocks:[{label,style,items:[]}], steps:[]}]
+let stepAdditions={};    // cardTitle -> [{text,linkLabel,linkUrl}]
+let stepDeletions={};    // cardTitle -> Set of original indices deleted
+
+async function loadConfig(){
+  try{
+    const token=await getToken();
+    if(!token)return;
+    const url=`https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/root:/${CONFIG_PATH}:/content`;
+    const res=await fetch(url,{headers:{Authorization:'Bearer '+token}});
+    if(res.status===404){return;} // first run, no config yet
+    if(!res.ok)throw new Error(res.status);
+    _configEtag=res.headers.get('ETag')||'';
+    const cfg=await res.json();
+    // Merge into state
+    if(cfg.edits) Object.assign(customEdits, cfg.edits);
+    if(cfg.customCards) customCards=cfg.customCards;
+    if(cfg.stepAdditions) stepAdditions=cfg.stepAdditions;
+    if(cfg.stepDeletions){
+      for(const k in cfg.stepDeletions) stepDeletions[k]=new Set(cfg.stepDeletions[k]);
+    }
+    // Add custom cards to EVENTS
+    customCards.forEach(c=>{if(!EVENTS.find(e=>e.id===c.id))addCustomCardToEvents(c);});
+    render(); renderHome();
+  }catch(e){console.warn('Config load:',e);}
+}
+
+async function saveConfig(){
+  try{
+    const token=await getToken();
+    if(!token)return;
+    const cfg={
+      edits:customEdits,
+      customCards:customCards,
+      stepAdditions:stepAdditions,
+      stepDeletions:Object.fromEntries(Object.entries(stepDeletions).map(([k,v])=>[k,[...v]]))
+    };
+    const url=`https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/root:/${CONFIG_PATH}:/content`;
+    await fetch(url,{
+      method:'PUT',
+      headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify(cfg,null,2)
+    });
+  }catch(e){console.warn('Config save:',e);}
+}
+
+// Debounced save — don't hammer SharePoint on every keystroke
+let _saveTimer=null;
+function scheduleSave(){
+  clearTimeout(_saveTimer);
+  _saveTimer=setTimeout(saveConfig,1500);
+}
+
+// Override saveEdits to also sync to SharePoint
+const _origSaveEdits=saveEdits;
+saveEdits=function(){_origSaveEdits();scheduleSave();};
+
+// ── Add/Delete Steps ──────────────────────────────────────────
+function addStep(cardTitle){
+  const text=prompt('New step text:','');
+  if(!text||!text.trim())return;
+  if(!stepAdditions[cardTitle])stepAdditions[cardTitle]=[];
+  stepAdditions[cardTitle].push({text:text.trim(),linkLabel:'',linkUrl:''});
+  scheduleSave();
+  // Re-render modal
+  const ev=EVENTS.find(e=>e.title===cardTitle);
+  if(ev)document.getElementById('m-body').innerHTML=ev.body();
+}
+
+function deleteStep(cardTitle,stepIdx,isAdded,addedIdx){
+  if(!confirm('Delete this step?'))return;
+  if(isAdded){
+    // Remove from stepAdditions
+    if(stepAdditions[cardTitle]){
+      stepAdditions[cardTitle].splice(addedIdx,1);
+      if(stepAdditions[cardTitle].length===0)delete stepAdditions[cardTitle];
+    }
+  } else {
+    // Mark original step as deleted
+    if(!stepDeletions[cardTitle])stepDeletions[cardTitle]=new Set();
+    stepDeletions[cardTitle].add(stepIdx);
+    // Also remove any custom edit for it
+    delete customEdits['S:'+cardTitle+':'+stepIdx];
+  }
+  scheduleSave();
+  const ev=EVENTS.find(e=>e.title===cardTitle);
+  if(ev)document.getElementById('m-body').innerHTML=ev.body();
+}
+
+// Updated steps() that respects deletions and additions
+const _origSteps=steps;
+steps=function(arr){
+  const deletedSet=stepDeletions[activeCardTitle]||new Set();
+  const additions=stepAdditions[activeCardTitle]||[];
+  const filtered=arr.map((s,i)=>({s,i,deleted:deletedSet.has(i)})).filter(x=>!x.deleted);
+  // Rebuild with correct display indices
+  let html=filtered.map(({s,i},di)=>{
+    let rawText=s,builtinChipUrl='',builtinChipLabel='';
+    if(typeof s==='string'&&s.startsWith('__FL__')){
+      const inner=s.slice(6),sep=inner.indexOf('__SEP__');
+      rawText=sep>=0?inner.slice(0,sep):inner;
+      builtinChipUrl=sep>=0?inner.slice(sep+7):'';
+      const domain=builtinChipUrl.replace(/https?:\/\//,'').split('/')[0]
+        .replace('ultimatecorp.sharepoint.com','SharePoint')
+        .replace('gogps.com','Quartix').replace('www.','');
+      builtinChipLabel='↗ '+domain;
+    }
+    rawText=fc(rawText);
+    const key='S:'+activeCardTitle+':'+i;
+    const edit=customEdits[key];
+    const displayText=edit&&edit.text?edit.text:rawText;
+    const chipUrl=edit&&edit.linkUrl?edit.linkUrl:builtinChipUrl;
+    const chipLabel=edit&&edit.linkLabel?edit.linkLabel:builtinChipLabel;
+    const chip=chipUrl?` <a href="${chipUrl}" target="_blank" class="ob-link-chip">${chipLabel||'↗'}</a>`:'';
+    const modified=edit?' modified':'';
+    const safeKey=encodeURIComponent(key).replace(/'/g,'%27');
+    const safeOrig=encodeURIComponent(rawText).replace(/'/g,'%27');
+    const safeChipLabel=encodeURIComponent(chipLabel||builtinChipLabel).replace(/'/g,'%27');
+    const safeChipUrl=encodeURIComponent(chipUrl||builtinChipUrl).replace(/'/g,'%27');
+    const ct=encodeURIComponent(activeCardTitle).replace(/'/g,'%27');
+    return `<div class="step-wrap">
+      <div class="step-num">${di+1}</div>
+      <div class="step-text" id="st_${i}_${activeCardTitle.replace(/\W/g,'')}">${displayText}${chip}</div>
+      <span style="display:flex;gap:3px;flex-shrink:0;margin-top:2px">
+        <button class="edit-btn${modified}" onclick="openEdit('step','${safeKey}','${safeOrig}','${safeChipLabel}','${safeChipUrl}',this)" title="Edit">✎</button>
+        <button class="edit-btn" style="color:#c00;border-color:#fca5a5" onclick="deleteStep('${ct}',${i},false,0)" title="Delete step">✕</button>
+      </span>
+    </div>`;
+  }).join('');
+  // Appended steps
+  let baseNum=filtered.length;
+  html+=additions.map((a,ai)=>{
+    const chip=a.linkUrl?` <a href="${a.linkUrl}" target="_blank" class="ob-link-chip">${a.linkLabel||'↗'}</a>`:'';
+    const key='SA:'+activeCardTitle+':'+ai;
+    const safeKey=encodeURIComponent(key).replace(/'/g,'%27');
+    const safeOrig=encodeURIComponent(a.text).replace(/'/g,'%27');
+    const safeLabel=encodeURIComponent(a.linkLabel||'').replace(/'/g,'%27');
+    const safeUrl=encodeURIComponent(a.linkUrl||'').replace(/'/g,'%27');
+    const ct=encodeURIComponent(activeCardTitle).replace(/'/g,'%27');
+    return `<div class="step-wrap" style="border-left:2px solid #059669;padding-left:6px">
+      <div class="step-num" style="background:#D1FAE5;color:#065F46">${baseNum+ai+1}</div>
+      <div class="step-text" id="sta_${ai}_${activeCardTitle.replace(/\W/g,'')}">${a.text}${chip}</div>
+      <span style="display:flex;gap:3px;flex-shrink:0;margin-top:2px">
+        <button class="edit-btn" onclick="openEdit('addedstep','${safeKey}','${safeOrig}','${safeLabel}','${safeUrl}',this)" title="Edit">✎</button>
+        <button class="edit-btn" style="color:#c00;border-color:#fca5a5" onclick="deleteStep('${ct}',${ai},true,${ai})" title="Delete step">✕</button>
+      </span>
+    </div>`;
+  }).join('');
+  // Add step button
+  const ct=encodeURIComponent(activeCardTitle).replace(/'/g,'%27');
+  html+=`<button onclick="addStep('${ct}')" style="font-size:12px;padding:4px 12px;border-radius:6px;cursor:pointer;border:1px dashed #aaa;background:transparent;color:#666;margin-top:6px;width:100%">+ Add step</button>`;
+  return html;
+};
+
+// Handle 'addedstep' mode in openEdit/popupSave
+const _origOpenEdit=openEdit;
+openEdit=function(mode,key,origText,chipLabel,chipUrl,btn){
+  if(mode==='addedstep'){
+    // Treat like step but key is SA:title:idx
+    _origOpenEdit('step',key,origText,chipLabel,chipUrl,btn);
+    _popupMode='addedstep';
+  } else {
+    _origOpenEdit(mode,key,origText,chipLabel,chipUrl,btn);
+  }
+};
+
+const _origPopupSave=popupSave;
+popupSave=function(){
+  if(_popupMode==='addedstep'){
+    const parts=_popupKey.split(':');
+    const ai=parseInt(parts[parts.length-1]);
+    const cardTitle=parts.slice(1,-1).join(':');
+    const text=document.getElementById('popup-text').value.trim();
+    const linkLabel=document.getElementById('popup-link-label').value.trim();
+    const linkUrl=document.getElementById('popup-link-url').value.trim();
+    if(stepAdditions[cardTitle]&&stepAdditions[cardTitle][ai]!==undefined){
+      stepAdditions[cardTitle][ai]={text:text||_popupOrig,linkLabel,linkUrl};
+    }
+    scheduleSave();
+    closePopup();
+    const ev=EVENTS.find(e=>e.title===cardTitle);
+    if(ev)document.getElementById('m-body').innerHTML=ev.body();
+  } else {
+    _origPopupSave();
+  }
+};
+
+// ── New Card Builder ──────────────────────────────────────────
+const BLOCK_PRESETS=[
+  {label:'KJ does',style:'kj'},
+  {label:'Amie does',style:'amie'},
+  {label:'Before driver leaves — your tasks',style:'bls'},
+  {label:'No rush — your tasks',style:'nrs'},
+  {label:'Custom...',style:'custom'},
+];
+const BLOCK_STYLES={
+  kj:KJS, amie:AMS, bls:BLS, nrs:NRS,
+  custom:{bg:'#F3F4F6',bd:'#9CA3AF',lc:'#374151',tc:'#374151'}
+};
+
+function showNewCardBuilder(){
+  document.getElementById('card-builder-modal').classList.add('open');
+  // Reset form
+  document.getElementById('cb-title').value='';
+  document.getElementById('cb-sec').value='daily';
+  document.getElementById('cb-blocks').innerHTML='';
+  document.getElementById('cb-steps').innerHTML='';
+  cbAddStepRow();
+}
+function hideNewCardBuilder(){
+  document.getElementById('card-builder-modal').classList.remove('open');
+}
+function cbAddStepRow(val=''){
+  const div=document.createElement('div');
+  div.style.cssText='display:flex;gap:6px;margin-bottom:6px;align-items:center';
+  div.innerHTML=`<input type="text" value="${val}" placeholder="Step text..." style="flex:1;font-size:13px;padding:5px 8px;border:0.5px solid #ccc;border-radius:6px">
+    <button onclick="this.parentElement.remove()" style="flex-shrink:0;font-size:12px;padding:3px 8px;border-radius:5px;cursor:pointer;border:0.5px solid #fca5a5;background:#fef2f2;color:#c00">✕</button>`;
+  document.getElementById('cb-steps').appendChild(div);
+}
+function cbAddBlock(){
+  const preset=document.getElementById('cb-block-preset').value;
+  const style=BLOCK_STYLES[preset]||BLOCK_STYLES.custom;
+  const label=preset==='custom'?(prompt('Block label (e.g. "Your tasks"):','')||'Custom'):BLOCK_PRESETS.find(p=>p.style===preset).label;
+  const id='cbblock_'+Date.now();
+  const div=document.createElement('div');
+  div.id=id;
+  div.style.cssText=`border:1px solid ${style.bd};border-left:4px solid ${style.bd};border-radius:8px;margin-bottom:8px;overflow:hidden`;
+  div.innerHTML=`<div style="background:${style.bg};color:${style.lc};font-size:11px;font-weight:500;padding:5px 12px;display:flex;justify-content:space-between;align-items:center">
+    <span>${label}</span>
+    <button onclick="document.getElementById('${id}').remove()" style="font-size:11px;padding:1px 6px;border-radius:4px;cursor:pointer;border:0.5px solid ${style.bd};background:transparent;color:${style.lc}">Remove</button>
+  </div>
+  <div style="background:${style.bg};padding:8px 12px">
+    <div class="block-items-${id}"></div>
+    <button onclick="cbAddBlockItem('${id}','${style.tc}')" style="font-size:11px;padding:3px 10px;border-radius:5px;cursor:pointer;border:1px dashed #aaa;background:transparent;color:#666;margin-top:4px">+ Add item</button>
+  </div>`;
+  // Store style info on element
+  div.dataset.label=label;div.dataset.style=preset;
+  document.getElementById('cb-blocks').appendChild(div);
+  cbAddBlockItem(id,style.tc);
+}
+function cbAddBlockItem(blockId,tc){
+  const container=document.querySelector('.block-items-'+blockId);
+  if(!container)return;
+  const div=document.createElement('div');
+  div.style.cssText='display:flex;gap:6px;margin-bottom:4px;align-items:center';
+  div.innerHTML=`<input type="text" placeholder="Item text..." style="flex:1;font-size:12px;padding:4px 8px;border:0.5px solid #ccc;border-radius:5px;color:${tc||'#111'}">
+    <button onclick="this.parentElement.remove()" style="flex-shrink:0;font-size:11px;padding:2px 6px;border-radius:4px;cursor:pointer;border:0.5px solid #fca5a5;background:#fef2f2;color:#c00">✕</button>`;
+  container.appendChild(div);
+}
+function cbSaveCard(){
+  const title=document.getElementById('cb-title').value.trim();
+  if(!title){alert('Please enter a card title.');return;}
+  if(EVENTS.find(e=>e.title===title)){alert('A card with this title already exists.');return;}
+  const sec=document.getElementById('cb-sec').value;
+  // Collect steps
+  const stepEls=document.getElementById('cb-steps').querySelectorAll('input[type=text]');
+  const steps=[...stepEls].map(el=>el.value.trim()).filter(Boolean);
+  // Collect blocks
+  const blockEls=document.getElementById('cb-blocks').children;
+  const blocks=[...blockEls].map(blockEl=>{
+    const label=blockEl.dataset.label||'';
+    const style=blockEl.dataset.style||'nrs';
+    const itemEls=blockEl.querySelectorAll('input[type=text]');
+    const items=[...itemEls].map(el=>el.value.trim()).filter(Boolean);
+    return {label,style,items};
+  }).filter(b=>b.items.length>0);
+  const card={id:'custom_'+Date.now(),title,sec,steps,blocks};
+  customCards.push(card);
+  addCustomCardToEvents(card);
+  scheduleSave();
+  hideNewCardBuilder();
+  render(); renderHome();
+}
+function addCustomCardToEvents(card){
+  EVENTS.push({
+    id:card.id, title:card.title, sec:card.sec,
+    body:()=>{
+      let html='';
+      if(card.steps&&card.steps.length) html+=steps(card.steps);
+      if(card.blocks&&card.blocks.length){
+        card.blocks.forEach(b=>{
+          const st=BLOCK_STYLES[b.style]||NRS;
+          html+=ob(b.label,st,b.items);
+        });
+      }
+      return html||'<p style="color:#888;font-size:13px">No content yet.</p>';
+    }
+  });
+}
+function deleteCustomCard(id){
+  if(!confirm('Delete this card permanently?'))return;
+  customCards=customCards.filter(c=>c.id!==id);
+  const idx=EVENTS.findIndex(e=>e.id===id);
+  if(idx>=0)EVENTS.splice(idx,1);
+  scheduleSave();
+  closeModal();
+  render(); renderHome();
+}
+
 // ── Init ──────────────────────────────────────────────────────
 loadStorage();
 showHome();
-if(typeof fetchLiveDrivers==='function') fetchLiveDrivers();
+if(typeof fetchLiveDrivers==='function'){
+  fetchLiveDrivers().then(()=>loadConfig());
+} else {
+  loadConfig();
+}
 </script>
 </body>
 </html>
