@@ -462,7 +462,7 @@ function loadStorage(){
 }
 function savePins(){try{localStorage.setItem('ul_pins',JSON.stringify(pins));}catch(e){}}
 function saveRecents(){try{localStorage.setItem('ul_recents',JSON.stringify(recents));}catch(e){}}
-function saveEdits(){try{localStorage.setItem('ul_edits',JSON.stringify(customEdits));}catch(e){}}
+function saveEdits(){try{localStorage.setItem('ul_edits',JSON.stringify(customEdits));}catch(e){}scheduleSave();}
 function saveInProgress(){try{localStorage.setItem('ul_inprog',JSON.stringify(inProgress));}catch(e){}}
 
 // ── In Progress sessions ──────────────────────────────────────
@@ -629,12 +629,14 @@ function ob(label,st,items){
 
 // steps() — numbered steps with edit buttons
 function steps(arr){
-  return arr.map((s,i)=>{
-    // Strip __FL__ tag if present (fl() items in steps show as plain text with chip)
+  const deletedSet=stepDeletions[activeCardTitle]||new Set();
+  const additions=stepAdditions[activeCardTitle]||[];
+  const ct=encodeURIComponent(activeCardTitle).replace(/'/g,'%27');
+  let html=arr.map((s,i)=>{
+    if(deletedSet.has(i)) return '';
     let rawText=s, builtinChipUrl='', builtinChipLabel='';
     if(typeof s==='string'&&s.startsWith('__FL__')){
-      const inner=s.slice(6);
-      const sep=inner.indexOf('__SEP__');
+      const inner=s.slice(6), sep=inner.indexOf('__SEP__');
       rawText=sep>=0?inner.slice(0,sep):inner;
       builtinChipUrl=sep>=0?inner.slice(sep+7):'';
       const domain=builtinChipUrl.replace(/https?:\/\//,'').split('/')[0]
@@ -654,12 +656,35 @@ function steps(arr){
     const safeOrig=encodeURIComponent(rawText).replace(/'/g,'%27');
     const safeChipLabel=encodeURIComponent(chipLabel||builtinChipLabel).replace(/'/g,'%27');
     const safeChipUrl=encodeURIComponent(chipUrl||builtinChipUrl).replace(/'/g,'%27');
+    // Recalculate display number (skipping deleted)
+    const num=arr.slice(0,i+1).filter((_,j)=>!deletedSet.has(j)).length;
     return `<div class="step-wrap">
-      <div class="step-num">${i+1}</div>
+      <div class="step-num">${num}</div>
       <div class="step-text" id="st_${i}_${activeCardTitle.replace(/\W/g,'')}">${displayText}${chip}</div>
-      <button class="edit-btn${modified}" onclick="openEdit('step','${safeKey}','${safeOrig}','${safeChipLabel}','${safeChipUrl}',this)" title="Edit this step">✎</button>
+      <span style="display:flex;gap:3px;flex-shrink:0;margin-top:2px">
+        <button class="edit-btn${modified}" onclick="openEdit('step','${safeKey}','${safeOrig}','${safeChipLabel}','${safeChipUrl}',this)" title="Edit">✎</button>
+        <button class="edit-btn" style="color:#c00;border-color:#fca5a5" onclick="deleteStep('${ct}',${i},false,0)" title="Delete">✕</button>
+      </span>
     </div>`;
   }).join('');
+  const baseNum=arr.filter((_,i)=>!deletedSet.has(i)).length;
+  html+=additions.map((a,ai)=>{
+    const chip=a.linkUrl?` <a href="${a.linkUrl}" target="_blank" class="ob-link-chip">${a.linkLabel||'↗'}</a>`:'';
+    const safeKey=encodeURIComponent('SA:'+activeCardTitle+':'+ai).replace(/'/g,'%27');
+    const safeOrig=encodeURIComponent(a.text).replace(/'/g,'%27');
+    const safeLabel=encodeURIComponent(a.linkLabel||'').replace(/'/g,'%27');
+    const safeUrl=encodeURIComponent(a.linkUrl||'').replace(/'/g,'%27');
+    return `<div class="step-wrap" style="border-left:2px solid #059669;padding-left:6px">
+      <div class="step-num" style="background:#D1FAE5;color:#065F46">${baseNum+ai+1}</div>
+      <div class="step-text">${a.text}${chip}</div>
+      <span style="display:flex;gap:3px;flex-shrink:0;margin-top:2px">
+        <button class="edit-btn" onclick="openEdit('addedstep','${safeKey}','${safeOrig}','${safeLabel}','${safeUrl}',this)" title="Edit">✎</button>
+        <button class="edit-btn" style="color:#c00;border-color:#fca5a5" onclick="deleteStep('${ct}',${ai},true,${ai})" title="Delete">✕</button>
+      </span>
+    </div>`;
+  }).join('');
+  html+=`<button onclick="addStep('${ct}')" style="font-size:12px;padding:4px 12px;border-radius:6px;cursor:pointer;border:1px dashed #aaa;background:transparent;color:#666;margin-top:6px;width:100%">+ Add step</button>`;
+  return html;
 }
 
 // ── Context form ─────────────────────────────────────────────
@@ -1660,7 +1685,20 @@ function popupSave(){
   saveEdits();
   closePopup();
   // Update DOM in-place
-  if(_popupMode==='step'){
+  if(_popupMode==='addedstep'){
+    const parts=_popupKey.split(':');
+    const ai=parseInt(parts[parts.length-1]);
+    const cardTitle=parts.slice(1,-1).join(':');
+    const text=document.getElementById('popup-text').value.trim();
+    const linkLabel=document.getElementById('popup-link-label').value.trim();
+    const linkUrl=document.getElementById('popup-link-url').value.trim();
+    if(stepAdditions[cardTitle]&&stepAdditions[cardTitle][ai]!==undefined){
+      stepAdditions[cardTitle][ai]={text:text||_popupOrig,linkLabel,linkUrl};
+    }
+    scheduleSave(); closePopup();
+    const ev=EVENTS.find(e=>e.title===cardTitle);
+    if(ev)document.getElementById('m-body').innerHTML=ev.body();
+  } else if(_popupMode==='step'){
     const parts=_popupKey.split(':');
     const idx=parts[parts.length-1];
     const cardSlug=activeCardTitle.replace(/\W/g,'');
@@ -1686,7 +1724,20 @@ function popupReset(){
   delete customEdits[_popupKey];
   saveEdits();
   closePopup();
-  if(_popupMode==='step'){
+  if(_popupMode==='addedstep'){
+    // Reset added step to original
+    const parts=_popupKey.split(':');
+    const ai=parseInt(parts[parts.length-1]);
+    const cardTitle=parts.slice(1,-1).join(':');
+    if(stepAdditions[cardTitle]&&stepAdditions[cardTitle][ai]){
+      stepAdditions[cardTitle][ai].text=_popupOrig;
+      stepAdditions[cardTitle][ai].linkLabel='';
+      stepAdditions[cardTitle][ai].linkUrl='';
+    }
+    scheduleSave(); closePopup();
+    const ev=EVENTS.find(e=>e.title===cardTitle);
+    if(ev)document.getElementById('m-body').innerHTML=ev.body();
+  } else if(_popupMode==='step'){
     const parts=_popupKey.split(':');
     const idx=parts[parts.length-1];
     const cardSlug=activeCardTitle.replace(/\W/g,'');
@@ -1914,8 +1965,7 @@ function scheduleSave(){
 }
 
 // Override saveEdits to also sync to SharePoint
-const _origSaveEdits=saveEdits;
-saveEdits=function(){_origSaveEdits();scheduleSave();};
+// saveEdits now also syncs to SharePoint (scheduleSave added directly to saveEdits above)
 
 // ── Add/Delete Steps ──────────────────────────────────────────
 function addStep(cardTitle){
@@ -1949,103 +1999,6 @@ function deleteStep(cardTitle,stepIdx,isAdded,addedIdx){
   if(ev)document.getElementById('m-body').innerHTML=ev.body();
 }
 
-// Updated steps() that respects deletions and additions
-const _origSteps=steps;
-steps=function(arr){
-  const deletedSet=stepDeletions[activeCardTitle]||new Set();
-  const additions=stepAdditions[activeCardTitle]||[];
-  const filtered=arr.map((s,i)=>({s,i,deleted:deletedSet.has(i)})).filter(x=>!x.deleted);
-  // Rebuild with correct display indices
-  let html=filtered.map(({s,i},di)=>{
-    let rawText=s,builtinChipUrl='',builtinChipLabel='';
-    if(typeof s==='string'&&s.startsWith('__FL__')){
-      const inner=s.slice(6),sep=inner.indexOf('__SEP__');
-      rawText=sep>=0?inner.slice(0,sep):inner;
-      builtinChipUrl=sep>=0?inner.slice(sep+7):'';
-      const domain=builtinChipUrl.replace(/https?:\/\//,'').split('/')[0]
-        .replace('ultimatecorp.sharepoint.com','SharePoint')
-        .replace('gogps.com','Quartix').replace('www.','');
-      builtinChipLabel='↗ '+domain;
-    }
-    rawText=fc(rawText);
-    const key='S:'+activeCardTitle+':'+i;
-    const edit=customEdits[key];
-    const displayText=edit&&edit.text?edit.text:rawText;
-    const chipUrl=edit&&edit.linkUrl?edit.linkUrl:builtinChipUrl;
-    const chipLabel=edit&&edit.linkLabel?edit.linkLabel:builtinChipLabel;
-    const chip=chipUrl?` <a href="${chipUrl}" target="_blank" class="ob-link-chip">${chipLabel||'↗'}</a>`:'';
-    const modified=edit?' modified':'';
-    const safeKey=encodeURIComponent(key).replace(/'/g,'%27');
-    const safeOrig=encodeURIComponent(rawText).replace(/'/g,'%27');
-    const safeChipLabel=encodeURIComponent(chipLabel||builtinChipLabel).replace(/'/g,'%27');
-    const safeChipUrl=encodeURIComponent(chipUrl||builtinChipUrl).replace(/'/g,'%27');
-    const ct=encodeURIComponent(activeCardTitle).replace(/'/g,'%27');
-    return `<div class="step-wrap">
-      <div class="step-num">${di+1}</div>
-      <div class="step-text" id="st_${i}_${activeCardTitle.replace(/\W/g,'')}">${displayText}${chip}</div>
-      <span style="display:flex;gap:3px;flex-shrink:0;margin-top:2px">
-        <button class="edit-btn${modified}" onclick="openEdit('step','${safeKey}','${safeOrig}','${safeChipLabel}','${safeChipUrl}',this)" title="Edit">✎</button>
-        <button class="edit-btn" style="color:#c00;border-color:#fca5a5" onclick="deleteStep('${ct}',${i},false,0)" title="Delete step">✕</button>
-      </span>
-    </div>`;
-  }).join('');
-  // Appended steps
-  let baseNum=filtered.length;
-  html+=additions.map((a,ai)=>{
-    const chip=a.linkUrl?` <a href="${a.linkUrl}" target="_blank" class="ob-link-chip">${a.linkLabel||'↗'}</a>`:'';
-    const key='SA:'+activeCardTitle+':'+ai;
-    const safeKey=encodeURIComponent(key).replace(/'/g,'%27');
-    const safeOrig=encodeURIComponent(a.text).replace(/'/g,'%27');
-    const safeLabel=encodeURIComponent(a.linkLabel||'').replace(/'/g,'%27');
-    const safeUrl=encodeURIComponent(a.linkUrl||'').replace(/'/g,'%27');
-    const ct=encodeURIComponent(activeCardTitle).replace(/'/g,'%27');
-    return `<div class="step-wrap" style="border-left:2px solid #059669;padding-left:6px">
-      <div class="step-num" style="background:#D1FAE5;color:#065F46">${baseNum+ai+1}</div>
-      <div class="step-text" id="sta_${ai}_${activeCardTitle.replace(/\W/g,'')}">${a.text}${chip}</div>
-      <span style="display:flex;gap:3px;flex-shrink:0;margin-top:2px">
-        <button class="edit-btn" onclick="openEdit('addedstep','${safeKey}','${safeOrig}','${safeLabel}','${safeUrl}',this)" title="Edit">✎</button>
-        <button class="edit-btn" style="color:#c00;border-color:#fca5a5" onclick="deleteStep('${ct}',${ai},true,${ai})" title="Delete step">✕</button>
-      </span>
-    </div>`;
-  }).join('');
-  // Add step button
-  const ct=encodeURIComponent(activeCardTitle).replace(/'/g,'%27');
-  html+=`<button onclick="addStep('${ct}')" style="font-size:12px;padding:4px 12px;border-radius:6px;cursor:pointer;border:1px dashed #aaa;background:transparent;color:#666;margin-top:6px;width:100%">+ Add step</button>`;
-  return html;
-};
-
-// Handle 'addedstep' mode in openEdit/popupSave
-const _origOpenEdit=openEdit;
-openEdit=function(mode,key,origText,chipLabel,chipUrl,btn){
-  if(mode==='addedstep'){
-    // Treat like step but key is SA:title:idx
-    _origOpenEdit('step',key,origText,chipLabel,chipUrl,btn);
-    _popupMode='addedstep';
-  } else {
-    _origOpenEdit(mode,key,origText,chipLabel,chipUrl,btn);
-  }
-};
-
-const _origPopupSave=popupSave;
-popupSave=function(){
-  if(_popupMode==='addedstep'){
-    const parts=_popupKey.split(':');
-    const ai=parseInt(parts[parts.length-1]);
-    const cardTitle=parts.slice(1,-1).join(':');
-    const text=document.getElementById('popup-text').value.trim();
-    const linkLabel=document.getElementById('popup-link-label').value.trim();
-    const linkUrl=document.getElementById('popup-link-url').value.trim();
-    if(stepAdditions[cardTitle]&&stepAdditions[cardTitle][ai]!==undefined){
-      stepAdditions[cardTitle][ai]={text:text||_popupOrig,linkLabel,linkUrl};
-    }
-    scheduleSave();
-    closePopup();
-    const ev=EVENTS.find(e=>e.title===cardTitle);
-    if(ev)document.getElementById('m-body').innerHTML=ev.body();
-  } else {
-    _origPopupSave();
-  }
-};
 
 // ── New Card Builder ──────────────────────────────────────────
 const BLOCK_PRESETS=[
