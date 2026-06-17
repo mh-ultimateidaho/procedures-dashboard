@@ -145,7 +145,11 @@ body{font-family:system-ui,sans-serif;background:#f9f9f9;color:#111}
 <div class="dash">
   <h2>Ultimate Logistics — Procedures Dashboard</h2>
   <p>Click any card for step-by-step instructions. Driver event cards auto-fill checklists with driver info.</p>
-  <div class="sp-note">&#128279; All file paths refer to <strong>https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC</strong></div>
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+    <div class="sp-note">&#128279; All file paths refer to <strong>https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC</strong></div>
+    <button id="sharepoint-signin" onclick="signIn()" style="display:none;font-size:12px;padding:5px 12px;border-radius:6px;cursor:pointer;border:0.5px solid #3a85d8;background:#e6f1fb;color:#185fa5;font-weight:500;align-items:center;gap:5px">&#128274; Sign in to SharePoint</button>
+    <span id="drv-status" style="font-size:12px;color:#0F6E56;font-weight:500"></span>
+  </div>
 
   <div class="view-tabs">
     <span class="view-tab active" id="tab-home" onclick="showHome()">&#127968; Home</span>
@@ -280,29 +284,53 @@ body{font-family:system-ui,sans-serif;background:#f9f9f9;color:#111}
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
 <script>
-// ── MSAL / Live driver fetch ────────────────────────────────
+// ── SharePoint / MSAL (loaded dynamically, fails gracefully) ─
 const MSAL_CFG={auth:{clientId:'2688e58a-1841-4c5b-8630-f92ff88238cc',authority:'https://login.microsoftonline.com/2c6b3d13-b98c-4605-8fcc-d8eed3579136',redirectUri:'https://mh-ultimateidaho.github.io/procedures-dashboard/'},cache:{cacheLocation:'localStorage',storeAuthStateInCookie:true}};
 const FILE_ID='01GO434OQNT6EVQH2RDRAIQJFE2PCVA4P2';
 const DRIVE_ID='b!C0W6AbLA70CaBrk6u9hU-fC2B-6QZHZEtrtGS_wNp0iHaZgFvWYnQZKhJjFss_W2';
 const SCOPES=['Files.Read','Files.ReadWrite','Sites.Read.All'];
-let msalApp;
-try{msalApp=new msal.PublicClientApplication(MSAL_CFG);}catch(e){}
-(async function init(){if(msalApp)try{await msalApp.handleRedirectPromise();}catch(e){}}());
+let msalApp=null;
 
+function loadMsal(){
+  return new Promise(resolve=>{
+    if(typeof msal!=='undefined'){initMsal();resolve();return;}
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js';
+    s.onload=()=>{initMsal();resolve();};
+    s.onerror=()=>{console.warn('MSAL unavailable');resolve();};
+    document.head.appendChild(s);
+  });
+}
+function initMsal(){
+  try{
+    msalApp=new msal.PublicClientApplication(MSAL_CFG);
+    msalApp.handleRedirectPromise().then(resp=>{
+      if(resp&&resp.accessToken) startSync();
+    }).catch(e=>console.warn('MSAL redirect:',e));
+  }catch(e){msalApp=null;}
+}
 async function getToken(){
-  if(!msalApp)return null;
-  const accs=msalApp.getAllAccounts();
-  if(accs.length){try{const r=await msalApp.acquireTokenSilent({scopes:SCOPES,account:accs[0]});return r.accessToken;}catch(e){}}
-  msalApp.loginRedirect({scopes:SCOPES});
-  return null;
+  if(!msalApp) return null;
+  try{
+    const accs=msalApp.getAllAccounts();
+    if(accs.length){
+      try{const r=await msalApp.acquireTokenSilent({scopes:SCOPES,account:accs[0]});return r.accessToken;}catch(e){}
+    }
+    return null; // not signed in
+  }catch(e){return null;}
+}
+function signIn(){
+  if(msalApp) msalApp.loginRedirect({scopes:SCOPES});
+}
+function startSync(){
+  fetchLiveDrivers();
+  loadConfig();
 }
 async function fetchLiveDrivers(){
   const el=document.getElementById('drv-status');
   const set=t=>{if(el)el.textContent=t;};
   try{
-    set('Connecting...');
     const token=await getToken();
     if(!token){set('');return;}
     set('Loading drivers...');
@@ -335,7 +363,7 @@ async function fetchLiveDrivers(){
     DR.length=0;fresh.forEach(d=>DR.push(d));
     set('✓ '+DR.length+' drivers (live)');
     setTimeout(()=>set(''),4000);
-  }catch(e){console.warn('Driver fetch:',e);const el=document.getElementById('drv-status');if(el)el.textContent='';}
+  }catch(e){console.warn('Driver fetch:',e);if(el)el.textContent='';}
 }
 </script>
 <script>
@@ -735,7 +763,7 @@ function ctxForm(fields){
     ${rows}
     <button class="ctx-btn" onclick="applyCtx()">Apply to checklist ↓</button>
     <div id="ctx-links" class="ctx-links"></div>
-    <div class="ctx-hint">Select a driver to auto-fill, or type directly, then click Apply. <span class="ctx-status" id="drv-status"></span></div>
+    <div class="ctx-hint">Select a driver to auto-fill, or type directly, then click Apply.</div>
   </div>`;
 }
 
@@ -2115,11 +2143,17 @@ function deleteCustomCard(id){
 // ── Init ──────────────────────────────────────────────────────
 loadStorage();
 showHome();
-if(typeof fetchLiveDrivers==='function'){
-  fetchLiveDrivers().then(()=>loadConfig());
-} else {
-  loadConfig();
-}
+// Load MSAL dynamically — won't crash if blocked
+loadMsal().then(()=>{
+  if(msalApp){
+    const accs=msalApp.getAllAccounts();
+    if(accs.length) startSync(); // already signed in
+    else {
+      const btn=document.getElementById('sharepoint-signin');
+      if(btn) btn.style.display='inline-flex';
+    }
+  }
+});
 </script>
 </body>
 </html>
