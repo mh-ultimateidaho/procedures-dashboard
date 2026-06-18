@@ -631,43 +631,43 @@ const BASE_CARDS = [
   {text:"Add mailbox tag"}
  ]
 },
-{id:"authority-change-cl",section:"Checklists",title:"Authority Change",isChecklist:true,
+{id:"authority-change-cl",section:"Checklists",title:"Authority Change",isChecklist:true,isAuthChange:true,
  kjItems:[
-  {text:"Driver's Authority Package"},
+  {text:"Driver's Authority Package for [NEW_AUTH]"},
   {text:"Two-pg Lease w/ Form"},
-  {text:"Clearinghouse account setup (FMCSA portal and login.gov)"},
-  {text:"Pre-Employment Query (PUT IN QuickBooks!)"},
-  {text:"SRS"},
-  {text:"Make Motive fleet manager account and email details"},
-  {text:"Change Motive logs to new DOT#"},
+  {text:"Clearinghouse account setup (FMCSA portal and login.gov) for [NEW_AUTH]"},
+  {text:"Pre-Employment Query under [NEW_AUTH] (PUT IN QuickBooks!)"},
+  {text:"SRS for [NEW_AUTH]"},
+  {text:"Make Motive fleet manager account for [NEW_AUTH] and email details"},
+  {text:"Change Motive logs from [OLD_DOT] to [NEW_DOT]"},
   {text:"Update driver packages to do sheet"},
-  {text:"Add authority to External Carriers in ITS"}
+  {text:"Add [NEW_AUTH] to External Carriers in ITS"}
  ],
  amieItems:[
-  {text:"Bestpass/Prepass swap"},
-  {text:"D&A test and policy setup"},
-  {text:"Email Blueline to remove from previous company"}
+  {text:"Bestpass/Prepass swap — [OLD_AUTH] → [NEW_AUTH]"},
+  {text:"D&A test and policy setup for [NEW_AUTH]"},
+  {text:"Email Blueline to remove [DRIVER] from [OLD_AUTH], add to [NEW_AUTH]"}
  ],
  beforeItems:[
-  {text:"Cancel old permits"},
-  {text:"UCR (if new auth)"},
-  {text:"Permit accounts set-up (POAs)"},
-  {text:"Get new permits"},
-  {text:"Add transponder in OR (non B#)"},
+  {text:"Cancel old permits for [OLD_AUTH]"},
+  {text:"UCR (if new auth) for [NEW_AUTH]"},
+  {text:"Permit accounts set-up (POAs) for [NEW_AUTH]"},
+  {text:"Get new permits for [NEW_AUTH]"},
+  {text:"Add transponder in OR under [NEW_AUTH] (non B#)"},
   {text:"Truck docs — email & upload to cloud"},
   {text:"Take picture of truck"}
  ],
  yourItems:[
-  {text:"Check truck cloud file has DOT, reg & ID card"},
-  {text:"Add auth to \"Ultimate Contractual Carriers\""},
-  {text:"Email Disp & Office new Carrier Packet"},
-  {text:"Get new MVR"},
-  {text:"Update Embark scheduled MVR date"},
-  {text:"Carrier package — upload to cloud, move old package to old folder"},
-  {text:"Enter NM transaction in QuickBooks"},
-  {text:"Update permit folders on cloud"},
+  {text:"Check truck cloud file has DOT, reg & ID card for [NEW_AUTH]"},
+  {text:"Add [NEW_AUTH] to \"Ultimate Contractual Carriers\""},
+  {text:"Remove [OLD_AUTH] from \"Ultimate Contractual Carriers\" (if driver is the only one on it)"},
+  {text:"Email Disp & Office new Carrier Packet for [NEW_AUTH]"},
+  {text:"Get new MVR and update Embark scheduled date"},
+  {text:"Carrier package for [NEW_AUTH] — upload to cloud, move [OLD_AUTH] package to old folder"},
+  {text:"Enter NM transaction for [NEW_AUTH] in QuickBooks"},
+  {text:"Update permit folders — add [NEW_AUTH] folder, move [OLD_AUTH] permits to canceled"},
   {text:"Update permit sheets on cloud"},
-  {text:"Update Current Trucks & Drivers sheet"},
+  {text:"Update Current Trucks & Drivers sheet — [OLD_AUTH] → [NEW_AUTH]"},
   {text:"Update driver authority sheet"}
  ]
 },
@@ -1517,22 +1517,31 @@ async function loadDriversFromSharePoint(){
   try {
     const url = `https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/items/${DRIVERS_FILE_ID}/workbook/worksheets`;
     const resp = await fetch(url, {headers:{Authorization:`Bearer ${token}`}});
+    if(!resp.ok){
+      console.warn("Drivers sheet fetch failed:", resp.status, await resp.text());
+      refreshOpenDriverDropdown('failed');
+      return;
+    }
     const data = await resp.json();
-    if(!data.value) return;
-    // Get last sheet
+    if(!data.value){ refreshOpenDriverDropdown('failed'); return; }
     const sheets = data.value;
-    if(sheets.length === 0) return;
+    if(sheets.length === 0){ refreshOpenDriverDropdown('failed'); return; }
     const lastSheet = sheets[sheets.length-1];
-    // Get used range
     const rangeUrl = `https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/items/${DRIVERS_FILE_ID}/workbook/worksheets/${encodeURIComponent(lastSheet.id)}/usedRange`;
     const rangeResp = await fetch(rangeUrl, {headers:{Authorization:`Bearer ${token}`}});
+    if(!rangeResp.ok){
+      console.warn("Drivers range fetch failed:", rangeResp.status);
+      refreshOpenDriverDropdown('failed');
+      return;
+    }
     const rangeData = await rangeResp.json();
-    if(!rangeData.values || rangeData.values.length < 2) return;
+    if(!rangeData.values || rangeData.values.length < 2){ refreshOpenDriverDropdown('failed'); return; }
     const headers = rangeData.values[0].map(h=> String(h||"").trim());
     const unitIdx = headers.findIndex(h=> h.includes("Unit"));
     const firstIdx = headers.findIndex(h=> h.toLowerCase()==="first");
     const lastIdx = headers.findIndex(h=> h.toLowerCase()==="last");
     const authIdx = headers.findIndex(h=> h.includes("FMCSA") || h.includes("Authority"));
+    console.log("Driver sheet headers:", headers, "Indices:", {unitIdx,firstIdx,lastIdx,authIdx});
     drivers = [];
     for(let i=1; i<rangeData.values.length; i++){
       const row = rangeData.values[i];
@@ -1547,7 +1556,32 @@ async function loadDriversFromSharePoint(){
       });
     }
     drivers.sort((a,b)=> a.last.localeCompare(b.last));
-  } catch(e){ console.warn("Failed to load drivers:", e); }
+    console.log(`Loaded ${drivers.length} drivers`);
+    refreshOpenDriverDropdown('ok');
+  } catch(e){
+    console.warn("Failed to load drivers:", e);
+    refreshOpenDriverDropdown('failed');
+  }
+}
+
+// If a checklist modal is open when drivers finish loading, refresh its dropdown
+function refreshOpenDriverDropdown(status){
+  const overlay = document.getElementById('modal-overlay');
+  if(!overlay.classList.contains('open') || !currentCard || !currentCard.isChecklist) return;
+  const sel = document.getElementById('ctx-driver');
+  if(!sel) return;
+  if(status === 'ok' && drivers.length > 0){
+    const current = sel.value;
+    sel.innerHTML = `<option value="">Select driver…</option>` +
+      drivers.map(d=>`<option value="${escHtml(d.last+','+d.first)}" data-unit="${escHtml(d.unit)}" data-auth="${escHtml(d.auth)}">${d.last}, ${d.first}</option>`).join('');
+    if(current) sel.value = current; // restore selection if any
+    // Also refresh new-auth dropdown for authority change
+    const newAuthSel = document.getElementById('ctx-new-auth-sel');
+    if(newAuthSel) refreshNewAuthDropdown(newAuthSel);
+  } else if(status === 'failed'){
+    const msg = sel.querySelector('option[data-status]');
+    if(msg){ msg.textContent = '⚠ Could not load drivers — check console'; }
+  }
 }
 
 function saveConfigLocal(){
@@ -1889,34 +1923,122 @@ function getEffectiveItems(cardId, blockKey, baseItems){
 // ============================================================
 // DRIVER CONTEXT
 // ============================================================
+function buildDriverOptions(){
+  if(!msalAccount){
+    return `<option disabled data-status="unauth">Sign in to load drivers</option>`;
+  }
+  if(drivers.length === 0){
+    return `<option disabled data-status="loading">Loading drivers…</option>`;
+  }
+  return `<option value="">Select driver…</option>` +
+    drivers.map(d=>`<option value="${escHtml(d.last+','+d.first)}" data-unit="${escHtml(d.unit)}" data-auth="${escHtml(d.auth)}">${d.last}, ${d.first}</option>`).join('');
+}
+
+function buildNewAuthOptions(){
+  const unique = [...new Set(drivers.map(d=>d.auth).filter(Boolean))].sort();
+  return `<option value="">Select existing auth…</option>` +
+    unique.map(a=>`<option value="${escHtml(a)}">${escHtml(a)}</option>`).join('') +
+    `<option value="__new__">New (enter below)…</option>`;
+}
+
+function refreshNewAuthDropdown(sel){
+  const current = sel.value;
+  sel.innerHTML = buildNewAuthOptions();
+  if(current) sel.value = current;
+}
+
 function renderDriverContext(card, sessionData){
-  const driverOptions = drivers.length > 0
-    ? drivers.map(d=>`<option value="${escHtml(d.last+','+d.first)}" data-unit="${escHtml(d.unit)}" data-auth="${escHtml(d.auth)}">${d.last}, ${d.first}</option>`).join('')
-    : '<option disabled>Sign in to load drivers</option>';
   const sd = sessionData||{};
+  const isAuthChange = !!card.isAuthChange;
+
+  if(isAuthChange){
+    return `<div class="driver-context">
+    <h4>Driver Context</h4>
+    <div class="ctx-row">
+      <div class="ctx-field" style="flex:2">
+        <label>Driver</label>
+        <select id="ctx-driver" onchange="onDriverSelect()">
+          ${buildDriverOptions()}
+        </select>
+      </div>
+      <div class="ctx-field">
+        <label>Truck #</label>
+        <input id="ctx-truck" type="text" placeholder="e.g. 835" value="${escHtml(sd.ctxTruck||'')}">
+      </div>
+    </div>
+    <div class="ctx-row">
+      <div class="ctx-field"><label>Driver Name</label><input id="ctx-name" type="text" placeholder="First Last" value="${escHtml(sd.ctxName||'')}"></div>
+    </div>
+    <div style="border-top:1px solid var(--border);margin:10px 0 12px;padding-top:12px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#ef4444;margin-bottom:10px">OLD Authority (leaving)</div>
+      <div class="ctx-row">
+        <div class="ctx-field"><label>Old Authority / LLC</label><input id="ctx-auth" type="text" placeholder="Auto-fills from driver" value="${escHtml(sd.ctxAuth||'')}"></div>
+        <div class="ctx-field"><label>Old DOT #</label><input id="ctx-dot" type="text" placeholder="e.g. 1234567" value="${escHtml(sd.ctxDot||'')}"></div>
+      </div>
+    </div>
+    <div style="border-top:1px solid var(--border);margin:0 0 12px;padding-top:12px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#10b981;margin-bottom:10px">NEW Authority (joining)</div>
+      <div class="ctx-row">
+        <div class="ctx-field" style="flex:2">
+          <label>New Authority / LLC</label>
+          <select id="ctx-new-auth-sel" onchange="onNewAuthSelect()">
+            ${buildNewAuthOptions()}
+          </select>
+        </div>
+      </div>
+      <div class="ctx-row" id="ctx-new-auth-manual-row" style="${sd.ctxNewAuth && !drivers.find(d=>d.auth===sd.ctxNewAuth) ? '' : 'display:none'}">
+        <div class="ctx-field"><label>New Authority / LLC (manual)</label><input id="ctx-new-auth" type="text" placeholder="New authority name" value="${escHtml(sd.ctxNewAuth||'')}"></div>
+        <div class="ctx-field"><label>New DOT #</label><input id="ctx-new-dot" type="text" placeholder="e.g. 7654321" value="${escHtml(sd.ctxNewDot||'')}"></div>
+      </div>
+      <div class="ctx-row" id="ctx-new-auth-auto-row" style="${sd.ctxNewAuth && !drivers.find(d=>d.auth===sd.ctxNewAuth) ? 'display:none' : ''}">
+        <div class="ctx-field"><label>New DOT #</label><input id="ctx-new-dot" type="text" placeholder="e.g. 7654321" value="${escHtml(sd.ctxNewDot||'')}"></div>
+      </div>
+    </div>
+    <div class="ctx-folder-btns" id="ctx-folder-btns"></div>
+    <button class="ctx-apply-btn" onclick="applyDriverContext()">Apply to checklist ↓</button>
+  </div>`;
+  }
+
+  // Standard context form for all other checklists
   return `<div class="driver-context">
     <h4>Driver Context</h4>
     <div class="ctx-row">
-      <div class="ctx-field">
+      <div class="ctx-field" style="flex:2">
         <label>Driver</label>
         <select id="ctx-driver" onchange="onDriverSelect()">
-          <option value="">Select driver…</option>
-          ${driverOptions}
+          ${buildDriverOptions()}
         </select>
       </div>
     </div>
     <div class="ctx-row">
       <div class="ctx-field"><label>Driver Name</label><input id="ctx-name" type="text" placeholder="First Last" value="${escHtml(sd.ctxName||'')}"></div>
-      <div class="ctx-field"><label>Authority / LLC</label><input id="ctx-auth" type="text" placeholder="Authority name" value="${escHtml(sd.ctxAuth||'')}"></div>
+      <div class="ctx-field"><label>Authority / LLC</label><input id="ctx-auth" type="text" placeholder="Auto-fills" value="${escHtml(sd.ctxAuth||'')}"></div>
     </div>
     <div class="ctx-row">
       <div class="ctx-field"><label>Current Truck #</label><input id="ctx-truck" type="text" placeholder="e.g. 835" value="${escHtml(sd.ctxTruck||'')}"></div>
       <div class="ctx-field"><label>New Truck #</label><input id="ctx-newtruck" type="text" placeholder="e.g. 779" value="${escHtml(sd.ctxNewTruck||'')}"></div>
-      <div class="ctx-field"><label>DOT #</label><input id="ctx-dot" type="text" placeholder="Auto-fills" value="${escHtml(sd.ctxDot||'')}"></div>
+      <div class="ctx-field"><label>DOT #</label><input id="ctx-dot" type="text" placeholder="Manual entry" value="${escHtml(sd.ctxDot||'')}"></div>
     </div>
     <div class="ctx-folder-btns" id="ctx-folder-btns"></div>
     <button class="ctx-apply-btn" onclick="applyDriverContext()">Apply to checklist ↓</button>
   </div>`;
+}
+
+function onNewAuthSelect(){
+  const sel = document.getElementById('ctx-new-auth-sel');
+  const manualRow = document.getElementById('ctx-new-auth-manual-row');
+  const autoRow = document.getElementById('ctx-new-auth-auto-row');
+  if(!sel) return;
+  if(sel.value === '__new__'){
+    if(manualRow) manualRow.style.display='';
+    if(autoRow) autoRow.style.display='none';
+  } else if(sel.value){
+    if(manualRow) manualRow.style.display='none';
+    if(autoRow) autoRow.style.display='';
+    // Auto-fill new auth name from selection
+    const newAuthInput = document.getElementById('ctx-new-auth');
+    if(newAuthInput) newAuthInput.value = sel.value;
+  }
 }
 
 function onDriverSelect(){
@@ -1957,20 +2079,36 @@ function applyDriverContext(){
   const truck = (document.getElementById('ctx-truck')||{}).value||'';
   const newTruck = (document.getElementById('ctx-newtruck')||{}).value||'';
   const dot = (document.getElementById('ctx-dot')||{}).value||'';
-  // Replace tokens in all item texts
+  // Auth-change specific fields
+  const newAuthSel = document.getElementById('ctx-new-auth-sel');
+  const newAuthManual = document.getElementById('ctx-new-auth');
+  const newDotInput = document.getElementById('ctx-new-dot');
+  const newAuth = newAuthManual ? (newAuthManual.value||newAuthSel&&newAuthSel.value!=='__new__'&&newAuthSel.value||'') : '';
+  const newDot = newDotInput ? newDotInput.value||'' : '';
+
   const replTokens = (text)=> text
     .replace(/\[DRIVER\]/g, name||'[DRIVER]')
     .replace(/\[AUTH\]/g, auth||'[AUTH]')
+    .replace(/\[OLD_AUTH\]/g, auth||'[OLD_AUTH]')
+    .replace(/\[NEW_AUTH\]/g, newAuth||'[NEW_AUTH]')
     .replace(/\[OLD\]/g, truck||'[OLD]')
     .replace(/\[NEW\]/g, newTruck||'[NEW]')
-    .replace(/\[DOT\]/g, dot||'[DOT]');
-  // Update displayed text
+    .replace(/\[TRUCK\]/g, truck||'[TRUCK]')
+    .replace(/\[DOT\]/g, dot||'[DOT]')
+    .replace(/\[OLD_DOT\]/g, dot||'[OLD_DOT]')
+    .replace(/\[NEW_DOT\]/g, newDot||'[NEW_DOT]');
+
   document.querySelectorAll('.item-text').forEach(el=>{
-    el.dataset.original = el.dataset.original || el.textContent;
-    el.firstChild.textContent = replTokens(el.firstChild.textContent||el.textContent);
+    const textNode = el.firstChild;
+    if(textNode && textNode.nodeType === 3){
+      textNode.textContent = replTokens(textNode.textContent);
+    }
   });
   document.querySelectorAll('.step-content').forEach(el=>{
-    el.firstChild.textContent = replTokens(el.firstChild.textContent||el.textContent);
+    const textNode = el.firstChild;
+    if(textNode && textNode.nodeType === 3){
+      textNode.textContent = replTokens(textNode.textContent);
+    }
   });
   showToast("Context applied ✓");
 }
@@ -1992,17 +2130,20 @@ function saveSession(){
   const truck = (document.getElementById('ctx-truck')||{}).value||'';
   const newTruck = (document.getElementById('ctx-newtruck')||{}).value||'';
   const dot = (document.getElementById('ctx-dot')||{}).value||'';
+  const newAuth = (document.getElementById('ctx-new-auth')||{}).value||'';
+  const newDot = (document.getElementById('ctx-new-dot')||{}).value||'';
   const total = countChecklistItems(currentCard);
   const checked = Object.values(currentCheckboxStates).filter(Boolean).length;
   const sid = 'sess_'+Date.now();
   const label = name ? `${currentCard.title} — ${name} #${truck}` : currentCard.title;
-  const driverMeta = [auth, truck&&`Truck #${truck}`].filter(Boolean).join(' · ');
+  const driverMeta = [auth, truck&&`Truck #${truck}`, newAuth&&`→ ${newAuth}`].filter(Boolean).join(' · ');
   const existing = sessions.findIndex(s=>s.cardId===currentCard.id && s.ctxName===name);
   const sessionObj = {
     id: existing>=0 ? sessions[existing].id : sid,
     cardId: currentCard.id, section: currentCard.section,
     label, driverMeta,
     ctxName:name, ctxAuth:auth, ctxTruck:truck, ctxNewTruck:newTruck, ctxDot:dot,
+    ctxNewAuth:newAuth, ctxNewDot:newDot,
     checkboxStates:{...currentCheckboxStates},
     totalItems:total, checkedCount:checked,
     savedAt: Date.now()
