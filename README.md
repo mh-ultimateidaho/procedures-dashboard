@@ -78,7 +78,8 @@ The redirect URI `https://mh-ultimateidaho.github.io/procedures-dashboard/` must
 ## Planned Updates
 Updates/ideas to implement.
 ### Pending
-- 
+- selecting a driver from the dropdown when in a checklist says "sign in to load drivers", even if I am signed in.
+- the "authority change" card needs two authority drop downs to auto fill, one for old and one for new. also need to configure checklist items to match what is done to the new vs old authority stuff.
 
 ---
 
