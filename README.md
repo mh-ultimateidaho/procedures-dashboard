@@ -78,8 +78,9 @@ The redirect URI `https://mh-ultimateidaho.github.io/procedures-dashboard/` must
 ## Planned Updates
 Updates/ideas to implement.
 ### Pending
-- selecting a driver from the dropdown when in a checklist says "sign in to load drivers", even if I am signed in.
-- the "authority change" card needs two authority drop downs to auto fill, one for old and one for new. also need to configure checklist items to match what is done to the new vs old authority stuff.
+- the "apply to checklist" has to be clicked everytime i open a saved sheet.
+- the "if NEW authority" items, like getting UCR & permit accounts set-up, should only show if a new authority is typed in (instead of selecting from the preexisting list).
+- editting an item or link in a checklist clears all the filled in info about the driver and truck.
 
 ---
 
