@@ -1452,7 +1452,7 @@ async function initMsal(){
   try {
     const msalConfig = {
       auth: { clientId: CLIENT_ID, authority: `https://login.microsoftonline.com/${TENANT_ID}`, redirectUri: REDIRECT_URI },
-      cache: { cacheLocation:"localStorage", storeAuthStateInCookie:true }
+      cache: { cacheLocation:"sessionStorage", storeAuthStateInCookie:true }
     };
     msalInstance = new msal.PublicClientApplication(msalConfig);
     await msalInstance.initialize();
@@ -1537,11 +1537,23 @@ async function loadDriversFromSharePoint(){
     const rangeData = await rangeResp.json();
     if(!rangeData.values || rangeData.values.length < 2){ refreshOpenDriverDropdown('failed'); return; }
     const headers = rangeData.values[0].map(h=> String(h||"").trim());
-    const unitIdx = headers.findIndex(h=> h.includes("Unit"));
-    const firstIdx = headers.findIndex(h=> h.toLowerCase()==="first");
-    const lastIdx = headers.findIndex(h=> h.toLowerCase()==="last");
-    const authIdx = headers.findIndex(h=> h.includes("FMCSA") || h.includes("Authority"));
-    console.log("Driver sheet headers:", headers, "Indices:", {unitIdx,firstIdx,lastIdx,authIdx});
+    console.log("Driver sheet raw headers:", JSON.stringify(headers));
+
+    // Flexible matching — handles "Unit #", "Unit#", "Truck #", "First Name", "Last Name", etc.
+    const h = headers.map(x=> x.toLowerCase().replace(/[^a-z0-9]/g,''));
+    const unitIdx  = h.findIndex(x=> x.includes('unit') || x.includes('truck') || x==='#');
+    const firstIdx = h.findIndex(x=> x.includes('first'));
+    const lastIdx  = h.findIndex(x=> x.includes('last') && !x.includes('first'));
+    const authIdx  = h.findIndex(x=> x.includes('fmcsa') || x.includes('authority') || x.includes('auth') || x.includes('llc'));
+
+    console.log("Column indices found:", {unitIdx, firstIdx, lastIdx, authIdx}, "from cleaned headers:", h);
+    if(firstIdx === -1 || lastIdx === -1){
+      const msg = `Could not find First/Last columns. Headers found: ${headers.join(' | ')}`;
+      console.warn(msg);
+      refreshOpenDriverDropdown('failed');
+      showToast("⚠ Driver sheet column names don't match — check console");
+      return;
+    }
     drivers = [];
     for(let i=1; i<rangeData.values.length; i++){
       const row = rangeData.values[i];
