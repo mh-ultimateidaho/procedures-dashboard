@@ -78,9 +78,7 @@ The redirect URI `https://mh-ultimateidaho.github.io/procedures-dashboard/` must
 ## Planned Updates
 Updates/ideas to implement.
 ### Pending
-- the "apply to checklist" has to be clicked everytime i open a saved sheet.
-- the "if NEW authority" items, like getting UCR & permit accounts set-up, should only show if a new authority is typed in (instead of selecting from the preexisting list).
-- editting an item or link in a checklist clears all the filled in info about the driver and truck.
+- 
 
 ---
 
