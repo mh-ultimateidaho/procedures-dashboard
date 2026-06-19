@@ -650,8 +650,8 @@ const BASE_CARDS = [
  ],
  beforeItems:[
   {text:"Cancel old permits for [OLD_AUTH]"},
-  {text:"UCR (if new auth) for [NEW_AUTH]"},
-  {text:"Permit accounts set-up (POAs) for [NEW_AUTH]"},
+  {text:"UCR (if new auth) for [NEW_AUTH]", newAuthOnly:true},
+  {text:"Permit accounts set-up (POAs) for [NEW_AUTH]", newAuthOnly:true},
   {text:"Get new permits for [NEW_AUTH]"},
   {text:"Add transponder in OR under [NEW_AUTH] (non B#)"},
   {text:"Truck docs — email & upload to cloud"},
@@ -664,7 +664,7 @@ const BASE_CARDS = [
   {text:"Email Disp & Office new Carrier Packet for [NEW_AUTH]"},
   {text:"Get new MVR and update Embark scheduled date"},
   {text:"Carrier package for [NEW_AUTH] — upload to cloud, move [OLD_AUTH] package to old folder"},
-  {text:"Enter NM transaction for [NEW_AUTH] in QuickBooks"},
+  {text:"Enter NM transaction for [NEW_AUTH] in QuickBooks", newAuthOnly:true},
   {text:"Update permit folders — add [NEW_AUTH] folder, move [OLD_AUTH] permits to canceled"},
   {text:"Update permit sheets on cloud"},
   {text:"Update Current Trucks & Drivers sheet — [OLD_AUTH] → [NEW_AUTH]"},
@@ -1421,6 +1421,8 @@ let activeFilter = null;
 let currentCard = null;
 let currentCheckboxStates = {};
 let editTarget = null; // {type:'step'|'item', cardId, idx, blockIdx}
+let currentContext = {}; // captured driver context for the open checklist
+let contextApplied = false; // whether tokens are currently applied
 let msalInstance = null;
 let msalAccount = null;
 let drivers = []; // from SharePoint xlsx
@@ -1536,35 +1538,48 @@ async function loadDriversFromSharePoint(){
     }
     const rangeData = await rangeResp.json();
     if(!rangeData.values || rangeData.values.length < 2){ refreshOpenDriverDropdown('failed'); return; }
-    const headers = rangeData.values[0].map(h=> String(h||"").trim());
-    console.log("Driver sheet raw headers:", JSON.stringify(headers));
+    const allRows = rangeData.values;
+    console.log(`Sheet has ${allRows.length} rows, ${allRows[0]?.length} cols. First row:`, JSON.stringify(allRows[0]));
 
-    // Flexible matching — handles "Unit #", "Unit#", "Truck #", "First Name", "Last Name", etc.
-    const h = headers.map(x=> x.toLowerCase().replace(/[^a-z0-9]/g,''));
-    const unitIdx  = h.findIndex(x=> x.includes('unit') || x.includes('truck') || x==='#');
-    const firstIdx = h.findIndex(x=> x.includes('first'));
-    const lastIdx  = h.findIndex(x=> x.includes('last') && !x.includes('first'));
-    const authIdx  = h.findIndex(x=> x.includes('fmcsa') || x.includes('authority') || x.includes('auth') || x.includes('llc'));
-
-    console.log("Column indices found:", {unitIdx, firstIdx, lastIdx, authIdx}, "from cleaned headers:", h);
-    if(firstIdx === -1 || lastIdx === -1){
-      const msg = `Could not find First/Last columns. Headers found: ${headers.join(' | ')}`;
-      console.warn(msg);
-      refreshOpenDriverDropdown('failed');
-      showToast("⚠ Driver sheet column names don't match — check console");
-      return;
+    // Scan up to the first 5 rows looking for a header row (contains "first" or "unit")
+    let headerRowIdx = -1;
+    let unitIdx = -1, firstIdx = -1, lastIdx = -1, authIdx = -1;
+    for(let r = 0; r < Math.min(allRows.length, 5); r++){
+      const row = allRows[r].map(x=> String(x||"").trim().toLowerCase().replace(/[^a-z0-9]/g,''));
+      const fi = row.findIndex(x=> x.startsWith('first'));
+      const li = row.findIndex(x=> x.startsWith('last') && !x.startsWith('lasti'));
+      if(fi !== -1 && li !== -1){
+        headerRowIdx = r;
+        unitIdx = row.findIndex(x=> x.includes('unit') || x.includes('truck'));
+        firstIdx = fi; lastIdx = li;
+        authIdx = row.findIndex(x=> x.includes('fmcsa') || x.includes('authority') || x.includes('auth'));
+        console.log(`Header row found at index ${r}:`, JSON.stringify(allRows[r]));
+        break;
+      }
     }
+
+    // No header row found — use hardcoded column order from known spreadsheet layout:
+    // A=Unit#(0), B=First(1), C=Last(2), D=FMCSA Authority(3)
+    if(headerRowIdx === -1){
+      console.log("No header row found — using hardcoded column order: Unit#=0, First=1, Last=2, Auth=3");
+      headerRowIdx = -1; // data starts from row 0
+      unitIdx = 0; firstIdx = 1; lastIdx = 2; authIdx = 3;
+    }
+    console.log("Final indices:", {unitIdx, firstIdx, lastIdx, authIdx}, "data from row:", headerRowIdx + 1);
+
     drivers = [];
-    for(let i=1; i<rangeData.values.length; i++){
-      const row = rangeData.values[i];
+    for(let i = headerRowIdx + 1; i < allRows.length; i++){
+      const row = allRows[i];
       const first = String(row[firstIdx]||"").trim();
-      const last = String(row[lastIdx]||"").trim();
+      const last  = String(row[lastIdx] ||"").trim();
       if(!first || !last) continue;
       if(first.startsWith("Was") || last.startsWith("Was")) continue;
+      if(first.toLowerCase() === "first" || last.toLowerCase() === "last") continue;
+      const auth = authIdx >= 0 ? String(row[authIdx]||"").trim() : "";
+      if(auth.startsWith("Was")) continue;
       drivers.push({
-        unit: String(row[unitIdx]||"").trim(),
-        first, last,
-        auth: String(row[authIdx]||"").trim()
+        unit: unitIdx >= 0 ? String(row[unitIdx]||"").trim() : "",
+        first, last, auth
       });
     }
     drivers.sort((a,b)=> a.last.localeCompare(b.last));
@@ -1784,6 +1799,8 @@ function openCard(id, sessionData){
   if(!card) return;
   currentCard = card;
   currentCheckboxStates = sessionData ? {...sessionData.checkboxStates} : {};
+  contextApplied = false;
+  currentContext = {};
   // Track recent
   addToRecents(id);
   // Render modal
@@ -1882,14 +1899,35 @@ function renderOwnerItem(item, cardId, blockKey, idx){
   const cbKey = `${cardId}__${blockKey}__${idx}`;
   const checked = currentCheckboxStates[cbKey]||false;
   const link = item.url ? `<a class="link-chip" href="${item.url}" target="_blank" rel="noopener">${item.linkLabel||chipLabel(item.url)}</a>` : '';
-  return `<div class="owner-item">
+  const newAuthCls = item.newAuthOnly ? ' new-auth-only' : '';
+  const hidden = item.newAuthOnly && !isBrandNewAuth() ? ' style="display:none"' : '';
+  return `<div class="owner-item${newAuthCls}"${hidden}>
     <input type="checkbox" onchange="toggleCheck('${cbKey}',this)" ${checked?'checked':''}>
-    <span class="item-text${checked?' checked':''}" id="ot-${cbKey}">${escHtml(item.text)}${link}</span>
+    <span class="item-text${checked?' checked':''}" id="ot-${cbKey}">${escHtml(item.text)}${link}${item.newAuthOnly?' <span style="font-size:10px;color:#10b981;font-weight:600">(new auth only)</span>':''}</span>
     <span class="item-edit-actions">
       <button class="edit-btn" onclick="openEditPopup('item','${cardId}',${idx},'${blockKey}',this)" title="Edit">✎</button>
       <button class="del-btn" onclick="deleteItem('${cardId}','${blockKey}',${idx})" title="Delete">✕</button>
     </span>
   </div>`;
+}
+
+// Is the NEW authority a brand-new one (typed in) rather than an existing one?
+function isBrandNewAuth(){
+  const sel = document.getElementById('ctx-new-auth-sel');
+  const manual = document.getElementById('ctx-new-auth');
+  if(sel && sel.value === '__new__') return true;
+  if(manual && manual.value && (!sel || sel.value === '__new__')) return true;
+  // From stored context
+  if(currentContext.newAuthIsNew) return true;
+  return false;
+}
+
+// Show/hide new-auth-only items based on current selection
+function updateNewAuthVisibility(){
+  const show = isBrandNewAuth();
+  document.querySelectorAll('.owner-item.new-auth-only').forEach(el=>{
+    el.style.display = show ? '' : 'none';
+  });
 }
 
 function toggleCovering(btn){
@@ -1999,7 +2037,7 @@ function renderDriverContext(card, sessionData){
         </div>
       </div>
       <div class="ctx-row" id="ctx-new-auth-manual-row" style="${sd.ctxNewAuth && !drivers.find(d=>d.auth===sd.ctxNewAuth) ? '' : 'display:none'}">
-        <div class="ctx-field"><label>New Authority / LLC (manual)</label><input id="ctx-new-auth" type="text" placeholder="New authority name" value="${escHtml(sd.ctxNewAuth||'')}"></div>
+        <div class="ctx-field"><label>New Authority / LLC (manual)</label><input id="ctx-new-auth" type="text" placeholder="New authority name" value="${escHtml(sd.ctxNewAuth||'')}" oninput="updateNewAuthVisibility()"></div>
         <div class="ctx-field"><label>New DOT #</label><input id="ctx-new-dot" type="text" placeholder="e.g. 7654321" value="${escHtml(sd.ctxNewDot||'')}"></div>
       </div>
       <div class="ctx-row" id="ctx-new-auth-auto-row" style="${sd.ctxNewAuth && !drivers.find(d=>d.auth===sd.ctxNewAuth) ? 'display:none' : ''}">
@@ -2047,10 +2085,10 @@ function onNewAuthSelect(){
   } else if(sel.value){
     if(manualRow) manualRow.style.display='none';
     if(autoRow) autoRow.style.display='';
-    // Auto-fill new auth name from selection
     const newAuthInput = document.getElementById('ctx-new-auth');
     if(newAuthInput) newAuthInput.value = sel.value;
   }
+  updateNewAuthVisibility();
 }
 
 function onDriverSelect(){
@@ -2078,37 +2116,102 @@ function updateFolderLinks(last, first, unit){
 }
 
 function restoreContext(sd){
-  if(!sd.ctxName) return;
-  const nameParts = sd.ctxName.split(' ');
-  const first = nameParts.slice(0,nameParts.length-1).join(' ');
-  const last = nameParts[nameParts.length-1];
-  updateFolderLinks(last, first, sd.ctxTruck||'');
+  // Populate currentContext from saved session and auto-apply
+  currentContext = {
+    name: sd.ctxName||'', auth: sd.ctxAuth||'', truck: sd.ctxTruck||'',
+    newTruck: sd.ctxNewTruck||'', dot: sd.ctxDot||'',
+    newAuth: sd.ctxNewAuth||'', newDot: sd.ctxNewDot||''
+  };
+  if(sd.ctxName){
+    const nameParts = sd.ctxName.split(' ');
+    const first = nameParts.slice(0,nameParts.length-1).join(' ');
+    const last = nameParts[nameParts.length-1];
+    updateFolderLinks(last, first, sd.ctxTruck||'');
+  }
+  // Auto-apply tokens so a resumed session shows filled-in text immediately
+  if(currentContext.name || currentContext.auth){
+    applyDriverContext(true);
+  }
 }
 
-function applyDriverContext(){
-  const name = (document.getElementById('ctx-name')||{}).value||'';
-  const auth = (document.getElementById('ctx-auth')||{}).value||'';
-  const truck = (document.getElementById('ctx-truck')||{}).value||'';
-  const newTruck = (document.getElementById('ctx-newtruck')||{}).value||'';
-  const dot = (document.getElementById('ctx-dot')||{}).value||'';
-  // Auth-change specific fields
+// Read all context form fields into currentContext
+function readContextForm(){
+  const g = id => (document.getElementById(id)||{}).value||'';
   const newAuthSel = document.getElementById('ctx-new-auth-sel');
   const newAuthManual = document.getElementById('ctx-new-auth');
-  const newDotInput = document.getElementById('ctx-new-dot');
-  const newAuth = newAuthManual ? (newAuthManual.value||newAuthSel&&newAuthSel.value!=='__new__'&&newAuthSel.value||'') : '';
-  const newDot = newDotInput ? newDotInput.value||'' : '';
+  let newAuth = '';
+  if(newAuthManual && newAuthManual.value) newAuth = newAuthManual.value;
+  else if(newAuthSel && newAuthSel.value && newAuthSel.value !== '__new__') newAuth = newAuthSel.value;
+  currentContext = {
+    name: g('ctx-name'), auth: g('ctx-auth'), truck: g('ctx-truck'),
+    newTruck: g('ctx-newtruck'), dot: g('ctx-dot'),
+    newAuth, newDot: g('ctx-new-dot'),
+    newAuthIsNew: newAuthSel ? newAuthSel.value === '__new__' : false
+  };
+  return currentContext;
+}
 
+// Write currentContext back into the form fields after a re-render
+function restoreContextForm(){
+  const s = (id,val) => { const el = document.getElementById(id); if(el && val) el.value = val; };
+  const c = currentContext;
+  s('ctx-name', c.name); s('ctx-auth', c.auth); s('ctx-truck', c.truck);
+  s('ctx-newtruck', c.newTruck); s('ctx-dot', c.dot); s('ctx-new-dot', c.newDot);
+  // New auth dropdown / manual
+  const newAuthSel = document.getElementById('ctx-new-auth-sel');
+  if(newAuthSel && c.newAuth){
+    if(c.newAuthIsNew){
+      newAuthSel.value = '__new__';
+      onNewAuthSelect();
+      const manual = document.getElementById('ctx-new-auth');
+      if(manual) manual.value = c.newAuth;
+    } else {
+      // Check if it exists as an option
+      const exists = Array.from(newAuthSel.options).some(o=>o.value===c.newAuth);
+      if(exists){ newAuthSel.value = c.newAuth; onNewAuthSelect(); }
+    }
+  }
+  // Restore driver dropdown selection
+  const driverSel = document.getElementById('ctx-driver');
+  if(driverSel && c.name){
+    const parts = c.name.split(' ');
+    const first = parts.slice(0,parts.length-1).join(' ');
+    const last = parts[parts.length-1];
+    const val = `${last},${first}`;
+    if(Array.from(driverSel.options).some(o=>o.value===val)) driverSel.value = val;
+  }
+  // Restore folder links
+  if(c.name){
+    const parts = c.name.split(' ');
+    updateFolderLinks(parts[parts.length-1], parts.slice(0,parts.length-1).join(' '), c.truck||'');
+  }
+}
+
+// Re-render the modal body while preserving context + applied tokens
+function rerenderModalBody(){
+  readContextForm();
+  document.getElementById('modal-body').innerHTML = renderCardBody(currentCard);
+  if(currentCard && currentCard.isChecklist){
+    restoreContextForm();
+    updateNewAuthVisibility();
+    if(contextApplied) applyDriverContext(true);
+  }
+}
+
+function applyDriverContext(silent){
+  readContextForm();
+  const c = currentContext;
   const replTokens = (text)=> text
-    .replace(/\[DRIVER\]/g, name||'[DRIVER]')
-    .replace(/\[AUTH\]/g, auth||'[AUTH]')
-    .replace(/\[OLD_AUTH\]/g, auth||'[OLD_AUTH]')
-    .replace(/\[NEW_AUTH\]/g, newAuth||'[NEW_AUTH]')
-    .replace(/\[OLD\]/g, truck||'[OLD]')
-    .replace(/\[NEW\]/g, newTruck||'[NEW]')
-    .replace(/\[TRUCK\]/g, truck||'[TRUCK]')
-    .replace(/\[DOT\]/g, dot||'[DOT]')
-    .replace(/\[OLD_DOT\]/g, dot||'[OLD_DOT]')
-    .replace(/\[NEW_DOT\]/g, newDot||'[NEW_DOT]');
+    .replace(/\[DRIVER\]/g, c.name||'[DRIVER]')
+    .replace(/\[AUTH\]/g, c.auth||'[AUTH]')
+    .replace(/\[OLD_AUTH\]/g, c.auth||'[OLD_AUTH]')
+    .replace(/\[NEW_AUTH\]/g, c.newAuth||'[NEW_AUTH]')
+    .replace(/\[OLD\]/g, c.truck||'[OLD]')
+    .replace(/\[NEW\]/g, c.newTruck||'[NEW]')
+    .replace(/\[TRUCK\]/g, c.truck||'[TRUCK]')
+    .replace(/\[DOT\]/g, c.dot||'[DOT]')
+    .replace(/\[OLD_DOT\]/g, c.dot||'[OLD_DOT]')
+    .replace(/\[NEW_DOT\]/g, c.newDot||'[NEW_DOT]');
 
   document.querySelectorAll('.item-text').forEach(el=>{
     const textNode = el.firstChild;
@@ -2122,7 +2225,8 @@ function applyDriverContext(){
       textNode.textContent = replTokens(textNode.textContent);
     }
   });
-  showToast("Context applied ✓");
+  contextApplied = true;
+  if(!silent) showToast("Context applied ✓");
 }
 
 // ============================================================
@@ -2229,7 +2333,16 @@ function saveEdit(){
   const text = document.getElementById('ep-text').value.trim();
   const linkLabel = document.getElementById('ep-link-label').value.trim();
   const url = document.getElementById('ep-url').value.trim();
-  const newItem = {text, ...(url?{url}:{}), ...(linkLabel?{linkLabel}:{})};
+  // Preserve flags from the original item (e.g. newAuthOnly)
+  let preserved = {};
+  if(type==='item'){
+    const card = allCards.find(c=>c.id===cardId);
+    const block = getBlockByKey(card, blockKey);
+    const items = getEffectiveItems(cardId, blockKey, block?block.items:[]);
+    const orig = items[idx];
+    if(orig && orig.newAuthOnly) preserved.newAuthOnly = true;
+  }
+  const newItem = {text, ...(url?{url}:{}), ...(linkLabel?{linkLabel}:{}), ...preserved};
   if(type==='step'){
     if(!config.edits[cardId]) config.edits[cardId]={};
     config.edits[cardId][`step_${idx}`] = newItem;
@@ -2240,8 +2353,7 @@ function saveEdit(){
   }
   scheduleConfigSave();
   closeEditPopup();
-  // Re-render modal body
-  document.getElementById('modal-body').innerHTML = renderCardBody(currentCard);
+  rerenderModalBody();
   showToast("Saved ✓");
 }
 
@@ -2256,7 +2368,7 @@ function resetEdit(){
   }
   scheduleConfigSave();
   closeEditPopup();
-  document.getElementById('modal-body').innerHTML = renderCardBody(currentCard);
+  rerenderModalBody();
   showToast("Reset to original ✓");
 }
 
@@ -2264,7 +2376,7 @@ function deleteStep(cardId, idx){
   if(!config.deletedSteps[cardId]) config.deletedSteps[cardId]=[];
   config.deletedSteps[cardId].push(idx);
   scheduleConfigSave();
-  document.getElementById('modal-body').innerHTML = renderCardBody(currentCard);
+  rerenderModalBody();
 }
 
 function deleteItem(cardId, blockKey, idx){
@@ -2272,7 +2384,7 @@ function deleteItem(cardId, blockKey, idx){
   if(!config.deletedSteps[key]) config.deletedSteps[key]=[];
   config.deletedSteps[key].push(idx);
   scheduleConfigSave();
-  document.getElementById('modal-body').innerHTML = renderCardBody(currentCard);
+  rerenderModalBody();
 }
 
 function addStep(cardId){
@@ -2281,7 +2393,7 @@ function addStep(cardId){
   if(!config.addedSteps[cardId]) config.addedSteps[cardId]=[];
   config.addedSteps[cardId].push({text});
   scheduleConfigSave();
-  document.getElementById('modal-body').innerHTML = renderCardBody(currentCard);
+  rerenderModalBody();
 }
 
 function addItem(cardId, blockKey){
@@ -2291,7 +2403,7 @@ function addItem(cardId, blockKey){
   if(!config.addedSteps[key]) config.addedSteps[key]=[];
   config.addedSteps[key].push({text});
   scheduleConfigSave();
-  document.getElementById('modal-body').innerHTML = renderCardBody(currentCard);
+  rerenderModalBody();
 }
 
 function getBlockByKey(card, blockKey){
