@@ -197,6 +197,42 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   display: none;
 }
 #modal-delete-card-btn.visible { display: block; }
+#modal-edit-btn {
+  background: none; border: 1px solid var(--border); cursor: pointer;
+  padding: 6px 12px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 500;
+  color: var(--text2); display: none;
+}
+#modal-edit-btn.visible { display: block; }
+#modal-edit-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+/* DRAG HANDLES + EDIT MODE */
+.drag-handle {
+  cursor: grab; color: var(--text3); font-size: 16px; flex-shrink: 0;
+  padding: 0 2px; user-select: none; line-height: 1;
+}
+.drag-handle:active { cursor: grabbing; }
+.steps-list.edit-mode .step-item, .owner-block-body.edit-mode .owner-item {
+  background: var(--surface2); border-radius: var(--radius-sm); margin-bottom: 3px;
+  padding-left: 6px; cursor: default;
+}
+.steps-list.edit-mode .step-actions, .owner-block-body.edit-mode .item-edit-actions { opacity: 1 !important; }
+.step-item.dragging, .owner-item.dragging { opacity: .4; }
+.step-item.drag-over, .owner-item.drag-over { box-shadow: inset 0 2px 0 var(--accent); }
+/* CONFIRM DIALOG */
+#confirm-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 500;
+  display: none; align-items: center; justify-content: center; padding: 20px;
+}
+#confirm-overlay.open { display: flex; }
+#confirm-box {
+  background: var(--surface); border-radius: 14px; padding: 24px; max-width: 380px;
+  box-shadow: var(--shadow-lg); text-align: center;
+}
+#confirm-box h3 { font-size: 17px; font-weight: 700; margin-bottom: 10px; }
+#confirm-box p { font-size: 13px; color: var(--text2); line-height: 1.5; margin-bottom: 20px; }
+#confirm-actions { display: flex; gap: 10px; justify-content: center; }
+#confirm-cancel { background: none; border: 1px solid var(--border); cursor: pointer; padding: 9px 20px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; color: var(--text2); }
+#confirm-delete { background: var(--red); color: #fff; border: none; cursor: pointer; padding: 9px 20px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; }
+#confirm-delete:hover { opacity: .9; }
 #modal-close-btn {
   background: none; border: none; cursor: pointer; font-size: 20px; color: var(--text3);
   width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
@@ -256,8 +292,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   display: flex; align-items: center; justify-content: center; margin-top: 1px;
 }
 .step-content { flex: 1; font-size: 14px; line-height: 1.5; }
-.step-actions { display: flex; gap: 4px; opacity: .25; transition: opacity .15s; flex-shrink: 0; margin-top: 2px; }
-.step-item:hover .step-actions { opacity: 1; }
+.step-actions { display: none; gap: 4px; flex-shrink: 0; margin-top: 2px; }
+.steps-list.edit-mode .step-actions { display: flex; opacity: 1; }
 .edit-btn, .del-btn {
   background: none; border: none; cursor: pointer; padding: 3px 5px;
   border-radius: 4px; font-size: 13px; color: var(--text2); transition: background .12s;
@@ -294,8 +330,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   margin-left: 6px; transition: background .12s;
 }
 .link-chip:hover { background: #dbeafe; }
-.item-edit-actions { display: flex; gap: 4px; opacity: .2; transition: opacity .15s; }
-.owner-item:hover .item-edit-actions { opacity: 1; }
+.item-edit-actions { display: none; gap: 4px; }
+.owner-block-body.edit-mode .item-edit-actions { display: flex; opacity: 1; }
 /* EDIT POPUP */
 #edit-popup {
   position: fixed; z-index: 300; background: var(--surface); border: 1px solid var(--border);
@@ -428,10 +464,23 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <span id="modal-badge">Badge</span>
       <span id="modal-title">Title</span>
       <button id="modal-save-btn" onclick="saveSession()">💾 Save progress</button>
-      <button id="modal-delete-card-btn" onclick="deleteCustomCard()">🗑 Delete card</button>
+      <button id="modal-edit-btn" onclick="toggleEditMode()">✎ Edit card</button>
+      <button id="modal-delete-card-btn" onclick="deleteCardConfirm()">🗑 Delete card</button>
       <button id="modal-close-btn" onclick="closeModal()">✕</button>
     </div>
     <div id="modal-body"></div>
+  </div>
+</div>
+
+<!-- DELETE CONFIRM OVERLAY -->
+<div id="confirm-overlay">
+  <div id="confirm-box">
+    <h3 id="confirm-title">Delete this card?</h3>
+    <p id="confirm-msg">This will hide the card from the dashboard. You can restore it later from settings.</p>
+    <div id="confirm-actions">
+      <button id="confirm-cancel" onclick="closeConfirm()">Cancel</button>
+      <button id="confirm-delete" onclick="confirmDeleteCard()">Delete card</button>
+    </div>
   </div>
 </div>
 
@@ -1413,7 +1462,7 @@ Thanks!`}
 // STATE
 // ============================================================
 let allCards = [...BASE_CARDS];
-let config = { edits:{}, addedSteps:{}, deletedSteps:{}, customCards:[] };
+let config = { edits:{}, addedSteps:{}, deletedSteps:{}, customCards:[], orders:{}, deletedCards:[] };
 let sessions = JSON.parse(localStorage.getItem('uli_sessions')||'[]');
 let pins = JSON.parse(localStorage.getItem('uli_pins')||'[]');
 let recents = JSON.parse(localStorage.getItem('uli_recents')||'[]');
@@ -1423,6 +1472,8 @@ let currentCheckboxStates = {};
 let editTarget = null; // {type:'step'|'item', cardId, idx, blockIdx}
 let currentContext = {}; // captured driver context for the open checklist
 let contextApplied = false; // whether tokens are currently applied
+let editMode = false; // card edit mode toggle
+let dragSrc = null; // drag source element
 let msalInstance = null;
 let msalAccount = null;
 let drivers = []; // from SharePoint xlsx
@@ -1621,7 +1672,7 @@ function loadConfigLocal(){
     if(!raw) return;
     const data = JSON.parse(raw);
     if(data && typeof data === 'object'){
-      config = { edits:{}, addedSteps:{}, deletedSteps:{}, customCards:[], ...data };
+      config = { edits:{}, addedSteps:{}, deletedSteps:{}, customCards:[], orders:{}, deletedCards:[], ...data };
       if(config.customCards && config.customCards.length > 0){
         allCards = [...BASE_CARDS, ...config.customCards];
       }
@@ -1639,7 +1690,7 @@ async function loadConfigFromSharePoint(){
     if(!resp.ok){ return; }
     const data = await resp.json();
     if(data && typeof data === 'object'){
-      config = { edits:{}, addedSteps:{}, deletedSteps:{}, customCards:[], ...data };
+      config = { edits:{}, addedSteps:{}, deletedSteps:{}, customCards:[], orders:{}, deletedCards:[], ...data };
       if(config.customCards && config.customCards.length > 0){
         allCards = [...BASE_CARDS, ...config.customCards];
       }
@@ -1755,6 +1806,7 @@ function renderCardGrid(){
   const query = (document.getElementById('search-input')||{}).value||"";
   const root = document.getElementById('card-grid-root');
   const filtered = allCards.filter(c=>{
+    if(config.deletedCards.includes(c.id)) return false; // hidden
     if(activeFilter && c.section!==activeFilter) return false;
     if(query){ const q=query.toLowerCase(); return c.title.toLowerCase().includes(q)||c.section.toLowerCase().includes(q); }
     return true;
@@ -1763,7 +1815,7 @@ function renderCardGrid(){
   const groups = {};
   filtered.forEach(c=>{ if(!groups[c.section]) groups[c.section]=[]; groups[c.section].push(c); });
   const sectionsToShow = SECTIONS.filter(s=> groups[s] && groups[s].length>0);
-  root.innerHTML = sectionsToShow.map(s=>`
+  let html = sectionsToShow.map(s=>`
     <div class="section-group">
       <div class="section-label">${s}</div>
       <div class="card-grid">
@@ -1771,6 +1823,21 @@ function renderCardGrid(){
       </div>
     </div>
   `).join('');
+  // Hidden cards restore section
+  const hidden = allCards.filter(c=> config.deletedCards.includes(c.id));
+  if(hidden.length > 0){
+    html += `<div class="section-group" style="opacity:.7">
+      <div class="section-label">🗑 Hidden cards (${hidden.length})</div>
+      <div class="card-grid">
+        ${hidden.map(c=>`<div class="proc-card" style="border-style:dashed">
+          <div class="pc-badge" style="background:${SECTION_COLORS[c.section]||'#888'}">${c.section}</div>
+          <div class="pc-title">${c.title}</div>
+          <button class="add-step-btn" style="margin-top:8px;padding:5px" onclick="restoreCard('${c.id}')">↺ Restore</button>
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }
+  root.innerHTML = html;
 }
 
 function procCardHTML(card){
@@ -1801,6 +1868,7 @@ function openCard(id, sessionData){
   currentCheckboxStates = sessionData ? {...sessionData.checkboxStates} : {};
   contextApplied = false;
   currentContext = {};
+  editMode = false;
   // Track recent
   addToRecents(id);
   // Render modal
@@ -1810,11 +1878,74 @@ function openCard(id, sessionData){
   document.getElementById('modal-title').textContent = card.title;
   const saveBtn = document.getElementById('modal-save-btn');
   saveBtn.classList.toggle('visible', !!card.isChecklist);
+  // Edit button shows for any card that has steps or blocks (not pure email templates)
+  const editBtn = document.getElementById('modal-edit-btn');
+  const editable = !!(card.steps || card.blocks || card.isChecklist);
+  editBtn.classList.toggle('visible', editable);
+  editBtn.classList.remove('active');
+  editBtn.textContent = '✎ Edit card';
+  // Delete card button only visible in edit mode
   const delBtn = document.getElementById('modal-delete-card-btn');
-  delBtn.classList.toggle('visible', !!card.isCustom);
+  delBtn.classList.remove('visible');
   document.getElementById('modal-body').innerHTML = renderCardBody(card, sessionData);
   openModal();
   if(sessionData) restoreContext(sessionData);
+}
+
+function toggleEditMode(){
+  editMode = !editMode;
+  const editBtn = document.getElementById('modal-edit-btn');
+  editBtn.classList.toggle('active', editMode);
+  editBtn.textContent = editMode ? '✓ Done editing' : '✎ Edit card';
+  document.getElementById('modal-delete-card-btn').classList.toggle('visible', editMode);
+  rerenderModalBody();
+  if(editMode) attachDragHandlers();
+}
+
+// ---- DRAG AND DROP REORDERING ----
+function attachDragHandlers(){
+  document.querySelectorAll('#modal-body [data-order-key]').forEach(container=>{
+    const items = container.querySelectorAll('[data-slot]');
+    items.forEach(item=>{
+      item.addEventListener('dragstart', e=>{
+        dragSrc = item; item.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      item.addEventListener('dragend', ()=>{
+        item.classList.remove('dragging');
+        container.querySelectorAll('.drag-over').forEach(el=>el.classList.remove('drag-over'));
+      });
+      item.addEventListener('dragover', e=>{
+        e.preventDefault();
+        if(dragSrc && dragSrc !== item && dragSrc.parentElement === item.parentElement){
+          item.classList.add('drag-over');
+        }
+      });
+      item.addEventListener('dragleave', ()=> item.classList.remove('drag-over'));
+      item.addEventListener('drop', e=>{
+        e.preventDefault();
+        item.classList.remove('drag-over');
+        if(!dragSrc || dragSrc === item || dragSrc.parentElement !== item.parentElement) return;
+        // Reorder in DOM
+        const rect = item.getBoundingClientRect();
+        const after = e.clientY > rect.top + rect.height/2;
+        if(after) item.after(dragSrc); else item.before(dragSrc);
+        // Persist new order
+        persistOrder(container);
+      });
+    });
+  });
+}
+
+function persistOrder(container){
+  const orderKey = container.dataset.orderKey;
+  const slots = Array.from(container.querySelectorAll('[data-slot]')).map(el=>el.dataset.slot);
+  config.orders[orderKey] = slots;
+  scheduleConfigSave();
+  // Renumber step numbers visually
+  const nums = container.querySelectorAll('.step-num');
+  nums.forEach((n,i)=> n.textContent = i+1);
+  showToast("Order saved ✓");
 }
 
 function openSession(sid){
@@ -1834,20 +1965,21 @@ function renderCardBody(card, sessionData){
   }
   if(card.steps){
     const steps = getEffectiveSteps(card);
-    html += `<ol class="steps-list">`;
+    html += `<ol class="steps-list${editMode?' edit-mode':''}" data-order-key="${card.id}" data-kind="step">`;
     steps.forEach((s,i)=>{
       const link = s.url ? `<a class="link-chip" href="${s.url}" target="_blank" rel="noopener">${s.linkLabel||chipLabel(s.url)}</a>` : '';
-      html += `<li class="step-item">
+      html += `<li class="step-item" draggable="${editMode?'true':'false'}" data-slot="${s._slot}">
+        ${editMode?'<span class="drag-handle" title="Drag to reorder">⠿</span>':''}
         <span class="step-num">${i+1}</span>
         <span class="step-content">${escHtml(s.text)}${link}</span>
         <span class="step-actions">
-          <button class="edit-btn" onclick="openEditPopup('step','${card.id}',${i},null,this)" title="Edit">✎</button>
-          <button class="del-btn" onclick="deleteStep('${card.id}',${i})" title="Delete">✕</button>
+          <button class="edit-btn" onclick="openEditPopup('step','${card.id}','${s._slot}',null,this)" title="Edit">✎</button>
+          <button class="del-btn" onclick="deleteStepSlot('${card.id}','${s._slot}')" title="Delete">✕</button>
         </span>
       </li>`;
     });
     html += `</ol>`;
-    html += `<button class="add-step-btn" onclick="addStep('${card.id}')">+ Add step</button>`;
+    if(editMode) html += `<button class="add-step-btn" onclick="addStep('${card.id}')">+ Add step</button>`;
   }
   if(card.blocks){
     html += renderOwnerBlocks(card, false);
@@ -1886,27 +2018,29 @@ function renderOwnerBlocks(card, inCovering){
 
 function renderOwnerBlock(block, cardId, blockKey){
   const items = getEffectiveItems(cardId, blockKey, block.items);
+  const orderKey = `${cardId}__${blockKey}`;
   return `<div class="owner-block" style="background:${block.color}15;border:1px solid ${block.color}30">
     <div class="owner-block-header" style="background:${block.color}">${block.label}</div>
-    <div class="owner-block-body">
+    <div class="owner-block-body${editMode?' edit-mode':''}" data-order-key="${orderKey}" data-kind="item">
       ${items.map((item,i)=> renderOwnerItem(item, cardId, blockKey, i)).join('')}
     </div>
-    <button class="add-step-btn" onclick="addItem('${cardId}','${blockKey}')" style="margin:4px 8px 8px">+ Add item</button>
+    ${editMode?`<button class="add-step-btn" onclick="addItem('${cardId}','${blockKey}')" style="margin:4px 8px 8px">+ Add item</button>`:''}
   </div>`;
 }
 
 function renderOwnerItem(item, cardId, blockKey, idx){
-  const cbKey = `${cardId}__${blockKey}__${idx}`;
+  const cbKey = `${cardId}__${blockKey}__${item._slot}`;
   const checked = currentCheckboxStates[cbKey]||false;
   const link = item.url ? `<a class="link-chip" href="${item.url}" target="_blank" rel="noopener">${item.linkLabel||chipLabel(item.url)}</a>` : '';
   const newAuthCls = item.newAuthOnly ? ' new-auth-only' : '';
-  const hidden = item.newAuthOnly && !isBrandNewAuth() ? ' style="display:none"' : '';
-  return `<div class="owner-item${newAuthCls}"${hidden}>
+  const hidden = item.newAuthOnly && !isBrandNewAuth() && !editMode ? ' style="display:none"' : '';
+  return `<div class="owner-item${newAuthCls}"${hidden} draggable="${editMode?'true':'false'}" data-slot="${item._slot}">
+    ${editMode?'<span class="drag-handle" title="Drag to reorder">⠿</span>':''}
     <input type="checkbox" onchange="toggleCheck('${cbKey}',this)" ${checked?'checked':''}>
     <span class="item-text${checked?' checked':''}" id="ot-${cbKey}">${escHtml(item.text)}${link}${item.newAuthOnly?' <span style="font-size:10px;color:#10b981;font-weight:600">(new auth only)</span>':''}</span>
     <span class="item-edit-actions">
-      <button class="edit-btn" onclick="openEditPopup('item','${cardId}',${idx},'${blockKey}',this)" title="Edit">✎</button>
-      <button class="del-btn" onclick="deleteItem('${cardId}','${blockKey}',${idx})" title="Delete">✕</button>
+      <button class="edit-btn" onclick="openEditPopup('item','${cardId}','${item._slot}','${blockKey}',this)" title="Edit">✎</button>
+      <button class="del-btn" onclick="deleteItemSlot('${cardId}','${blockKey}','${item._slot}')" title="Delete">✕</button>
     </span>
   </div>`;
 }
@@ -1942,7 +2076,21 @@ function toggleCheck(key, cb){
   if(el) el.classList.toggle('checked', cb.checked);
 }
 
-// ---- EFFECTIVE STEPS/ITEMS (applying config overrides) ----
+// ---- EFFECTIVE STEPS/ITEMS (applying config overrides + ordering) ----
+function applyOrder(arr, orderKey){
+  const order = config.orders[orderKey];
+  if(!order || !Array.isArray(order)) return arr;
+  // order is an array of the item "slot ids" in desired sequence.
+  // Each element in arr has a _slot property; reorder by it, appending any not in order.
+  const bySlot = {};
+  arr.forEach(x=> { bySlot[x._slot] = x; });
+  const ordered = [];
+  order.forEach(slot=>{ if(bySlot[slot]!==undefined){ ordered.push(bySlot[slot]); delete bySlot[slot]; } });
+  // append leftovers (newly added since last save) in their natural order
+  arr.forEach(x=>{ if(bySlot[x._slot]!==undefined) ordered.push(x); });
+  return ordered;
+}
+
 function getEffectiveSteps(card){
   const base = card.steps||[];
   const edits = config.edits[card.id] || {};
@@ -1950,24 +2098,27 @@ function getEffectiveSteps(card){
   const deleted = config.deletedSteps[card.id] || [];
   let steps = base.map((s,i)=>{
     if(deleted.includes(i)) return null;
-    if(edits[`step_${i}`]) return {...edits[`step_${i}`]};
-    return typeof s==='string' ? {text:s} : s;
+    const v = edits[`step_${i}`] ? {...edits[`step_${i}`]} : (typeof s==='string' ? {text:s} : {...s});
+    v._slot = `b${i}`; // base slot id
+    return v;
   }).filter(Boolean);
-  steps = [...steps, ...added];
-  return steps;
+  added.forEach((a,ai)=>{ const v = {...a, _slot:`a${ai}`}; steps.push(v); });
+  return applyOrder(steps, card.id);
 }
 
 function getEffectiveItems(cardId, blockKey, baseItems){
-  const edits = config.edits[`${cardId}__${blockKey}`] || {};
-  const added = (config.addedSteps[`${cardId}__${blockKey}`]) || [];
-  const deleted = (config.deletedSteps[`${cardId}__${blockKey}`]) || [];
+  const key = `${cardId}__${blockKey}`;
+  const edits = config.edits[key] || {};
+  const added = config.addedSteps[key] || [];
+  const deleted = config.deletedSteps[key] || [];
   let items = (baseItems||[]).map((item,i)=>{
     if(deleted.includes(i)) return null;
-    if(edits[`item_${i}`]) return {...edits[`item_${i}`]};
-    return typeof item==='string' ? {text:item} : item;
+    const v = edits[`item_${i}`] ? {...edits[`item_${i}`]} : (typeof item==='string' ? {text:item} : {...item});
+    v._slot = `b${i}`;
+    return v;
   }).filter(Boolean);
-  items = [...items, ...added];
-  return items;
+  added.forEach((a,ai)=>{ const v = {...a, _slot:`a${ai}`}; items.push(v); });
+  return applyOrder(items, key);
 }
 
 // ============================================================
@@ -2196,6 +2347,7 @@ function rerenderModalBody(){
     updateNewAuthVisibility();
     if(contextApplied) applyDriverContext(true);
   }
+  if(editMode) attachDragHandlers();
 }
 
 function applyDriverContext(silent){
@@ -2303,18 +2455,23 @@ function togglePin(id, e){
 // ============================================================
 // EDIT POPUP
 // ============================================================
-function openEditPopup(type, cardId, idx, blockKey, btn){
-  editTarget = {type, cardId, idx, blockKey: blockKey==='null'?null:blockKey};
-  let item;
+// Find an effective item/step by its _slot, returns the object
+function findBySlot(type, cardId, blockKey, slot){
+  let arr;
   if(type==='step'){
-    const steps = getEffectiveSteps(allCards.find(c=>c.id===cardId));
-    item = steps[idx] || {};
+    arr = getEffectiveSteps(allCards.find(c=>c.id===cardId));
   } else {
     const card = allCards.find(c=>c.id===cardId);
     const block = getBlockByKey(card, blockKey);
-    const items = getEffectiveItems(cardId, blockKey, block?block.items:[]);
-    item = items[idx] || {};
+    arr = getEffectiveItems(cardId, blockKey, block?block.items:[]);
   }
+  return arr.find(x=> x._slot===slot) || {};
+}
+
+// Storage key for edits/deletes given slot. Base slots (b{n}) edit the base; added slots (a{n}) edit the addedSteps entry.
+function openEditPopup(type, cardId, slot, blockKey, btn){
+  editTarget = {type, cardId, slot, blockKey: blockKey==='null'?null:blockKey};
+  const item = findBySlot(type, cardId, blockKey, slot);
   document.getElementById('ep-text').value = typeof item==='string' ? item : item.text||'';
   document.getElementById('ep-link-label').value = item.linkLabel||'';
   document.getElementById('ep-url').value = item.url||'';
@@ -2329,27 +2486,27 @@ function closeEditPopup(){ document.getElementById('edit-popup').classList.remov
 
 function saveEdit(){
   if(!editTarget) return;
-  const {type, cardId, idx, blockKey} = editTarget;
+  const {type, cardId, slot, blockKey} = editTarget;
   const text = document.getElementById('ep-text').value.trim();
   const linkLabel = document.getElementById('ep-link-label').value.trim();
   const url = document.getElementById('ep-url').value.trim();
   // Preserve flags from the original item (e.g. newAuthOnly)
+  const orig = findBySlot(type, cardId, blockKey, slot);
   let preserved = {};
-  if(type==='item'){
-    const card = allCards.find(c=>c.id===cardId);
-    const block = getBlockByKey(card, blockKey);
-    const items = getEffectiveItems(cardId, blockKey, block?block.items:[]);
-    const orig = items[idx];
-    if(orig && orig.newAuthOnly) preserved.newAuthOnly = true;
-  }
+  if(orig && orig.newAuthOnly) preserved.newAuthOnly = true;
   const newItem = {text, ...(url?{url}:{}), ...(linkLabel?{linkLabel}:{}), ...preserved};
-  if(type==='step'){
-    if(!config.edits[cardId]) config.edits[cardId]={};
-    config.edits[cardId][`step_${idx}`] = newItem;
+  const storeKey = type==='step' ? cardId : `${cardId}__${blockKey}`;
+  if(slot[0]==='a'){
+    // edit an added item directly
+    const ai = parseInt(slot.slice(1));
+    if(config.addedSteps[storeKey] && config.addedSteps[storeKey][ai]){
+      config.addedSteps[storeKey][ai] = {...config.addedSteps[storeKey][ai], ...newItem};
+    }
   } else {
-    const key = `${cardId}__${blockKey}`;
-    if(!config.edits[key]) config.edits[key]={};
-    config.edits[key][`item_${idx}`] = newItem;
+    // base item — store as an override edit keyed by base index
+    const bi = parseInt(slot.slice(1));
+    if(!config.edits[storeKey]) config.edits[storeKey]={};
+    config.edits[storeKey][`${type==='step'?'step':'item'}_${bi}`] = newItem;
   }
   scheduleConfigSave();
   closeEditPopup();
@@ -2359,12 +2516,11 @@ function saveEdit(){
 
 function resetEdit(){
   if(!editTarget) return;
-  const {type, cardId, idx, blockKey} = editTarget;
-  if(type==='step'){
-    if(config.edits[cardId]) delete config.edits[cardId][`step_${idx}`];
-  } else {
-    const key = `${cardId}__${blockKey}`;
-    if(config.edits[key]) delete config.edits[key][`item_${idx}`];
+  const {type, cardId, slot, blockKey} = editTarget;
+  const storeKey = type==='step' ? cardId : `${cardId}__${blockKey}`;
+  if(slot[0]==='b'){
+    const bi = parseInt(slot.slice(1));
+    if(config.edits[storeKey]) delete config.edits[storeKey][`${type==='step'?'step':'item'}_${bi}`];
   }
   scheduleConfigSave();
   closeEditPopup();
@@ -2372,17 +2528,30 @@ function resetEdit(){
   showToast("Reset to original ✓");
 }
 
-function deleteStep(cardId, idx){
-  if(!config.deletedSteps[cardId]) config.deletedSteps[cardId]=[];
-  config.deletedSteps[cardId].push(idx);
-  scheduleConfigSave();
-  rerenderModalBody();
+function deleteStepSlot(cardId, slot){
+  deleteBySlot('step', cardId, null, slot);
 }
-
-function deleteItem(cardId, blockKey, idx){
-  const key = `${cardId}__${blockKey}`;
-  if(!config.deletedSteps[key]) config.deletedSteps[key]=[];
-  config.deletedSteps[key].push(idx);
+function deleteItemSlot(cardId, blockKey, slot){
+  deleteBySlot('item', cardId, blockKey, slot);
+}
+function deleteBySlot(type, cardId, blockKey, slot){
+  const storeKey = type==='step' ? cardId : `${cardId}__${blockKey}`;
+  if(slot[0]==='a'){
+    // Remove from addedSteps; re-slotting handled at render time so also clean order refs
+    const ai = parseInt(slot.slice(1));
+    if(config.addedSteps[storeKey]){
+      // mark as null then compact, but compacting shifts indices — instead splice and rebuild order
+      config.addedSteps[storeKey].splice(ai,1);
+      // Any order array referencing a-slots needs reindexing; simplest: clear stored order for this key
+      delete config.orders[storeKey];
+    }
+  } else {
+    const bi = parseInt(slot.slice(1));
+    if(!config.deletedSteps[storeKey]) config.deletedSteps[storeKey]=[];
+    config.deletedSteps[storeKey].push(bi);
+    // remove from order array if present
+    if(config.orders[storeKey]) config.orders[storeKey] = config.orders[storeKey].filter(s=>s!==slot);
+  }
   scheduleConfigSave();
   rerenderModalBody();
 }
@@ -2497,15 +2666,37 @@ function createCard(){
   openCard(id);
 }
 
-function deleteCustomCard(){
-  if(!currentCard || !currentCard.isCustom) return;
-  if(!confirm(`Delete "${currentCard.title}"?`)) return;
-  config.customCards = config.customCards.filter(c=>c.id!==currentCard.id);
-  allCards = allCards.filter(c=>c.id!==currentCard.id);
+function deleteCardConfirm(){
+  if(!currentCard) return;
+  document.getElementById('confirm-title').textContent = `Delete "${currentCard.title}"?`;
+  document.getElementById('confirm-msg').textContent = currentCard.isCustom
+    ? "This custom card will be permanently removed."
+    : "This will hide the built-in card from your dashboard. You can restore hidden cards later from the All Procedures view.";
+  document.getElementById('confirm-overlay').classList.add('open');
+}
+function closeConfirm(){ document.getElementById('confirm-overlay').classList.remove('open'); }
+
+function confirmDeleteCard(){
+  if(!currentCard) return;
+  if(currentCard.isCustom){
+    config.customCards = config.customCards.filter(c=>c.id!==currentCard.id);
+    allCards = allCards.filter(c=>c.id!==currentCard.id);
+  } else {
+    if(!config.deletedCards.includes(currentCard.id)) config.deletedCards.push(currentCard.id);
+  }
   scheduleConfigSave();
+  closeConfirm();
   closeModal();
   renderBrowse();
   showToast("Card deleted");
+}
+
+// Restore a hidden built-in card
+function restoreCard(id){
+  config.deletedCards = config.deletedCards.filter(c=>c!==id);
+  scheduleConfigSave();
+  renderBrowse();
+  showToast("Card restored ✓");
 }
 
 // ============================================================
@@ -2517,7 +2708,8 @@ function handleOverlayClick(e){ if(e.target===document.getElementById('modal-ove
 
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){
-    if(document.getElementById('edit-popup').classList.contains('open')) closeEditPopup();
+    if(document.getElementById('confirm-overlay').classList.contains('open')) closeConfirm();
+    else if(document.getElementById('edit-popup').classList.contains('open')) closeEditPopup();
     else closeModal();
   }
 });
