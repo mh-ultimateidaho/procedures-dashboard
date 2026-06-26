@@ -4207,86 +4207,239 @@
     return String(text).replace(TOKEN_RE, function(m,k){ return ctx[k] ? ctx[k] : m; });
   }
 
-  // Adds selected driver/truck/authority info to checklist rows when the card
-  // has no explicit [TOKENS] in the built-in text. This keeps old/simple
-  // checklist wording useful without having to hand-edit every row.
+  // Adds only the context that is directly useful for that checklist line.
+  // Example: "Get new permits." -> "Get 899 permits under ShortStack."
+  // It intentionally does NOT append every driver/truck/authority value to every task.
   function enrichChecklistText(text, ctx, card){
     if(!ctx || !card || card.type!=="driver-event") return text;
     text=String(text||"");
     var l=text.toLowerCase();
-    if(l.indexOf("driver:")>=0 || l.indexOf("old auth:")>=0 || l.indexOf("new auth:")>=0 || l.indexOf("authority:")>=0) return text;
 
-    function has(words){
-      for(var i=0;i<words.length;i++){ if(l.indexOf(words[i])>=0) return true; }
-      return false;
+    function clean(v){ return String(v||"").trim(); }
+    function truck(v){ return clean(v).replace(/^#+\s*/,""); }
+    function authName(v){ return clean(v).replace(/,?\s+LLC\.?$/i,"").trim(); }
+    function dot(v){ return clean(v).replace(/^#+\s*/,""); }
+    function has(words){ for(var i=0;i<words.length;i++){ if(l.indexOf(words[i])>=0) return true; } return false; }
+    function cap(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : s; }
+    function under(a){ a=authName(a); return a ? " under "+a : ""; }
+    function forAuth(a){ a=authName(a); return a ? " for "+a : ""; }
+    function truckWords(t){ t=truck(t); return t ? "truck "+t : "truck"; }
+    function possessive(n){ n=clean(n); return n ? n+(n.slice(-1).toLowerCase()==="s"?"'":"'s") : "Driver's"; }
+    function sentence(s){ s=String(s||"").replace(/\s+/g," ").trim(); return /[.!?)]$/.test(s) ? s : s+"."; }
+    function permitLine(action, t, a){
+      t=truck(t); a=authName(a);
+      if(t && a) return sentence(action+" "+t+" permits under "+a);
+      if(t) return sentence(action+" "+t+" permits");
+      if(a) return sentence(action+" permits under "+a);
+      return text;
     }
-    function uniq(bits){
-      var out=[], seen={};
-      bits.forEach(function(b){ if(b && !seen[b]){ seen[b]=1; out.push(b); } });
-      return out;
+    function addTransponder(t,a){
+      t=truck(t); a=authName(a);
+      if(t || a) return sentence("Add "+(t?t+" ":"")+"transponder in OR"+(a?" under "+a:"")+" (non B#)");
+      return text;
     }
-    function driver(){ return ctx.DRIVER ? "Driver: "+ctx.DRIVER : ""; }
-    function truck(label, val){ return val ? label+" truck #"+val : ""; }
-    function auth(label, name, dot){
-      if(name && dot) return label+": "+name+" DOT #"+dot;
-      if(name) return label+": "+name;
-      if(dot) return label+" DOT #"+dot;
-      return "";
+    function truckDocs(t,a){
+      t=truck(t); a=authName(a);
+      if(t || a) return sentence("Truck docs for "+(t?"truck "+t:"truck")+(a?" under "+a:"")+". Email & upload to cloud");
+      return text;
     }
-    function add(bits){
-      bits=uniq(bits);
-      return bits.length ? text.replace(/\s+$/,'')+" — "+bits.join(" · ") : text;
+    function truckPhoto(t){ t=truck(t); return t ? sentence("Take picture of truck "+t) : text; }
+    function truckCloud(t,d){
+      t=truck(t); d=dot(d);
+      if(t || d) return sentence("Check "+(t?"truck "+t+" ":"truck ")+"cloud file has DOT"+(d?" #"+d:"") + ", reg & ID card");
+      return text;
+    }
+    function permitFolders(t,a){
+      t=truck(t); a=authName(a);
+      if(t || a) return sentence("Update permit folders on cloud"+(t?" for "+t:"")+(a?" under "+a:""));
+      return text;
+    }
+    function permitSheets(t,a,extra){
+      t=truck(t); a=authName(a);
+      if(t || a) return sentence("Update permit sheets on cloud"+(t?" for "+t:"")+(a?" under "+a:"")+(extra?". "+extra:"") );
+      return text;
+    }
+    function currentTrucks(driver, oldT, newT, a, note){
+      var bits=[];
+      driver=clean(driver); oldT=truck(oldT); newT=truck(newT); a=authName(a);
+      if(driver) bits.push(driver);
+      if(oldT && newT) bits.push(oldT+" → "+newT); else if(newT) bits.push(newT); else if(oldT) bits.push(oldT);
+      if(a) bits.push(a);
+      if(note) bits.push(note);
+      return bits.length ? sentence("Update current trucks & drivers sheet: "+bits.join(" · ")) : text;
+    }
+    function driverAuthSheet(driver, oldA, newA){
+      driver=clean(driver); oldA=authName(oldA); newA=authName(newA);
+      var line="Update driver authority sheet";
+      if(driver) line += ": "+driver;
+      if(oldA && newA) line += (driver?" ":": ")+oldA+" → "+newA;
+      else if(newA) line += (driver?" — ":": ")+newA;
+      else if(oldA) line += (driver?" — ":": ")+oldA;
+      return line!=="Update driver authority sheet" ? sentence(line) : text;
+    }
+    function dotText(d,a){
+      d=dot(d); a=authName(a);
+      if(d && a) return "DOT #"+d+" ("+a+")";
+      if(d) return "DOT #"+d;
+      return a;
     }
 
     var ev=card.eventType;
-    var d=driver();
-    var a=auth("Authority", ctx.AUTH, ctx.DOT);
-    var oldA=auth("Old auth", ctx.OLD_AUTH, ctx.OLD_DOT);
-    var newA=auth("New auth", ctx.NEW_AUTH, ctx.NEW_DOT);
-    var oldT=truck("Old", ctx.OLD);
-    var newT=truck("New", ctx.NEW);
-    var curT=truck("Truck", ctx.NEW || ctx.OLD);
-    var normalT=truck("Normal", ctx.OLD);
-    var tempT=truck("Temp", ctx.NEW);
+    var driver=clean(ctx.DRIVER);
+    var baseAuth=authName(ctx.AUTH), baseDot=dot(ctx.DOT);
+    var oldAuth=authName(ctx.OLD_AUTH), newAuth=authName(ctx.NEW_AUTH);
+    var oldDot=dot(ctx.OLD_DOT), newDot=dot(ctx.NEW_DOT);
+    var oldTruck=truck(ctx.OLD), newTruck=truck(ctx.NEW), curTruck=newTruck || oldTruck;
 
     if(ev==="authority-change"){
-      if(has(["carrier package"])) return add([d, oldA, newA, curT]);
-      if(has(["cancel old", "old permits", "old package", "previous company", "remove from previous"])) return add([d, oldA, curT]);
-      if(has(["driver authority sheet"])) return add([d, oldA, newA]);
-      if(has(["permit folders", "permit sheets", "current trucks", "truck cloud", "truck docs", "transponder", "take picture"])) return add([d, curT, newA]);
-      if(has(["ucr", "permit accounts", "get new permits", "new carrier packet", "add auth", "add authority", "authority package", "external carriers", "clearinghouse", "motive", "d&a", "policy setup", "srs", "new mvr", "embark", "pre-employment query", "quickbooks", "two-pg", "lease"])) return add([d, newA, curT]);
-      return add([d, oldA || newA, curT]);
+      if(has(["cancel old permits"])) return permitLine("Cancel", oldTruck || curTruck, oldAuth);
+      if(has(["get new permits"])) return permitLine("Get", curTruck, newAuth);
+      if(has(["ucr"])) return newAuth ? sentence("UCR for "+newAuth) : text;
+      if(has(["permit accounts set-up", "permit accounts setup"])) return newAuth ? sentence("Permit accounts set-up (POAs) for "+newAuth) : text;
+      if(has(["add transponder"])) return addTransponder(curTruck, newAuth);
+      if(has(["truck docs"])) return truckDocs(curTruck, newAuth);
+      if(has(["take picture"])) return truckPhoto(curTruck);
+      if(has(["check truck cloud"])) return truckCloud(curTruck, newDot || oldDot);
+      if(has(["add auth to"])) return newAuth ? sentence("Add "+newAuth+" to “Ultimate Contractual Carriers”") : text;
+      if(has(["new carrier packet"])) return newAuth ? sentence("Email Disp & Office new Carrier Packet for "+newAuth+" (replace ^)") : text;
+      if(has(["get new mvr"])) return driver ? sentence("Get new MVR for "+driver) : text;
+      if(has(["embark scheduled mvr"])) return driver ? sentence("Update "+possessive(driver)+" embark scheduled MVR date") : text;
+      if(has(["carrier package"])){
+        if(newAuth && oldAuth) return sentence("Carrier package for "+newAuth+". Upload to cloud; move "+oldAuth+" package to old folder");
+        if(newAuth) return sentence("Carrier package for "+newAuth+". Upload to cloud; move old package to old folder");
+        return text;
+      }
+      if(has(["nm transaction"])) return newAuth ? sentence("Enter NM transaction in QuickBooks for "+newAuth) : text;
+      if(has(["permit folders"])) return permitFolders(curTruck, newAuth);
+      if(has(["permit sheets"])) return permitSheets(curTruck, newAuth);
+      if(has(["current trucks & drivers"])) return currentTrucks(driver, "", curTruck, newAuth);
+      if(has(["driver authority sheet"])) return driverAuthSheet(driver, oldAuth, newAuth);
+      if(has(["driver’s authority package", "driver's authority package"])) return newAuth ? sentence("Driver’s Authority Package for "+newAuth) : text;
+      if(has(["two-pg lease"])) return sentence("Two-pg Lease w/ Form"+(curTruck?" for truck "+curTruck:"")+(newAuth?" under "+newAuth:""));
+      if(has(["clearinghouse account setup"])) return newAuth ? sentence("Clearinghouse account setup for "+newAuth+" (FMCSA portal and login.gov)") : text;
+      if(has(["pre-employment query"])) return driver ? sentence("Pre-Employment Query for "+driver+" (PUT IN QuickBooks!)") : text;
+      if(has(["srs"])) return dotText(newDot,newAuth) ? sentence("SRS for "+dotText(newDot,newAuth)) : text;
+      if(has(["motive fleet manager"])) return newAuth ? sentence("Make Motive fleet manager account for "+newAuth+" and email details") : text;
+      if(has(["change motive logs"])) return dotText(newDot,newAuth) ? sentence("Change Motive logs to "+dotText(newDot,newAuth)) : text;
+      if(has(["external carriers"])) return newAuth ? sentence("Add "+newAuth+" to External Carriers in ITS") : text;
+      if(has(["bestpass", "prepass swap"])) return curTruck ? sentence("Bestpass/prepass swap for "+curTruck+(newAuth?" under "+newAuth:"")) : text;
+      if(has(["d&a test and policy"])) return driver || newAuth ? sentence("D&A test and policy setup"+(driver?" for "+driver:"")+(newAuth?" under "+newAuth:"")) : text;
+      if(has(["remove from previous company"])) return driver || oldAuth ? sentence("Email Blueline to remove"+(driver?" "+driver:"")+" from "+(oldAuth||"previous company")) : text;
+      return text;
     }
 
     if(ev==="perm-truck"){
-      if(has(["quartix", "current trucks", "permit folders", "permit sheets"])) return add([d, oldT, newT, a]);
-      if(has(["cancel old", "old permits", "old package", "old folder", "old truck"])) return add([d, oldT, a]);
-      if(has(["get new", "new permits", "transponder", "truck docs", "take picture", "truck cloud", "2-pg", "lease", "line-items", "srs", "bestpass", "prepass", "quickbooks"])) return add([d, newT, a]);
-      return add([d, newT || oldT, a]);
+      if(has(["truck checklist"])) return newTruck ? sentence("Truck Checklist for "+newTruck+" (clipboard)") : text;
+      if(has(["cancel old permits"])) return permitLine("Cancel", oldTruck, baseAuth);
+      if(has(["get new permits"])) return permitLine("Get", newTruck, baseAuth);
+      if(has(["add transponder"])) return addTransponder(newTruck, baseAuth);
+      if(has(["truck docs"])) return truckDocs(newTruck, baseAuth);
+      if(has(["take picture"])) return truckPhoto(newTruck);
+      if(has(["check truck cloud"])) return truckCloud(newTruck, baseDot);
+      if(has(["carrier package"])) return sentence("Carrier package"+(newTruck?" for "+newTruck:"")+". Upload to cloud"+(oldTruck?"; move "+oldTruck+" package to old folder":"; move old package to old folder"));
+      if(has(["update quartix"])) return sentence("Update Quartix. Old truck "+(oldTruck||"old")+": remove from all groups except “Ultimate Logistics All Vehicles”, rename to “No Driver”. New truck "+(newTruck||"new")+": add to dispatch and active group"+(driver?", add "+driver+"":""));
+      if(has(["2-pg lease"])) return sentence("Scan & upload 2-pg lease for "+truckWords(newTruck)+" to cloud"+(oldTruck?". Move "+oldTruck+" lease to old folder":". Move old truck lease to old folder"));
+      if(has(["nm transaction"])) return newTruck||baseAuth ? sentence("Enter NM transaction in QuickBooks"+(newTruck?" for "+newTruck:"")+(baseAuth?" under "+baseAuth:"")) : text;
+      if(has(["permit folders"])) return permitFolders(newTruck, baseAuth);
+      if(has(["permit sheets"])) return permitSheets(newTruck, baseAuth);
+      if(has(["current trucks & drivers"])) return currentTrucks(driver, oldTruck, newTruck, baseAuth);
+      if(has(["srs"])) return dotText(baseDot,baseAuth) ? sentence("SRS for "+dotText(baseDot,baseAuth)+(newTruck?" / truck "+newTruck:"")) : text;
+      if(has(["auth to drive", "trailer lease"])) return sentence("2-pg lease, auth to drive, trailer lease agreement"+(newTruck?" for "+newTruck:""));
+      if(has(["line-items"])) return newTruck ? sentence("Add "+newTruck+" to line-items to show new monthly truck payment") : text;
+      if(has(["bestpass", "prepass swap"])) return oldTruck || newTruck ? sentence("Bestpass/prepass swap"+(oldTruck&&newTruck?" from "+oldTruck+" to "+newTruck:newTruck?" for "+newTruck:" for "+oldTruck)) : text;
+      return text;
     }
 
     if(ev==="temp-truck"){
-      if(has(["quartix", "normal truck", "temporary truck", "current trucks", "permit sheets"])) return add([d, normalT, tempT, a]);
-      if(has(["get new", "new permits", "transponder", "truck docs", "take picture", "truck cloud", "2-pg", "lease", "srs", "line-items", "bestpass", "prepass", "quickbooks", "permit folders"])) return add([d, tempT, a]);
-      return add([d, normalT, tempT, a]);
+      var normalTruck=oldTruck, tempTruck=newTruck;
+      if(has(["truck checklist"])) return tempTruck ? sentence("Truck Checklist for temp truck "+tempTruck+" (clipboard)") : text;
+      if(has(["get new permits"])) return permitLine("Get", tempTruck, baseAuth);
+      if(has(["add transponder"])) return addTransponder(tempTruck, baseAuth);
+      if(has(["truck docs"])) return truckDocs(tempTruck, baseAuth);
+      if(has(["take picture"])) return truckPhoto(tempTruck);
+      if(has(["check truck cloud"])) return truckCloud(tempTruck, baseDot);
+      if(has(["carrier package"])) return sentence("Carrier package for temp truck "+(tempTruck||"")+". Upload to cloud; move old package to old folder");
+      if(has(["update quartix"])) return sentence("Update Quartix. Normal truck "+(normalTruck||"normal")+": add “Shop” in front of name. Temp truck "+(tempTruck||"temp")+": add to dispatch and active group"+(driver?", add "+driver:"")+"); add “Temp” in front of name");
+      if(has(["2-pg lease"])) return sentence("Scan & upload 2-pg lease for temp truck "+(tempTruck||"")+" to cloud. Add “TEMP” to the end of the file name");
+      if(has(["nm transaction"])) return tempTruck||baseAuth ? sentence("Enter NM transaction in QuickBooks"+(tempTruck?" for "+tempTruck:"")+(baseAuth?" under "+baseAuth:"")) : text;
+      if(has(["permit folders"])) return permitFolders(tempTruck, baseAuth);
+      if(has(["permit sheets"])) return permitSheets(tempTruck, baseAuth, (normalTruck||tempTruck)?"Add “in shop” to "+(normalTruck||"normal truck")+" notes and “temp truck” to "+(tempTruck||"temporary truck")+" notes":"");
+      if(has(["current trucks & drivers"])) return currentTrucks(driver, normalTruck, tempTruck, baseAuth, "temp truck");
+      if(has(["srs"])) return dotText(baseDot,baseAuth) ? sentence("SRS for "+dotText(baseDot,baseAuth)+(tempTruck?" / temp truck "+tempTruck:"")) : text;
+      if(has(["auth to drive", "trailer lease"])) return sentence("2-pg lease, auth to drive, trailer lease agreement"+(tempTruck?" for temp truck "+tempTruck:""));
+      if(has(["line-items"])) return tempTruck ? sentence("Add "+tempTruck+" to line-items to show new monthly truck payment") : text;
+      if(has(["bestpass", "prepass swap"])) return tempTruck ? sentence("Bestpass/prepass swap for temp truck "+tempTruck) : text;
+      return text;
     }
 
     if(ev==="out-temp"){
-      // For this card, Current/Old = temp truck being left; New = normal truck being returned to.
-      var outTempT=truck("Temp", ctx.OLD);
-      var outNormalT=truck("Normal", ctx.NEW);
-      if(has(["quartix", "current trucks", "permit folders", "permit sheets"])) return add([d, outTempT, outNormalT, a]);
-      if(has(["cancel temp", "temp permits", "temp carrier", "temp truck", "temporary"])) return add([d, outTempT, a]);
-      if(has(["normal permits", "normal", "remove shop", "truck cloud"])) return add([d, outNormalT, a]);
-      return add([d, outTempT, outNormalT, a]);
+      var tempLeaving=oldTruck, normalReturning=newTruck;
+      if(has(["cancel temp permits"])) return permitLine("Cancel", tempLeaving, baseAuth);
+      if(has(["normal permits"])) return normalReturning||baseAuth ? sentence("Check "+(normalReturning?normalReturning+" ":"")+"normal permits are still active"+(baseAuth?" under "+baseAuth:"")) : text;
+      if(has(["temp carrier package"])) return tempLeaving ? sentence("Move temp carrier package for "+tempLeaving+" to old folder") : text;
+      if(has(["temp truck lease"])) return tempLeaving ? sentence("Move/rename temp truck "+tempLeaving+" lease to old folder (if there is one)") : text;
+      if(has(["update quartix"])) return sentence("Update Quartix. Temp truck "+(tempLeaving||"old")+": remove from all groups except “Ultimate Logistics All Vehicles”, rename to “No Driver”. Normal truck "+(normalReturning||"new")+": remove “Shop” from name");
+      if(has(["check truck cloud"])) return truckCloud(normalReturning, baseDot);
+      if(has(["permit folders"])) return permitFolders(normalReturning, baseAuth);
+      if(has(["permit sheets"])) return permitSheets(normalReturning, baseAuth, "Leave notes until next tax period");
+      if(has(["current trucks & drivers"])) return currentTrucks(driver, tempLeaving, normalReturning, baseAuth, "out of temp");
+      return text;
     }
 
     if(ev==="driver-quits"){
-      return add([d, truck("Truck", ctx.OLD || ctx.NEW), a]);
+      var quitTruck=oldTruck || newTruck;
+      if(has(["remove auth from"])) return baseAuth ? sentence("Remove "+baseAuth+" from “Ultimate Contractual Carriers”") : text;
+      if(has(["new carrier packet"])) return baseAuth ? sentence("Email Disp & Office new Carrier Packet for "+baseAuth+" (replace ^)") : text;
+      if(has(["cancel permits", "close accounts"])) return (quitTruck||baseAuth) ? permitLine("Cancel", quitTruck, baseAuth).replace(/\.$/," / close accounts.") : text;
+      if(has(["permit files"])) return quitTruck||baseAuth ? sentence("Move/rename permit files to canceled"+(quitTruck?" for "+quitTruck:"")+(baseAuth?" under "+baseAuth:"")) : text;
+      if(has(["permit sheets"])) return permitSheets(quitTruck, baseAuth);
+      if(has(["driver cloud folder"])) return driver ? sentence("Move "+possessive(driver)+" driver cloud folder to old") : text;
+      if(has(["id card"])) return quitTruck ? sentence("Move ID card on truck "+quitTruck+" cloud to Old Docs") : text;
+      if(has(["current trucks & drivers"])) return currentTrucks(driver, quitTruck, "", baseAuth, "driver quit");
+      if(has(["driver authority sheet"])) return driverAuthSheet(driver, baseAuth, "");
+      if(has(["safety excel"])) return driver ? sentence("Remove "+driver+" from safety Excel sheet (CDL/Med/MVR checklist)") : text;
+      if(has(["email contacts"])) return driver ? sentence("Remove "+driver+" from email contacts and contact lists") : text;
+      if(has(["drivers information"])) return driver ? sentence("Remove "+driver+" from Drivers Information on Drivers & Locations") : text;
+      if(has(["embark"])) return driver ? sentence("Disable auto-run and deactivate "+driver+" on embark") : text;
+      if(has(["mailbox tag"])) return driver ? sentence("Remove mailbox tag for "+driver) : text;
+      if(has(["quartix"])) return quitTruck ? sentence("Quartix — remove truck "+quitTruck+" from all groups except Ult Log All and Trucks No Driver. Change name to No Driver") : text;
+      if(has(["d&a policy"])) return driver||baseAuth ? sentence("Email Blueline to close D&A policy"+(driver?" for "+driver:"")+(baseAuth?" / "+baseAuth:"")) : text;
+      if(has(["prepass account"])) return baseAuth ? sentence("Close prepass account for "+baseAuth) : text;
+      return text;
     }
 
-    // New driver and any other driver-event checklist: default to the useful combo.
-    return add([d, curT, a]);
+    if(ev==="new-driver"){
+      if(has(["get permits"])) return permitLine("Get", curTruck, baseAuth);
+      if(has(["add transponder"])) return addTransponder(curTruck, baseAuth);
+      if(has(["truck docs"])) return truckDocs(curTruck, baseAuth);
+      if(has(["truck checklist"])) return curTruck ? sentence("Truck Checklist for "+curTruck+" (clipboard)") : text;
+      if(has(["take picture"])) return truckPhoto(curTruck);
+      if(has(["check truck cloud"])) return truckCloud(curTruck, baseDot);
+      if(has(["carrier package"])) return baseAuth ? sentence("Carrier package for "+baseAuth+". Upload to cloud") : text;
+      if(has(["nm transaction"])) return baseAuth ? sentence("Enter NM transaction in QuickBooks for "+baseAuth) : text;
+      if(has(["permit folders"])) return permitFolders(curTruck, baseAuth);
+      if(has(["permit sheets"])) return permitSheets(curTruck, baseAuth);
+      if(has(["quartix"])) return curTruck||driver ? sentence("Update Quartix. Add "+(curTruck||"truck")+" to dispatch and active group"+(driver?"; add "+driver+" to truck name":"")) : text;
+      if(has(["2-pg lease"])) return curTruck ? sentence("Scan & upload 2-pg lease for truck "+curTruck+" to the driver cloud folder") : text;
+      if(has(["dop"])) return driver ? sentence("Scan & upload DOP to "+possessive(driver)+" driver cloud folder") : text;
+      if(has(["driver poa"])) return driver ? sentence("Scan & upload driver POA to "+possessive(driver)+" driver cloud folder") : text;
+      if(has(["move driver cloud folder"])) return driver ? sentence("Move "+possessive(driver)+" driver cloud folder from potential to current") : text;
+      if(has(["current trucks & drivers"])) return currentTrucks(driver, "", curTruck, baseAuth);
+      if(has(["driver authority sheet"])) return driverAuthSheet(driver, "", baseAuth);
+      if(has(["safety sheet"])) return driver ? sentence("Add "+driver+" to safety sheet (CDL/Med/MVR checklist)") : text;
+      if(has(["drivers information"])) return driver ? sentence("Add "+driver+" to Drivers Information on Drivers & Locations") : text;
+      if(has(["email contacts"])) return driver ? sentence("Add "+driver+" to email contacts and contact lists") : text;
+      if(has(["embark"])) return driver ? sentence("Add "+driver+" to embark; schedule MVR a year from start date") : text;
+      if(has(["mailbox tag"])) return driver ? sentence("Add mailbox tag for "+driver) : text;
+      if(has(["pre-employment query"])) return driver ? sentence("Pre-Employment Query for "+driver+" (PUT IN QuickBooks!)") : text;
+      if(has(["srs"])) return dotText(baseDot,baseAuth) ? sentence("SRS for "+dotText(baseDot,baseAuth)) : text;
+      if(has(["drivers in its"])) return driver ? sentence("Add "+driver+" to Drivers in ITS") : text;
+      if(has(["line-items"])) return curTruck ? sentence("Add "+curTruck+" to line-items to show monthly truck payment on 2-pg lease") : text;
+      if(has(["bestpass", "prepass swap"])) return curTruck ? sentence("Bestpass/prepass swap for "+curTruck+(baseAuth?" under "+baseAuth:"")) : text;
+      return text;
+    }
+
+    return text;
   }
 
   /* ---------- card resolution ---------- */
