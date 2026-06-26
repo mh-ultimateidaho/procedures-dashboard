@@ -4207,6 +4207,88 @@
     return String(text).replace(TOKEN_RE, function(m,k){ return ctx[k] ? ctx[k] : m; });
   }
 
+  // Adds selected driver/truck/authority info to checklist rows when the card
+  // has no explicit [TOKENS] in the built-in text. This keeps old/simple
+  // checklist wording useful without having to hand-edit every row.
+  function enrichChecklistText(text, ctx, card){
+    if(!ctx || !card || card.type!=="driver-event") return text;
+    text=String(text||"");
+    var l=text.toLowerCase();
+    if(l.indexOf("driver:")>=0 || l.indexOf("old auth:")>=0 || l.indexOf("new auth:")>=0 || l.indexOf("authority:")>=0) return text;
+
+    function has(words){
+      for(var i=0;i<words.length;i++){ if(l.indexOf(words[i])>=0) return true; }
+      return false;
+    }
+    function uniq(bits){
+      var out=[], seen={};
+      bits.forEach(function(b){ if(b && !seen[b]){ seen[b]=1; out.push(b); } });
+      return out;
+    }
+    function driver(){ return ctx.DRIVER ? "Driver: "+ctx.DRIVER : ""; }
+    function truck(label, val){ return val ? label+" truck #"+val : ""; }
+    function auth(label, name, dot){
+      if(name && dot) return label+": "+name+" DOT #"+dot;
+      if(name) return label+": "+name;
+      if(dot) return label+" DOT #"+dot;
+      return "";
+    }
+    function add(bits){
+      bits=uniq(bits);
+      return bits.length ? text.replace(/\s+$/,'')+" — "+bits.join(" · ") : text;
+    }
+
+    var ev=card.eventType;
+    var d=driver();
+    var a=auth("Authority", ctx.AUTH, ctx.DOT);
+    var oldA=auth("Old auth", ctx.OLD_AUTH, ctx.OLD_DOT);
+    var newA=auth("New auth", ctx.NEW_AUTH, ctx.NEW_DOT);
+    var oldT=truck("Old", ctx.OLD);
+    var newT=truck("New", ctx.NEW);
+    var curT=truck("Truck", ctx.NEW || ctx.OLD);
+    var normalT=truck("Normal", ctx.OLD);
+    var tempT=truck("Temp", ctx.NEW);
+
+    if(ev==="authority-change"){
+      if(has(["carrier package"])) return add([d, oldA, newA, curT]);
+      if(has(["cancel old", "old permits", "old package", "previous company", "remove from previous"])) return add([d, oldA, curT]);
+      if(has(["driver authority sheet"])) return add([d, oldA, newA]);
+      if(has(["permit folders", "permit sheets", "current trucks", "truck cloud", "truck docs", "transponder", "take picture"])) return add([d, curT, newA]);
+      if(has(["ucr", "permit accounts", "get new permits", "new carrier packet", "add auth", "add authority", "authority package", "external carriers", "clearinghouse", "motive", "d&a", "policy setup", "srs", "new mvr", "embark", "pre-employment query", "quickbooks", "two-pg", "lease"])) return add([d, newA, curT]);
+      return add([d, oldA || newA, curT]);
+    }
+
+    if(ev==="perm-truck"){
+      if(has(["quartix", "current trucks", "permit folders", "permit sheets"])) return add([d, oldT, newT, a]);
+      if(has(["cancel old", "old permits", "old package", "old folder", "old truck"])) return add([d, oldT, a]);
+      if(has(["get new", "new permits", "transponder", "truck docs", "take picture", "truck cloud", "2-pg", "lease", "line-items", "srs", "bestpass", "prepass", "quickbooks"])) return add([d, newT, a]);
+      return add([d, newT || oldT, a]);
+    }
+
+    if(ev==="temp-truck"){
+      if(has(["quartix", "normal truck", "temporary truck", "current trucks", "permit sheets"])) return add([d, normalT, tempT, a]);
+      if(has(["get new", "new permits", "transponder", "truck docs", "take picture", "truck cloud", "2-pg", "lease", "srs", "line-items", "bestpass", "prepass", "quickbooks", "permit folders"])) return add([d, tempT, a]);
+      return add([d, normalT, tempT, a]);
+    }
+
+    if(ev==="out-temp"){
+      // For this card, Current/Old = temp truck being left; New = normal truck being returned to.
+      var outTempT=truck("Temp", ctx.OLD);
+      var outNormalT=truck("Normal", ctx.NEW);
+      if(has(["quartix", "current trucks", "permit folders", "permit sheets"])) return add([d, outTempT, outNormalT, a]);
+      if(has(["cancel temp", "temp permits", "temp carrier", "temp truck", "temporary"])) return add([d, outTempT, a]);
+      if(has(["normal permits", "normal", "remove shop", "truck cloud"])) return add([d, outNormalT, a]);
+      return add([d, outTempT, outNormalT, a]);
+    }
+
+    if(ev==="driver-quits"){
+      return add([d, truck("Truck", ctx.OLD || ctx.NEW), a]);
+    }
+
+    // New driver and any other driver-event checklist: default to the useful combo.
+    return add([d, curT, a]);
+  }
+
   /* ---------- card resolution ---------- */
   function isCustom(id){ for(var i=0;i<config.customCards.length;i++) if(config.customCards[i].id===id) return config.customCards[i]; return null; }
   function getEffectiveCard(id){
@@ -4568,7 +4650,13 @@
       var s=el("select",{id:id});
       s.appendChild(el("option",{value:"", text:blank}));
       list.forEach(function(v){ s.appendChild(el("option",{value:v, text:v})); });
-      s.addEventListener("change", function(){ captureContextForm(); applyContext(); captureChecks(); renderModal(); });
+      s.addEventListener("change", function(){
+        captureContextForm();
+        syncDotForAuthorityField(id);
+        applyContext();
+        captureChecks();
+        renderModal();
+      });
       return s;
     }
     function selectPlaceholder(){
@@ -4598,6 +4686,17 @@
       elx.value=val;
     }
     var bn=document.getElementById("f-brandnew"); if(bn) bn.checked=!!modalState.brandNewAuth;
+  }
+  function authorityDot(auth){
+    if(!auth || !S365 || !S365.roster || !S365.roster.byAuthorityDot) return "";
+    return S365.roster.byAuthorityDot[String(auth).trim().toLowerCase()] || "";
+  }
+  function syncDotForAuthorityField(id){
+    if(!modalState || !modalState.formValues) return;
+    var v=modalState.formValues;
+    if(id==="f-auth") v.dot = v.auth ? authorityDot(v.auth) : "";
+    if(id==="f-oldauth") v.olddot = v.oldauth ? authorityDot(v.oldauth) : "";
+    if(id==="f-newauth") v.newdot = v.newauth ? authorityDot(v.newauth) : "";
   }
   function applyContext(){
     var v=modalState.formValues;
@@ -4696,7 +4795,9 @@
       }
 
       var txtSpan=el("span",{class:"txt"});
-      txtSpan.appendChild(document.createTextNode(substitute(it.text, ctx)));
+      var displayText = substitute(it.text, ctx);
+      displayText = enrichChecklistText(displayText, ctx, card);
+      txtSpan.appendChild(document.createTextNode(displayText));
       if(it.newAuthOnly){ txtSpan.appendChild(el("span",{class:"new-auth-only", text:"new auth only"})); }
       if(it.linkUrl){
         var label=it.linkLabel ? ("↗ "+it.linkLabel) : deriveChip(it.linkUrl);
@@ -5120,7 +5221,7 @@
       var head=vals[0];
       var iF=colIndex(head,m.colFirst), iL=colIndex(head,m.colLast), iN=colIndex(head,m.colName);
       var iT=colIndex(head,m.colTruck), iA=colIndex(head,m.colAuthority), iD=colIndex(head,m.colDot);
-      var drivers=[], trucks={}, auths={}, byDriver={};
+      var drivers=[], trucks={}, auths={}, byDriver={}, byAuthorityDot={};
       for(var r=1;r<vals.length;r++){
         var row=vals[r]; if(!row) continue;
         var name="";
@@ -5130,9 +5231,15 @@
         if(!name && !truck && !aut) continue;
         var rec={name:name, truck:truck, authority:aut, dot:dot};
         if(name){ var key=name+(truck?(" #"+truck):""); drivers.push({key:key, label:key}); byDriver[key]=rec; }
-        if(truck) trucks[truck]=1; if(aut) auths[aut]=1;
+        if(truck) trucks[truck]=1;
+        if(aut){
+          auths[aut]=1;
+          var authKey=aut.trim().toLowerCase();
+          if(dot && !byAuthorityDot[authKey]) byAuthorityDot[authKey]=dot;
+        }
       }
-      S365.roster={ drivers:drivers, trucks:Object.keys(trucks), authorities:Object.keys(auths), byDriver:byDriver };
+      var sortAlpha=function(a,b){ return String(a).localeCompare(String(b), undefined, {sensitivity:"base", numeric:true}); };
+      S365.roster={ drivers:drivers, trucks:Object.keys(trucks), authorities:Object.keys(auths).sort(sortAlpha), byDriver:byDriver, byAuthorityDot:byAuthorityDot };
     });
   }
 
