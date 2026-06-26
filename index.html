@@ -5015,7 +5015,7 @@
 
   /* ==================== M365 / SharePoint integration ==================== */
   var SP = {
-    clientId: "3c1066e0-8963-49c7-abfb-540e78612ceb",
+    clientId: "2688e58a-1841-4c5b-8630-f92ff88238cc",
     tenantId: "2c6b3d13-b98c-4605-8fcc-d8eed3579136",
     scopes: ["https://graph.microsoft.com/Sites.ReadWrite.All"],
     fleetUrl: "https://ultimatecorp.sharepoint.com/:x:/r/sites/UltimateLogisticsLLC/_layouts/15/Doc.aspx?sourcedoc=%7B4443A618-6514-4DDB-8103-38FC1E3D2ED7%7D&file=Fleet%20Master%20Sheet%20v6.xlsx&action=default&mobileredirect=true",
@@ -5038,7 +5038,7 @@
 
     if(typeof msal==="undefined"){ setSync("err","Sign-in unavailable"); btn.textContent="Sign-in unavailable"; btn.disabled=true; return; }
 
-    var redirectUri = location.origin + location.pathname.replace(/index\.html$/, "");
+    var redirectUri = "https://mh-ultimateidaho.github.io/procedures-dashboard/";
     S365.msal = new msal.PublicClientApplication({
       auth:{ clientId:SP.clientId, authority:"https://login.microsoftonline.com/"+SP.tenantId, redirectUri:redirectUri },
       cache:{ cacheLocation:"localStorage", storeAuthStateInCookie:false }
