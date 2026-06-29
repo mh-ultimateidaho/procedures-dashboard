@@ -150,6 +150,11 @@
   .toggle-bar .tg .sp{flex:1}
   .archived-sec > summary{cursor:pointer;list-style:none;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:6px 0;margin-bottom:6px}
   .archived-sec > summary::-webkit-details-marker{display:none}
+  .card .edited{font-size:11px;color:var(--muted);margin-top:9px}
+  .review-bar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:-4px 0 16px}
+  .review-bar .review-label{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  .review-bar select,.review-bar input[type=date]{border:1px solid var(--line-strong);border-radius:8px;padding:6px 9px;background:#fff;font-size:13px}
+  .review-bar .review-count{font-size:12.5px;color:var(--muted);font-weight:600}
 
   .item-ctrls{display:flex;gap:3px;align-items:center;opacity:.85}
   .mini{border:1px solid var(--line);background:#fff;border-radius:7px;padding:2px 7px;font-size:12px;line-height:1.4}
@@ -4467,7 +4472,7 @@
     var cust=isCustom(id); if(cust) return cust;
     var base=builtinById[id]; if(!base) return null;
     var ov=config.cardOverrides[id];
-    if(ov){ var m=clone(base); if(ov.steps) m.steps=ov.steps; if(ov.blocks) m.blocks=ov.blocks; if(ov.title!=null) m.title=ov.title; if(ov.defaultMode) m.defaultMode=ov.defaultMode; if(ov.toggles) m.toggles=ov.toggles; return m; }
+    if(ov){ var m=clone(base); if(ov.steps) m.steps=ov.steps; if(ov.blocks) m.blocks=ov.blocks; if(ov.title!=null) m.title=ov.title; if(ov.defaultMode) m.defaultMode=ov.defaultMode; if(ov.toggles) m.toggles=ov.toggles; if(ov.lastEdited) m.lastEdited=ov.lastEdited; return m; }
     return base;
   }
   function getOriginalCard(id){
@@ -4482,6 +4487,25 @@
     return config.cardOverrides[id];
   }
   function isEditable(card){ return card.type!=="email"; }
+
+  /* ----- per-card "last edited" tracking (synced via shared config) ----- */
+  function cardLastEdited(cardId){
+    var cust=isCustom(cardId);
+    if(cust) return cust.lastEdited||null;
+    var ov=config.cardOverrides[cardId];
+    return (ov && ov.lastEdited)||null;
+  }
+  function touchCard(cardId){
+    var cust=isCustom(cardId);
+    if(cust){ cust.lastEdited=Date.now(); }
+    else { getMutableCard(cardId).lastEdited=Date.now(); }
+  }
+  function fmtMDY(ts){
+    if(!ts) return "n/a";
+    var d=new Date(ts); if(isNaN(d.getTime())) return "n/a";
+    function p(n){ return (n<10?"0":"")+n; }
+    return p(d.getMonth()+1)+"/"+p(d.getDate())+"/"+d.getFullYear();
+  }
   function isHidden(id){ return config.hiddenCards.indexOf(id)>=0; }
 
   function allVisibleCards(){
@@ -4513,6 +4537,7 @@
       mkBadge(card.section),
       el("h3",{text:card.title})
     );
+    tile.appendChild(el("div",{class:"edited", text:"Last edited: "+fmtMDY(cardLastEdited(card.id))}));
     var pinned=state.pins.indexOf(card.id)>=0;
     var pin=el("button",{class:"pin"+(pinned?" on":""), title:pinned?"Unpin":"Pin", onclick:function(e){ e.stopPropagation(); togglePin(card.id); }}, pinned?"📌":"📍");
     tile.appendChild(pin);
@@ -4625,7 +4650,19 @@
   /* ====================================================================
      BROWSE VIEW
   ==================================================================== */
-  var browseQuery="", browseFilter=null;
+  var browseQuery="", browseFilter=null, editFilterMode="all", editBeforeDate="";
+  function passesEditFilter(card){
+    var le=cardLastEdited(card.id);
+    if(editFilterMode==="never") return !le;
+    if(editFilterMode==="edited") return !!le;
+    if(editFilterMode==="before"){
+      if(!editBeforeDate) return true;
+      var cutoff=new Date(editBeforeDate+"T00:00:00").getTime();
+      if(!le) return true;            // never-edited counts as needing review
+      return le < cutoff;
+    }
+    return true;
+  }
   function cardMatches(card, q){
     if(!q) return true; q=q.toLowerCase();
     if(card.title.toLowerCase().indexOf(q)>=0) return true;
@@ -4668,21 +4705,39 @@
     });
     root.appendChild(chips);
 
+    // review filter — find cards by edit status (e.g. ones never edited yet)
+    var review=el("div",{class:"review-bar"});
+    review.appendChild(el("span",{class:"review-label",text:"Review"}));
+    var efSel=el("select",{id:"edit-filter"});
+    [["all","Any edit status"],["never","Never edited"],["edited","Edited"],["before","Not edited since…"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===editFilterMode)o.selected=true; efSel.appendChild(o); });
+    efSel.addEventListener("change", function(){ editFilterMode=efSel.value; renderBrowse(); });
+    review.appendChild(efSel);
+    var dInp=el("input",{type:"date", id:"edit-before"}); dInp.value=editBeforeDate;
+    dInp.style.display=(editFilterMode==="before")?"":"none";
+    dInp.addEventListener("change", function(){ editBeforeDate=dInp.value; renderGroups(); });
+    review.appendChild(dInp);
+    review.appendChild(el("span",{class:"review-count", id:"review-count"}));
+    root.appendChild(review);
+
     var groupsHost=el("div",{id:"browse-groups"});
     root.appendChild(groupsHost);
     renderGroups();
 
     function renderGroups(){
       groupsHost.textContent="";
+      var shown=0;
       var sections = browseFilter ? SECTIONS.filter(function(s){return s.id===browseFilter;}) : SECTIONS;
       sections.forEach(function(sec){
-        var cards=allVisibleCards().filter(function(c){ return c.section===sec.id && cardMatches(c, browseQuery); });
+        var cards=allVisibleCards().filter(function(c){ return c.section===sec.id && cardMatches(c, browseQuery) && passesEditFilter(c); });
         if(cards.length===0) return;
+        shown+=cards.length;
         var grp=el("div",{class:"sec-group"});
         grp.appendChild(el("h2",{}, (function(){var d=el("span",{class:"dot"}); d.style.background=sec.color; return d;})(), sec.name));
         var g=el("div",{class:"grid"}); cards.forEach(function(c){ g.appendChild(cardTile(c)); }); grp.appendChild(g);
         groupsHost.appendChild(grp);
       });
+      var rc=document.getElementById("review-count");
+      if(rc) rc.textContent = (editFilterMode!=="all"||browseQuery||browseFilter) ? (shown+" card"+(shown===1?"":"s")) : "";
 
       // hidden built-ins
       var hidden=config.hiddenCards.map(function(id){return builtinById[id];}).filter(Boolean);
@@ -4772,6 +4827,7 @@
           captureContextForm(); captureChecks();
           var mut=getMutableCard(card.id);
           mut.defaultMode = effectiveCardDefaultMode(mut)==="number" ? "check" : "number";
+          touchCard(card.id);
           scheduleSave();
           renderModal();
         }}));
@@ -5077,7 +5133,7 @@
     var mut=getMutableCard(cardId);
     var list=getList(mut, listKey);
     list.push({id:uid("it"), text:"New "+(listKey==="steps"?"step":"item")});
-    scheduleSave(); reRenderModalPreserving();
+    touchCard(cardId); scheduleSave(); reRenderModalPreserving();
   }
   function deleteItem(cardId, listKey, itemId){
     var mut=getMutableCard(cardId);
@@ -5085,7 +5141,7 @@
     var i=list.findIndex(function(x){return x.id===itemId;});
     if(i>=0) list.splice(i,1);
     delete modalState.checks[itemId];
-    scheduleSave(); reRenderModalPreserving();
+    touchCard(cardId); scheduleSave(); reRenderModalPreserving();
   }
   function moveWithin(list, fromId, toId, after){
     var fi=list.findIndex(function(x){return x.id===fromId;}); if(fi<0) return;
@@ -5119,7 +5175,7 @@
       e.preventDefault();
       var rect=row.getBoundingClientRect(); var after=(e.clientY-rect.top)>rect.height/2;
       var mut=getMutableCard(card.id); var list=getList(mut, listKey);
-      if(dragInfo.id!==itemId){ moveWithin(list, dragInfo.id, itemId, after); scheduleSave(); }
+      if(dragInfo.id!==itemId){ moveWithin(list, dragInfo.id, itemId, after); touchCard(card.id); scheduleSave(); }
       clearDragMarks(); dragInfo=null;
       reRenderModalPreserving();
     });
@@ -5158,7 +5214,7 @@
         else { delete item.linkUrl; delete item.linkLabel; }
         if(modeSel.value){ item.mode=modeSel.value; } else { delete item.mode; }
         if(tgSel.value){ item.toggle=tgSel.value; } else { delete item.toggle; }
-        scheduleSave(); closePopup(); reRenderModalPreserving();
+        touchCard(card.id); scheduleSave(); closePopup(); reRenderModalPreserving();
       }}),
       el("button",{class:"btn small",text:"Reset to original", onclick:function(){
         var orig=findOriginalItem(card.id, listKey, itemId);
@@ -5271,12 +5327,12 @@
     if(label==null) return; label=String(label).trim(); if(!label) return;
     var mut=getMutableCard(cardId); mut.toggles=mut.toggles||[];
     mut.toggles.push({id:uid("tg"), label:label});
-    scheduleSave(); reRenderModalPreserving();
+    touchCard(cardId); scheduleSave(); reRenderModalPreserving();
   }
   function renameToggle(cardId, tid){
     var mut=getMutableCard(cardId); var t=(mut.toggles||[]).filter(function(x){return x.id===tid;})[0]; if(!t) return;
     var label=window.prompt("Rename this checkbox:", t.label); if(label==null) return; label=String(label).trim(); if(!label) return;
-    t.label=label; scheduleSave(); reRenderModalPreserving();
+    t.label=label; touchCard(cardId); scheduleSave(); reRenderModalPreserving();
   }
   function deleteToggle(cardId, tid){
     if(!window.confirm("Delete this checkbox? Items set to “only show when” it will become always-visible.")) return;
@@ -5285,7 +5341,7 @@
     (mut.steps||[]).forEach(function(s){ if(s.toggle===tid) delete s.toggle; });
     (mut.blocks||[]).forEach(function(b){ (b.items||[]).forEach(function(it){ if(it.toggle===tid) delete it.toggle; }); });
     if(modalState.toggleState) delete modalState.toggleState[tid];
-    scheduleSave(); reRenderModalPreserving();
+    touchCard(cardId); scheduleSave(); reRenderModalPreserving();
   }
 
   /* ----- per-step bold notes (operational, saved with the session) ----- */
@@ -5461,6 +5517,7 @@
       blocks: blocks
     };
     card._orig = clone({steps:steps, blocks:blocks});
+    card.lastEdited = Date.now();
     config.customCards.push(card);
     flushConfig();
     closeBuilder();
@@ -5485,12 +5542,14 @@
     tenantId: "2c6b3d13-b98c-4605-8fcc-d8eed3579136",
     scopes: ["https://graph.microsoft.com/Sites.ReadWrite.All", "https://graph.microsoft.com/Files.ReadWrite"],
     fleetUrl: "https://ultimatecorp.sharepoint.com/:x:/r/sites/UltimateLogisticsLLC/_layouts/15/Doc.aspx?sourcedoc=%7B4443A618-6514-4DDB-8103-38FC1E3D2ED7%7D&file=Fleet%20Master%20Sheet%20v6.xlsx&action=default&mobileredirect=true",
-    // Default settings file location: user's OneDrive for Business > My Files.
-    configStorage: "onedrive",
+    // Default: the shared SharePoint site library (the Ultimate Logistics team site).
+    // Everyone with site access can read it; office staff with Edit access can write it.
+    configStorage: "sharepoint",
     configFile: "procedures-dashboard-config.json",
+    // Older locations are checked once so existing edits migrate into the shared file automatically.
     legacyConfigFiles: [
-      {storage:"sharepoint", path:"Office Documents/procedures-dashboard-config.json"},
-      {storage:"sharepoint", path:"procedures-dashboard-config.json"}
+      {storage:"onedrive", path:"procedures-dashboard-config.json"},
+      {storage:"sharepoint", path:"Office Documents/procedures-dashboard-config.json"}
     ]
   };
   var S365 = { msal:null, account:null, signedIn:false, item:null, driveId:null,
@@ -5500,6 +5559,9 @@
       colName:"Driver", colFirst:"First", colLast:"Last", colTruck:"Truck #", colAuthority:"Authority", colDot:"DOT #" };
   config.remoteConfigStorage = config.remoteConfigStorage || SP.configStorage;
   config.remoteConfigPath = config.remoteConfigPath || SP.configFile;
+  // One-time migration: anyone whose saved setting still points at personal OneDrive is moved
+  // onto the shared SharePoint library so edits reach the whole office.
+  if(!config._sharedStorageMigrated){ config.remoteConfigStorage="sharepoint"; config._sharedStorageMigrated=true; try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){} }
 
   function setSync(kind, text){ var c=document.getElementById("sync-status"); if(c){ c.className="sync-chip "+kind; c.textContent=text; } }
   function rerenderAll(){ if(currentView==="home") renderHome(); else renderBrowse(); }
@@ -5683,11 +5745,12 @@
         var x=legacy[i++];
         return readRemoteConfigAt(x.path, x.storage).then(function(foundLegacy){
           if(foundLegacy){
-            // Borrow old/shared data once so nothing is lost, then keep saving to the preferred OneDrive path.
+            // Borrow old data once so nothing is lost, then save it to the shared location.
             config.remoteConfigStorage=preferredStorage;
             config.remoteConfigPath=preferred;
             S365.remote.loadedFromLegacy=true;
             try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){}
+            pushRemoteConfig();   // migrate borrowed data into the shared SharePoint file
             return;
           }
           return tryNext();
@@ -5723,8 +5786,12 @@
     body.appendChild(st);
     if(!S365.signedIn) return;
 
-    body.appendChild(colRow("OneDrive JSON save path","set-config-path",activeConfigFile()));
-    body.appendChild(el("p",{class:"note",text:"This saves under OneDrive > My Files. Example: procedures-dashboard-config.json or Dashboard/procedures-dashboard-config.json. Folders must already exist."}));
+    var stoRow=el("div",{class:"settings-row"}); stoRow.appendChild(el("label",{text:"Where shared edits are saved"}));
+    var stoSel=el("select",{id:"set-config-storage"});
+    [["sharepoint","SharePoint Documents (shared with the office)"],["onedrive","OneDrive My Files (only me)"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===activeConfigStorage())o.selected=true; stoSel.appendChild(o); });
+    stoRow.appendChild(stoSel); body.appendChild(stoRow);
+    body.appendChild(colRow("JSON file name / path","set-config-path",activeConfigFile()));
+    body.appendChild(el("p",{class:"note",text:"For everyone to see your card edits, keep this on SharePoint Documents — the shared site library. OneDrive My Files only syncs to you. Any folders in the path must already exist."}));
 
     var wsRow=el("div",{class:"settings-row"}); wsRow.appendChild(el("label",{text:"Worksheet (tab) to read"}));
     var wsSel=el("select",{id:"set-ws"}); (S365.worksheets.length?S365.worksheets:[m.worksheet]).forEach(function(n){ var o=el("option",{value:n,text:n}); if(n===m.worksheet)o.selected=true; wsSel.appendChild(o); });
@@ -5751,7 +5818,7 @@
   }
   function saveMapping(persist){
     function gv(id){ var e=document.getElementById(id); return e?e.value:""; }
-    config.remoteConfigStorage="onedrive";
+    config.remoteConfigStorage=normalizeConfigStorage(gv("set-config-storage") || activeConfigStorage());
     config.remoteConfigPath=normalizeConfigPath(gv("set-config-path") || config.remoteConfigPath || SP.configFile);
     config.mapping={ worksheet:gv("set-ws")||config.mapping.worksheet, nameMode:gv("set-namemode")||"firstlast",
       colName:gv("set-name"), colFirst:gv("set-first"), colLast:gv("set-last"),
