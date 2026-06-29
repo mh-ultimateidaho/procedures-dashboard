@@ -4725,6 +4725,14 @@
       }});
       mActions.appendChild(editBtn);
       if(modalState.editMode){
+        var defMode=effectiveCardDefaultMode(card);
+        mActions.appendChild(el("button",{class:"icon-btn", title:"Set the default style for items on this card", text:"Default: "+modeName(defMode), onclick:function(){
+          captureContextForm(); captureChecks();
+          var mut=getMutableCard(card.id);
+          mut.defaultMode = effectiveCardDefaultMode(mut)==="number" ? "check" : "number";
+          scheduleSave();
+          renderModal();
+        }}));
         mActions.appendChild(el("button",{class:"icon-btn", style:"border-color:#e6b5ae;color:var(--bad)", text:"🗑 Delete card", onclick:function(){ confirmDelete(card.id); }}));
       }
     }else{
@@ -4788,9 +4796,6 @@
       wrap.appendChild(el("label",{class:"toggle-row"}, tgl, "Brand-new authority (show UCR / permit / NM setup steps)"));
     }
 
-    wrap.appendChild(el("button",{class:"btn primary ctx-apply", text:"Apply to checklist ↓", onclick:function(){
-      captureContextForm(); applyContext(); captureChecks(); renderModal();
-    }}));
     return wrap;
 
     function field(lbl, control){ return el("div",{class:"field"}, el("label",{text:lbl}), control); }
@@ -4914,6 +4919,28 @@
   }
 
   // listKey: "steps" or a block id
+  function cardDefaultItemMode(card, listKey, opts){
+    if(card && (card.defaultMode==="number" || card.defaultMode==="check")) return card.defaultMode;
+    // Preserve the original built-in behavior until a card default is chosen:
+    // main steps are numbered; owner/task blocks are checkboxes.
+    if(opts && opts.ordered) return "number";
+    if(opts && opts.checkbox) return "check";
+    return "check";
+  }
+  function effectiveCardDefaultMode(card){
+    if(card && (card.defaultMode==="number" || card.defaultMode==="check")) return card.defaultMode;
+    var hasSteps=!!(card && card.steps && card.steps.length);
+    var hasBlocks=!!(card && card.blocks && card.blocks.length);
+    if(hasSteps && !hasBlocks) return "number";
+    return "check";
+  }
+  function itemDisplayMode(card, listKey, item, opts){
+    var m=item && item.mode;
+    if(m==="number" || m==="check") return m;
+    return cardDefaultItemMode(card, listKey, opts);
+  }
+  function modeName(mode){ return mode==="number" ? "Numbers" : "Checkboxes"; }
+
   function renderList(card, listKey, items, opts){
     var ctx=modalState.ctx;
     var list = (listKey==="steps") ? el("ol",{class:"steps"}) : el("div",{class:"steps"});
@@ -4933,9 +4960,10 @@
         row.classList.add("editing-on");
       }
 
-      if(opts.ordered){
+      var displayMode=itemDisplayMode(card, listKey, it, opts);
+      if(displayMode==="number"){
         row.appendChild(el("span",{class:"num"}));
-      }else if(opts.checkbox){
+      }else if(displayMode==="check"){
         var cb=el("input",{type:"checkbox", class:"cb"});
         cb.setAttribute("data-id", it.id);
         cb.checked=!!modalState.checks[it.id];
@@ -5057,18 +5085,22 @@
     var urlF=el("input",{type:"text",placeholder:"https://…"}); urlF.value=item.linkUrl||"";
     popup.appendChild(el("div",{class:"field"}, el("label",{text:"Link label (optional)"}), labelF));
     popup.appendChild(el("div",{class:"field"}, el("label",{text:"URL (blank to remove link)"}), urlF));
+    var modeSel=el("select");
+    [["","Use card default"],["check","Checkbox"],["number","Numbered"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if((item.mode||"")===p[0]) o.selected=true; modeSel.appendChild(o); });
+    popup.appendChild(el("div",{class:"field"}, el("label",{text:"Item style"}), modeSel));
     popup.appendChild(el("div",{class:"pop-actions"},
       el("button",{class:"btn small primary",text:"Save", onclick:function(){
         item.text=ta.value;
         var u=urlF.value.trim();
         if(u){ item.linkUrl=u; item.linkLabel=labelF.value.trim()||undefined; }
         else { delete item.linkUrl; delete item.linkLabel; }
+        if(modeSel.value){ item.mode=modeSel.value; } else { delete item.mode; }
         scheduleSave(); closePopup(); reRenderModalPreserving();
       }}),
       el("button",{class:"btn small",text:"Reset to original", onclick:function(){
         var orig=findOriginalItem(card.id, listKey, itemId);
-        if(orig){ ta.value=orig.text||""; labelF.value=orig.linkLabel||""; urlF.value=orig.linkUrl||""; }
-        else { ta.value=""; labelF.value=""; urlF.value=""; }
+        if(orig){ ta.value=orig.text||""; labelF.value=orig.linkLabel||""; urlF.value=orig.linkUrl||""; modeSel.value=orig.mode||""; }
+        else { ta.value=""; labelF.value=""; urlF.value=""; modeSel.value=""; }
       }}),
       el("button",{class:"btn small",text:"Cancel", onclick:closePopup})
     ));
@@ -5152,7 +5184,7 @@
 
   var builderModel=null;
   function openBuilder(){
-    builderModel={ title:"", section:SECTIONS[0].id, steps:[], blocks:[] };
+    builderModel={ title:"", section:SECTIONS[0].id, defaultMode:"check", steps:[], blocks:[] };
     bOverlay.classList.remove("hidden"); bOverlay.setAttribute("aria-hidden","false");
     document.body.style.overflow="hidden";
     renderBuilder();
@@ -5167,20 +5199,26 @@
     titleI.addEventListener("input",function(){ builderModel.title=titleI.value; });
     var secSel=el("select"); SECTIONS.forEach(function(s){ var o=el("option",{value:s.id,text:s.name}); if(s.id===builderModel.section)o.selected=true; secSel.appendChild(o); });
     secSel.addEventListener("change",function(){ builderModel.section=secSel.value; });
+    var defSel=el("select");
+    [["check","Checkboxes"],["number","Numbers"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===builderModel.defaultMode)o.selected=true; defSel.appendChild(o); });
+    defSel.addEventListener("change",function(){ builderModel.defaultMode=defSel.value; });
     basics.appendChild(el("h4",{text:"Card"}));
     basics.appendChild(el("div",{class:"field",style:"margin-bottom:10px"}, el("label",{text:"Title"}), titleI));
-    basics.appendChild(el("div",{class:"field"}, el("label",{text:"Section"}), secSel));
+    basics.appendChild(el("div",{class:"field",style:"margin-bottom:10px"}, el("label",{text:"Section"}), secSel));
+    basics.appendChild(el("div",{class:"field"}, el("label",{text:"Default item style"}), defSel));
     bBody.appendChild(basics);
 
     // steps
     var stepSeg=el("div",{class:"seg"});
-    stepSeg.appendChild(el("h4",{text:"Numbered steps"}));
+    stepSeg.appendChild(el("h4",{text:"Steps / main list"}));
     builderModel.steps.forEach(function(st,idx){
       var row=el("div",{class:"b-row"});
       var inp=el("input",{type:"text",placeholder:"Step "+(idx+1)}); inp.value=st.text;
       inp.addEventListener("input",function(){ st.text=inp.value; });
+      var mode=builderModeSelect(st);
       row.appendChild(el("span",{style:"color:var(--accent);font-weight:700;min-width:18px",text:(idx+1)+"."}));
       row.appendChild(inp);
+      row.appendChild(mode);
       row.appendChild(el("button",{class:"mini del",text:"✕", onclick:function(){ builderModel.steps.splice(idx,1); renderBuilder(); }}));
       stepSeg.appendChild(row);
     });
@@ -5215,6 +5253,7 @@
         var inp=el("input",{type:"text",placeholder:"Item"}); inp.value=it.text;
         inp.addEventListener("input",function(){ it.text=inp.value; });
         r.appendChild(inp);
+        r.appendChild(builderModeSelect(it));
         r.appendChild(el("button",{class:"mini del",text:"✕", onclick:function(){ blk.items.splice(ii,1); renderBuilder(); }}));
         box.appendChild(r);
       });
@@ -5234,17 +5273,31 @@
     ));
   }
 
+  function builderModeSelect(item){
+    var s=el("select",{title:"Item style"});
+    [["","Default"],["check","Checkbox"],["number","Number"]].forEach(function(p){ var o=el("option",{value:p[0], text:p[1]}); if((item.mode||"")===p[0]) o.selected=true; s.appendChild(o); });
+    s.addEventListener("change",function(){ if(s.value){ item.mode=s.value; } else { delete item.mode; } });
+    return s;
+  }
+
+  function cleanBuilderItem(item){
+    var out={id:item.id, text:String(item.text||"").trim()};
+    if(item.mode==="check" || item.mode==="number") out.mode=item.mode;
+    return out;
+  }
+
   function createCard(){
     if(!builderModel.title.trim()){ window.alert("Give the card a title first."); return; }
-    var steps=builderModel.steps.filter(function(s){return s.text.trim();});
+    var steps=builderModel.steps.filter(function(s){return s.text.trim();}).map(cleanBuilderItem);
     var blocks=builderModel.blocks
-      .map(function(b){ return {id:b.id, kind:b.kind, label:b.label||"Tasks", items:(b.items||[]).filter(function(i){return i.text.trim();})}; })
+      .map(function(b){ return {id:b.id, kind:b.kind, label:b.label||"Tasks", items:(b.items||[]).filter(function(i){return i.text.trim();}).map(cleanBuilderItem)}; })
       .filter(function(b){ return b.items.length>0; });
     var card={
       id: uid("custom"),
       section: builderModel.section,
       type: "standard",
       title: builderModel.title.trim(),
+      defaultMode: builderModel.defaultMode || "check",
       steps: steps,
       blocks: blocks
     };
@@ -5271,15 +5324,23 @@
   var SP = {
     clientId: "2688e58a-1841-4c5b-8630-f92ff88238cc",
     tenantId: "2c6b3d13-b98c-4605-8fcc-d8eed3579136",
-    scopes: ["https://graph.microsoft.com/Sites.ReadWrite.All"],
+    scopes: ["https://graph.microsoft.com/Sites.ReadWrite.All", "https://graph.microsoft.com/Files.ReadWrite"],
     fleetUrl: "https://ultimatecorp.sharepoint.com/:x:/r/sites/UltimateLogisticsLLC/_layouts/15/Doc.aspx?sourcedoc=%7B4443A618-6514-4DDB-8103-38FC1E3D2ED7%7D&file=Fleet%20Master%20Sheet%20v6.xlsx&action=default&mobileredirect=true",
-    configFile: "procedures-dashboard-config.json"
+    // Default settings file location: user's OneDrive for Business > My Files.
+    configStorage: "onedrive",
+    configFile: "procedures-dashboard-config.json",
+    legacyConfigFiles: [
+      {storage:"sharepoint", path:"Office Documents/procedures-dashboard-config.json"},
+      {storage:"sharepoint", path:"procedures-dashboard-config.json"}
+    ]
   };
   var S365 = { msal:null, account:null, signedIn:false, item:null, driveId:null,
                roster:null, worksheets:[], remote:{eTag:null, by:null, at:null, present:false} };
 
   config.mapping = config.mapping || { worksheet:"Current Roster", nameMode:"firstlast",
       colName:"Driver", colFirst:"First", colLast:"Last", colTruck:"Truck #", colAuthority:"Authority", colDot:"DOT #" };
+  config.remoteConfigStorage = config.remoteConfigStorage || SP.configStorage;
+  config.remoteConfigPath = config.remoteConfigPath || SP.configFile;
 
   function setSync(kind, text){ var c=document.getElementById("sync-status"); if(c){ c.className="sync-chip "+kind; c.textContent=text; } }
   function rerenderAll(){ if(currentView==="home") renderHome(); else renderBrowse(); }
@@ -5409,33 +5470,81 @@
   }
 
   /* ----- shared config in SharePoint ----- */
-  function configPath(){ return "/drives/"+S365.driveId+"/root:/"+encodeURIComponent(SP.configFile); }
-  function loadRemoteConfig(){
-    return graph(configPath()+":/content").then(function(data){
-      if(data && data.__notfound){ S365.remote.present=false; return; }
+  function normalizeConfigPath(path){
+    path=String(path||SP.configFile).trim().replace(/^\/+/,"").replace(/\\/g,"/").replace(/\/{2,}/g,"/");
+    return path || SP.configFile;
+  }
+  function normalizeConfigStorage(storage){
+    return String(storage||SP.configStorage).toLowerCase()==="sharepoint" ? "sharepoint" : "onedrive";
+  }
+  function activeConfigFile(){ return normalizeConfigPath(config.remoteConfigPath || SP.configFile); }
+  function activeConfigStorage(){ return normalizeConfigStorage(config.remoteConfigStorage || SP.configStorage); }
+  function configLocationLabel(storage){ return normalizeConfigStorage(storage)==="sharepoint" ? "SharePoint Documents" : "OneDrive My Files"; }
+  function encodeDrivePath(path){ return normalizeConfigPath(path).split("/").map(encodeURIComponent).join("/"); }
+  function configPath(path, storage){
+    var encoded=encodeDrivePath(path || activeConfigFile());
+    return normalizeConfigStorage(storage || activeConfigStorage())==="onedrive"
+      ? "/me/drive/root:/"+encoded
+      : "/drives/"+S365.driveId+"/root:/"+encoded;
+  }
+  function applyRemoteConfig(remote){
+    if(remote && typeof remote==="object"){
+      if(remote.cardOverrides) config.cardOverrides=remote.cardOverrides;
+      if(remote.customCards) config.customCards=remote.customCards;
+      if(remote.hiddenCards) config.hiddenCards=remote.hiddenCards;
+      if(remote.mapping) config.mapping=remote.mapping;
+      if(remote.remoteConfigStorage) config.remoteConfigStorage=normalizeConfigStorage(remote.remoteConfigStorage);
+      if(remote.remoteConfigPath) config.remoteConfigPath=normalizeConfigPath(remote.remoteConfigPath);
+      try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){}
+    }
+  }
+  function readRemoteConfigAt(path, storage){
+    storage=normalizeConfigStorage(storage || activeConfigStorage());
+    return graph(configPath(path, storage)+":/content").then(function(data){
+      if(data && data.__notfound) return false;
       var remote = (typeof data==="string") ? JSON.parse(data) : data;
-      if(remote && typeof remote==="object"){
-        if(remote.cardOverrides) config.cardOverrides=remote.cardOverrides;
-        if(remote.customCards) config.customCards=remote.customCards;
-        if(remote.hiddenCards) config.hiddenCards=remote.hiddenCards;
-        if(remote.mapping) config.mapping=remote.mapping;
-        try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){}
-        S365.remote.present=true;
-      }
-      graph(configPath()+"?$select=eTag,lastModifiedDateTime,lastModifiedBy").then(function(meta){
+      applyRemoteConfig(remote);
+      S365.remote.present=true; S365.remote.path=normalizeConfigPath(path); S365.remote.storage=storage;
+      graph(configPath(path, storage)+"?$select=eTag,lastModifiedDateTime,lastModifiedBy").then(function(meta){
         if(meta && !meta.__notfound){ S365.remote.eTag=meta.eTag; S365.remote.at=meta.lastModifiedDateTime;
           S365.remote.by=meta.lastModifiedBy && meta.lastModifiedBy.user && meta.lastModifiedBy.user.displayName; }
       }).catch(function(){});
+      return true;
+    });
+  }
+  function loadRemoteConfig(){
+    var preferred=activeConfigFile(), preferredStorage=activeConfigStorage();
+    return readRemoteConfigAt(preferred, preferredStorage).then(function(found){
+      if(found) return;
+      S365.remote.present=false;
+      var legacy=(SP.legacyConfigFiles||[]).filter(function(x){ return x.path!==preferred || normalizeConfigStorage(x.storage)!==preferredStorage; });
+      var i=0;
+      function tryNext(){
+        if(i>=legacy.length) return;
+        var x=legacy[i++];
+        return readRemoteConfigAt(x.path, x.storage).then(function(foundLegacy){
+          if(foundLegacy){
+            // Borrow old/shared data once so nothing is lost, then keep saving to the preferred OneDrive path.
+            config.remoteConfigStorage=preferredStorage;
+            config.remoteConfigPath=preferred;
+            S365.remote.loadedFromLegacy=true;
+            try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){}
+            return;
+          }
+          return tryNext();
+        });
+      }
+      return tryNext();
     }).catch(function(e){ console.warn("loadRemoteConfig", e); });
   }
   function pushRemoteConfig(){
-    if(!S365.signedIn || !S365.driveId) return;        // local-only until signed in
+    if(!S365.signedIn) return;        // local-only until signed in
     setSync("saving","Saving…");
-    var payload={ version:1, savedAt:new Date().toISOString(),
+    var payload={ version:1, savedAt:new Date().toISOString(), remoteConfigStorage:activeConfigStorage(), remoteConfigPath:activeConfigFile(),
       cardOverrides:config.cardOverrides, customCards:config.customCards, hiddenCards:config.hiddenCards, mapping:config.mapping };
-    graph(configPath()+":/content", { method:"PUT", body:JSON.stringify(payload), headers:{"Content-Type":"application/json"} })
-      .then(function(){ S365.remote.present=true; setSync("ok","Synced ✓"); })
-      .catch(function(e){ if(String(e).indexOf("403")>=0) setSync("err","No write access (read-only)"); else setSync("err","Save failed — local only"); });
+    graph(configPath()+":/content", { method:"PUT", body:JSON.stringify(payload,null,2), headers:{"Content-Type":"application/json"} })
+      .then(function(){ S365.remote.present=true; S365.remote.storage=activeConfigStorage(); S365.remote.path=activeConfigFile(); setSync("ok","Synced ✓"); })
+      .catch(function(e){ if(String(e).indexOf("403")>=0) setSync("err","No write access"); else setSync("err","Save failed — local only"); });
   }
 
   /* ----- settings modal ----- */
@@ -5447,12 +5556,16 @@
     if(S365.signedIn){
       st.appendChild(el("div",{}, el("b",{text:"Signed in: "}), (S365.account.username||S365.account.name||"")));
       st.appendChild(el("div",{}, el("b",{text:"Fleet sheet: "}), S365.item?"connected":"not found"));
-      st.appendChild(el("div",{}, el("b",{text:"Shared edits: "}), S365.remote.present?("syncing to SharePoint"+(S365.remote.by?(" · last edit by "+S365.remote.by):"")):"not created yet (saves on first edit)"));
+      st.appendChild(el("div",{}, el("b",{text:"Saved JSON: "}), S365.remote.present?("syncing to "+configLocationLabel(S365.remote.storage)+(S365.remote.by?(" · last edit by "+S365.remote.by):"")):"not created yet (saves on first edit)"));
+      st.appendChild(el("div",{}, el("b",{text:"JSON path: "}), configLocationLabel(activeConfigStorage())+" / "+activeConfigFile()));
     } else {
       st.appendChild(el("div",{text:"Not signed in. Use Sign in (top right) to load drivers and sync edits across the office."}));
     }
     body.appendChild(st);
     if(!S365.signedIn) return;
+
+    body.appendChild(colRow("OneDrive JSON save path","set-config-path",activeConfigFile()));
+    body.appendChild(el("p",{class:"note",text:"This saves under OneDrive > My Files. Example: procedures-dashboard-config.json or Dashboard/procedures-dashboard-config.json. Folders must already exist."}));
 
     var wsRow=el("div",{class:"settings-row"}); wsRow.appendChild(el("label",{text:"Worksheet (tab) to read"}));
     var wsSel=el("select",{id:"set-ws"}); (S365.worksheets.length?S365.worksheets:[m.worksheet]).forEach(function(n){ var o=el("option",{value:n,text:n}); if(n===m.worksheet)o.selected=true; wsSel.appendChild(o); });
@@ -5479,6 +5592,8 @@
   }
   function saveMapping(persist){
     function gv(id){ var e=document.getElementById(id); return e?e.value:""; }
+    config.remoteConfigStorage="onedrive";
+    config.remoteConfigPath=normalizeConfigPath(gv("set-config-path") || config.remoteConfigPath || SP.configFile);
     config.mapping={ worksheet:gv("set-ws")||config.mapping.worksheet, nameMode:gv("set-namemode")||"firstlast",
       colName:gv("set-name"), colFirst:gv("set-first"), colLast:gv("set-last"),
       colTruck:gv("set-truck"), colAuthority:gv("set-auth"), colDot:gv("set-dot") };
