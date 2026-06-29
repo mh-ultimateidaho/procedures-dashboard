@@ -132,6 +132,25 @@
   .chip-link:hover{background:#dfeafb}
   .new-auth-only{display:inline-block;font-size:10.5px;font-weight:700;color:var(--warn);background:#fff5e0;border-radius:5px;padding:0 5px;margin-left:6px;vertical-align:middle}
 
+  /* --- saved-card date / archive / notes / custom toggles --- */
+  .ip-card .when{font-size:12px;font-weight:700;color:var(--accent)}
+  .ip-card .when.past{color:var(--bad)}
+  .ip-card.archived{opacity:.8}
+  .item-note{font-weight:700;color:var(--ink);font-size:13px;margin:2px 0 4px 27px;padding:6px 10px;background:#fff7e6;border-left:3px solid var(--warn);border-radius:0 7px 7px 0}
+  .note-edit{margin:2px 0 6px 27px;display:flex;flex-direction:column;gap:6px}
+  .note-edit textarea{border:1px solid var(--line-strong);border-radius:8px;padding:7px;min-height:46px;resize:vertical;font-weight:600;width:100%}
+  .note-edit .row-actions{display:flex;gap:7px}
+  .note-btn{border:0;background:transparent;color:var(--muted);font-size:13px;padding:2px 5px;border-radius:6px;cursor:pointer;opacity:.45;flex:none}
+  .row:hover .note-btn{opacity:.95}
+  .note-btn.has{opacity:1}
+  .only-marker{display:inline-block;font-size:10.5px;font-weight:700;color:#5b3ea1;background:#efeaff;border-radius:5px;padding:0 5px;margin-left:6px;vertical-align:middle}
+  .toggle-bar{display:flex;flex-direction:column;gap:7px;margin-bottom:16px}
+  .toggle-bar .tg{display:flex;align-items:center;gap:9px;font-size:13.5px;font-weight:600;background:var(--accent-soft);border:1px solid #d4e0f6;border-radius:9px;padding:8px 11px}
+  .toggle-bar .tg input{width:16px;height:16px;flex:none}
+  .toggle-bar .tg .sp{flex:1}
+  .archived-sec > summary{cursor:pointer;list-style:none;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:6px 0;margin-bottom:6px}
+  .archived-sec > summary::-webkit-details-marker{display:none}
+
   .item-ctrls{display:flex;gap:3px;align-items:center;opacity:.85}
   .mini{border:1px solid var(--line);background:#fff;border-radius:7px;padding:2px 7px;font-size:12px;line-height:1.4}
   .mini:hover{border-color:var(--accent);color:var(--accent)}
@@ -4448,7 +4467,7 @@
     var cust=isCustom(id); if(cust) return cust;
     var base=builtinById[id]; if(!base) return null;
     var ov=config.cardOverrides[id];
-    if(ov){ var m=clone(base); if(ov.steps) m.steps=ov.steps; if(ov.blocks) m.blocks=ov.blocks; if(ov.title!=null) m.title=ov.title; return m; }
+    if(ov){ var m=clone(base); if(ov.steps) m.steps=ov.steps; if(ov.blocks) m.blocks=ov.blocks; if(ov.title!=null) m.title=ov.title; if(ov.defaultMode) m.defaultMode=ov.defaultMode; if(ov.toggles) m.toggles=ov.toggles; return m; }
     return base;
   }
   function getOriginalCard(id){
@@ -4503,20 +4522,33 @@
   function renderHome(){
     var root=document.getElementById("home"); root.textContent="";
 
-    // In Progress
+    // In Progress (active) + Archived
+    var activeSessions = sortSessions(state.sessions.filter(function(s){return !s.archived;}));
+    var archivedSessions = sortSessions(state.sessions.filter(function(s){return s.archived;}));
+
     var ipSec=el("section",{class:"home-sec"});
     ipSec.appendChild(el("div",{class:"home-head"},
       el("h2",{text:"In progress"}),
-      el("span",{class:"ct",text:String(state.sessions.length)})
+      el("span",{class:"ct",text:String(activeSessions.length)})
     ));
-    if(state.sessions.length===0){
+    if(activeSessions.length===0){
       ipSec.appendChild(el("div",{class:"empty",text:"No saved checklist sessions. Open a driver-event checklist and hit Save progress."}));
     }else{
       var g=el("div",{class:"grid"});
-      state.sessions.slice().sort(function(a,b){return b.savedAt-a.savedAt;}).forEach(function(s){ g.appendChild(ipTile(s)); });
+      activeSessions.forEach(function(s){ g.appendChild(ipTile(s)); });
       ipSec.appendChild(g);
     }
     root.appendChild(ipSec);
+
+    // Archived (collapsible, for future reference)
+    if(archivedSessions.length){
+      var arSec=el("details",{class:"home-sec archived-sec"});
+      arSec.appendChild(el("summary",{text:"Archived ("+archivedSessions.length+")"}));
+      var ag=el("div",{class:"grid"});
+      archivedSessions.forEach(function(s){ ag.appendChild(ipTile(s)); });
+      arSec.appendChild(ag);
+      root.appendChild(arSec);
+    }
 
     // Pinned
     var pinSec=el("section",{class:"home-sec"});
@@ -4550,24 +4582,29 @@
   }
 
   function ipTile(s){
-    var sec=SEC_BY_ID[s.section]||{};
-    var badge=mkBadge(s.section);
+    var card0=getEffectiveCard(s.cardId);
+    var title=(card0&&card0.title)||(s.label||"Checklist");
     var pct=s.total?Math.round(100*s.checked/s.total):0;
     var truckLine=[];
     if(s.context && s.context.AUTH) truckLine.push(s.context.AUTH);
     var tnum = (s.context && (s.context.NEW||s.context.OLD)) ? ("#"+(s.context.NEW||s.context.OLD)) : "";
     if(tnum) truckLine.push(tnum);
-    var card=el("div",{class:"ip-card"},
-      el("div",{class:"top"}, badge, el("span",{class:"who",text:(s.context&&s.context.DRIVER)||"(no driver)"})),
+    var tile=el("div",{class:"ip-card"+(s.archived?" archived":"")},
+      el("div",{class:"top"}, mkBadge(s.section), el("span",{class:"who",text:(s.context&&s.context.DRIVER)||"(no driver)"})),
+      el("div",{class:"meta",text:title}),
+      (s.eventDate ? el("div",{class:"when"+(isPastDate(s.eventDate)?" past":""), text:"📅 "+formatEventDate(s.eventDate)}) : el("div",{class:"meta",text:"No date set"})),
       el("div",{class:"meta",text:truckLine.join("  ·  ")||"—"}),
       el("div",{class:"bar-wrap"}, (function(){var f=el("div",{class:"bar-fill"}); f.style.width=pct+"%"; return f;})()),
       el("div",{class:"meta",text:s.checked+"/"+s.total+" done · saved "+timeAgo(s.savedAt)})
     );
-    card.appendChild(el("div",{class:"ip-actions"},
+    tile.appendChild(el("div",{class:"ip-actions"},
       el("button",{class:"btn small primary",text:"Open", onclick:function(){ openCard(s.cardId, s); }}),
+      (s.archived
+        ? el("button",{class:"btn small",text:"Unarchive", onclick:function(){ unarchiveSession(s.id); }})
+        : el("button",{class:"btn small",text:"Archive", onclick:function(){ archiveSession(s.id); }})),
       el("button",{class:"btn small danger",text:"Delete", onclick:function(){ deleteSession(s.id); }})
     ));
-    return card;
+    return tile;
   }
   function deleteSession(id){ state.sessions=state.sessions.filter(function(x){return x.id!==id;}); saveState(); renderHome(); }
 
@@ -4685,6 +4722,9 @@
       formValues:{},            // raw context-form values
       sessionId: session?session.id:null,
       brandNewAuth: session?!!(session.brandNewAuth):false,
+      toggleState:{},
+      notes:{},
+      noteEditing:null,
       coveringOpen:false
     };
     if(session){
@@ -4692,6 +4732,8 @@
       modalState.formValues = clone(session.formValues)||{};
       modalState.ctx = clone(session.context)||null;
       modalState.brandNewAuth = !!session.brandNewAuth;
+      modalState.toggleState = clone(session.toggleState)||{};
+      modalState.notes = clone(session.notes)||{};
     }
     overlay.classList.remove("hidden"); overlay.setAttribute("aria-hidden","false");
     document.body.style.overflow="hidden";
@@ -4769,6 +4811,7 @@
       grid.appendChild(field("Driver", selectPlaceholder()));
     }
     grid.appendChild(field("Driver name", input("f-driver")));
+    grid.appendChild(field("Date (when this happens)", dateInput("f-eventdate")));
     if(!isAuth){
       grid.appendChild(field("Authority / LLC", authCtrl("f-auth")));
       grid.appendChild(field("DOT #", input("f-dot")));
@@ -4802,6 +4845,7 @@
     function field2(lbl, control, cls){ return el("div",{class:"field "+(cls||"")}, el("label",{text:lbl}), control); }
     function labeled(lbl, cls, control){ return el("div",{class:"field"}, el("label",{class:cls, text:lbl}), control); }
     function input(id){ return el("input",{type:"text", id:id}); }
+    function dateInput(id){ return el("input",{type:"date", id:id}); }
     function truckCtrl(id){ return (hasR && roster.trucks.length) ? liveSelect(id, roster.trucks, "— truck —") : input(id); }
     function authCtrl(id){ return (hasR && roster.authorities.length) ? liveSelect(id, roster.authorities, "— authority —") : input(id); }
     function liveSelect(id, list, blank){
@@ -4824,7 +4868,7 @@
 
   function captureContextForm(){
     var v=modalState.formValues;
-    [["f-driverpick","driverpick"],["f-driver","driver"],["f-auth","auth"],["f-dot","dot"],["f-old","old"],["f-new","new"],
+    [["f-driverpick","driverpick"],["f-driver","driver"],["f-eventdate","eventdate"],["f-auth","auth"],["f-dot","dot"],["f-old","old"],["f-new","new"],
      ["f-oldauth","oldauth"],["f-newauth","newauth"],["f-olddot","olddot"],["f-newdot","newdot"]].forEach(function(p){
       var elx=document.getElementById(p[0]); if(elx) v[p[1]]=elx.value;
     });
@@ -4832,7 +4876,7 @@
   }
   function restoreContextForm(){
     var v=modalState.formValues||{};
-    var map={"f-driverpick":"driverpick","f-driver":"driver","f-auth":"auth","f-dot":"dot","f-old":"old","f-new":"new","f-oldauth":"oldauth","f-newauth":"newauth","f-olddot":"olddot","f-newdot":"newdot"};
+    var map={"f-driverpick":"driverpick","f-driver":"driver","f-eventdate":"eventdate","f-auth":"auth","f-dot":"dot","f-old":"old","f-new":"new","f-oldauth":"oldauth","f-newauth":"newauth","f-olddot":"olddot","f-newdot":"newdot"};
     for(var id in map){
       var elx=document.getElementById(id); var val=v[map[id]];
       if(!elx || val==null) continue;
@@ -4878,6 +4922,9 @@
       host.appendChild(el("pre",{class:"email", text:card.email||""}));
       return host;
     }
+
+    // custom "special instructions" toggles (user-defined, like Brand-new authority)
+    var tb=renderToggleBar(card); if(tb) host.appendChild(tb);
 
     // steps
     if(card.steps && card.steps.length || (modalState.editMode && card.steps)){
@@ -4946,12 +4993,13 @@
     var list = (listKey==="steps") ? el("ol",{class:"steps"}) : el("div",{class:"steps"});
 
     items.forEach(function(it){
-      // new-auth-only visibility
+      // conditional visibility: new-auth-only + custom special-instruction toggles
       var newAuthHidden = it.newAuthOnly && card.eventType==="authority-change" && !modalState.brandNewAuth;
-      var row=el("div",{class:"row"+(opts.editMode?"":"")});
+      var toggleHidden = it.toggle && !toggleOn(it.toggle);
+      var row=el("div",{class:"row"});
       row.setAttribute("data-list", listKey);
       row.setAttribute("data-id", it.id);
-      if(newAuthHidden){ row.classList.add("hidden"); }
+      if((newAuthHidden || toggleHidden) && !modalState.editMode){ row.classList.add("hidden"); }
 
       if(modalState.editMode){
         var handle=el("span",{class:"handle", title:"Drag to reorder", text:"⠿"});
@@ -4980,6 +5028,7 @@
       displayText = enrichChecklistText(displayText, ctx, card);
       txtSpan.appendChild(document.createTextNode(displayText));
       if(it.newAuthOnly){ txtSpan.appendChild(el("span",{class:"new-auth-only", text:"new auth only"})); }
+      if(it.toggle){ var _tg=cardToggle(card, it.toggle); if(_tg) txtSpan.appendChild(el("span",{class:"only-marker", text:"only: "+_tg.label})); }
       if(it.linkUrl){
         var label=it.linkLabel ? ("↗ "+it.linkLabel) : deriveChip(it.linkUrl);
         txtSpan.appendChild(el("a",{class:"chip-link", href:it.linkUrl, target:"_blank", rel:"noopener", text:label, onclick:function(e){ e.stopPropagation(); }}));
@@ -4993,7 +5042,16 @@
         );
         row.appendChild(ctrls);
       }
+      // note button (always available — for recording why a step couldn't be completed)
+      row.appendChild(el("button",{class:"note-btn"+(modalState.notes[it.id]?" has":""), title:modalState.notes[it.id]?"Edit note":"Add note", text:"📝", onclick:function(e){ e.stopPropagation(); openNoteEditor(it.id); }}));
       list.appendChild(row);
+      // bold sub-note under the item (only when the row itself is visible)
+      if(!row.classList.contains("hidden")){
+        if(modalState.notes[it.id] && modalState.noteEditing!==it.id){
+          list.appendChild(el("div",{class:"item-note", text:modalState.notes[it.id]}));
+        }
+        if(modalState.noteEditing===it.id){ list.appendChild(noteEditor(it.id)); }
+      }
     });
 
     if(modalState.editMode){
@@ -5088,6 +5146,10 @@
     var modeSel=el("select");
     [["","Use card default"],["check","Checkbox"],["number","Numbered"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if((item.mode||"")===p[0]) o.selected=true; modeSel.appendChild(o); });
     popup.appendChild(el("div",{class:"field"}, el("label",{text:"Item style"}), modeSel));
+    var tgSel=el("select");
+    tgSel.appendChild(el("option",{value:"",text:"Always show"}));
+    (mut.toggles||[]).forEach(function(t){ var o=el("option",{value:t.id,text:"Only when: "+t.label}); if(item.toggle===t.id)o.selected=true; tgSel.appendChild(o); });
+    popup.appendChild(el("div",{class:"field"}, el("label",{text:"Show only when (special-instruction checkbox)"}), tgSel));
     popup.appendChild(el("div",{class:"pop-actions"},
       el("button",{class:"btn small primary",text:"Save", onclick:function(){
         item.text=ta.value;
@@ -5095,12 +5157,13 @@
         if(u){ item.linkUrl=u; item.linkLabel=labelF.value.trim()||undefined; }
         else { delete item.linkUrl; delete item.linkLabel; }
         if(modeSel.value){ item.mode=modeSel.value; } else { delete item.mode; }
+        if(tgSel.value){ item.toggle=tgSel.value; } else { delete item.toggle; }
         scheduleSave(); closePopup(); reRenderModalPreserving();
       }}),
       el("button",{class:"btn small",text:"Reset to original", onclick:function(){
         var orig=findOriginalItem(card.id, listKey, itemId);
-        if(orig){ ta.value=orig.text||""; labelF.value=orig.linkLabel||""; urlF.value=orig.linkUrl||""; modeSel.value=orig.mode||""; }
-        else { ta.value=""; labelF.value=""; urlF.value=""; modeSel.value=""; }
+        if(orig){ ta.value=orig.text||""; labelF.value=orig.linkLabel||""; urlF.value=orig.linkUrl||""; modeSel.value=orig.mode||""; tgSel.value=orig.toggle||""; }
+        else { ta.value=""; labelF.value=""; urlF.value=""; modeSel.value=""; tgSel.value=""; }
       }}),
       el("button",{class:"btn small",text:"Cancel", onclick:closePopup})
     ));
@@ -5147,17 +5210,22 @@
       total++; if(b.checked) checked++;
     });
     var label=card.title + (modalState.ctx.DRIVER?(" — "+modalState.ctx.DRIVER):"") + ((modalState.ctx.NEW||modalState.ctx.OLD)?(" #"+(modalState.ctx.NEW||modalState.ctx.OLD)):"");
+    var existing=state.sessions.filter(function(s){return s.id===(modalState.sessionId||"");})[0];
     var sess={
       id: modalState.sessionId || uid("sess"),
       cardId: modalState.cardId,
       section: card.section,
       eventType: card.eventType,
       label: label,
+      eventDate: modalState.formValues.eventdate||"",
       context: clone(modalState.ctx),
       formValues: clone(modalState.formValues),
       brandNewAuth: modalState.brandNewAuth,
+      toggleState: clone(modalState.toggleState),
+      notes: clone(modalState.notes),
       checks: clone(modalState.checks),
       total: total, checked: checked,
+      archived: existing ? !!existing.archived : false,
       savedAt: Date.now()
     };
     var i=state.sessions.findIndex(function(s){return s.id===sess.id;});
@@ -5173,6 +5241,97 @@
     var save=btns[0];
     if(save){ var old=save.textContent; save.textContent="✓ Saved"; save.classList.add("on"); setTimeout(function(){ save.textContent=old; save.classList.remove("on"); },1100); }
   }
+
+  /* ----- custom "special instructions" toggles ----- */
+  function cardToggle(card, id){ return (card && card.toggles ? card.toggles : []).filter(function(t){return t.id===id;})[0] || null; }
+  function toggleOn(id){ return !!(modalState.toggleState && modalState.toggleState[id]); }
+  function renderToggleBar(card){
+    var toggles = card.toggles || [];
+    if(!toggles.length && !modalState.editMode) return null;
+    var bar=el("div",{class:"toggle-bar"});
+    toggles.forEach(function(t){
+      var row=el("div",{class:"tg"});
+      var cb=el("input",{type:"checkbox"}); cb.checked=toggleOn(t.id);
+      cb.addEventListener("change", function(){ captureContextForm(); captureChecks(); modalState.toggleState[t.id]=cb.checked; renderModal(); });
+      row.appendChild(cb);
+      row.appendChild(el("span",{class:"sp", text:t.label}));
+      if(modalState.editMode){
+        row.appendChild(el("button",{class:"mini", title:"Rename", text:"✎", onclick:function(){ renameToggle(card.id, t.id); }}));
+        row.appendChild(el("button",{class:"mini del", title:"Delete", text:"✕", onclick:function(){ deleteToggle(card.id, t.id); }}));
+      }
+      bar.appendChild(row);
+    });
+    if(modalState.editMode){
+      bar.appendChild(el("button",{class:"btn small", text:"+ Add special-instruction checkbox", onclick:function(){ addToggle(card.id); }}));
+    }
+    return bar;
+  }
+  function addToggle(cardId){
+    var label=window.prompt("Label for this checkbox (e.g. “Hazmat — show extra steps”):","Special instructions");
+    if(label==null) return; label=String(label).trim(); if(!label) return;
+    var mut=getMutableCard(cardId); mut.toggles=mut.toggles||[];
+    mut.toggles.push({id:uid("tg"), label:label});
+    scheduleSave(); reRenderModalPreserving();
+  }
+  function renameToggle(cardId, tid){
+    var mut=getMutableCard(cardId); var t=(mut.toggles||[]).filter(function(x){return x.id===tid;})[0]; if(!t) return;
+    var label=window.prompt("Rename this checkbox:", t.label); if(label==null) return; label=String(label).trim(); if(!label) return;
+    t.label=label; scheduleSave(); reRenderModalPreserving();
+  }
+  function deleteToggle(cardId, tid){
+    if(!window.confirm("Delete this checkbox? Items set to “only show when” it will become always-visible.")) return;
+    var mut=getMutableCard(cardId);
+    mut.toggles=(mut.toggles||[]).filter(function(x){return x.id!==tid;});
+    (mut.steps||[]).forEach(function(s){ if(s.toggle===tid) delete s.toggle; });
+    (mut.blocks||[]).forEach(function(b){ (b.items||[]).forEach(function(it){ if(it.toggle===tid) delete it.toggle; }); });
+    if(modalState.toggleState) delete modalState.toggleState[tid];
+    scheduleSave(); reRenderModalPreserving();
+  }
+
+  /* ----- per-step bold notes (operational, saved with the session) ----- */
+  function openNoteEditor(itemId){ captureContextForm(); captureChecks(); modalState.noteEditing=itemId; renderModal(); }
+  function noteEditor(itemId){
+    var wrap=el("div",{class:"note-edit"});
+    var ta=el("textarea",{placeholder:"e.g. Couldn’t complete — waiting on signed lease from KJ"}); ta.value=modalState.notes[itemId]||"";
+    wrap.appendChild(ta);
+    wrap.appendChild(el("div",{class:"row-actions"},
+      el("button",{class:"btn small primary", text:"Save note", onclick:function(){
+        var v=ta.value.trim();
+        if(v) modalState.notes[itemId]=v; else delete modalState.notes[itemId];
+        modalState.noteEditing=null; reRenderModalPreserving();
+      }}),
+      el("button",{class:"btn small", text:"Clear", onclick:function(){ delete modalState.notes[itemId]; modalState.noteEditing=null; reRenderModalPreserving(); }}),
+      el("button",{class:"btn small", text:"Cancel", onclick:function(){ modalState.noteEditing=null; reRenderModalPreserving(); }})
+    ));
+    setTimeout(function(){ ta.focus(); },0);
+    return wrap;
+  }
+
+  /* ----- saved-session date / archive helpers ----- */
+  function sortSessions(list){
+    return list.sort(function(a,b){
+      var da=a.eventDate||"", db=b.eventDate||"";
+      if(da && db){ return da<db?-1:(da>db?1:(b.savedAt-a.savedAt)); }
+      if(da && !db) return -1;
+      if(!da && db) return 1;
+      return b.savedAt-a.savedAt;
+    });
+  }
+  function formatEventDate(d){
+    if(!d) return "";
+    var p=String(d).split("-"); if(p.length!==3) return d;
+    var dt=new Date(Number(p[0]), Number(p[1])-1, Number(p[2]));
+    if(isNaN(dt.getTime())) return d;
+    return dt.toLocaleDateString(undefined, {month:"short", day:"numeric", year:"numeric"});
+  }
+  function isPastDate(d){
+    if(!d) return false;
+    var today=new Date(); today.setHours(0,0,0,0);
+    var p=String(d).split("-"); if(p.length!==3) return false;
+    return new Date(Number(p[0]), Number(p[1])-1, Number(p[2])) < today;
+  }
+  function archiveSession(id){ var s=state.sessions.filter(function(x){return x.id===id;})[0]; if(s){ s.archived=true; saveState(); renderHome(); } }
+  function unarchiveSession(id){ var s=state.sessions.filter(function(x){return x.id===id;})[0]; if(s){ s.archived=false; saveState(); renderHome(); } }
 
   /* ====================================================================
      NEW CARD BUILDER
