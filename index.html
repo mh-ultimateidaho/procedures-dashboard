@@ -4910,7 +4910,7 @@
       grid.appendChild(field("DOT #", input("f-dot")));
     }
     if(!isNewDriver) grid.appendChild(field("Current truck #", truckCtrl("f-old")));
-    grid.appendChild(field("New truck #", truckCtrl("f-new")));
+    grid.appendChild(field("New truck #", truckCtrl("f-new", true)));
     wrap.appendChild(grid);
 
     if(isAuth){
@@ -4939,7 +4939,10 @@
     function labeled(lbl, cls, control){ return el("div",{class:"field"}, el("label",{class:cls, text:lbl}), control); }
     function input(id){ return el("input",{type:"text", id:id}); }
     function dateInput(id){ return el("input",{type:"date", id:id}); }
-    function truckCtrl(id){ return (hasR && roster.trucks.length) ? liveSelect(id, roster.trucks, "— truck —") : input(id); }
+    function truckCtrl(id, useFleetTrucks){
+      var list = useFleetTrucks && roster && roster.fleetTrucks && roster.fleetTrucks.length ? roster.fleetTrucks : (roster ? roster.trucks : []);
+      return (hasR && list.length) ? liveSelect(id, list, "— truck —") : input(id);
+    }
     function authCtrl(id){ return (hasR && roster.authorities.length) ? liveSelect(id, roster.authorities, "— authority —") : input(id); }
     function liveSelect(id, list, blank){
       var s=el("select",{id:id});
@@ -5698,7 +5701,7 @@
   function loadRoster(){
     var m=config.mapping;
     return readSheet(m.worksheet).then(function(vals){
-      if(!vals.length){ S365.roster={drivers:[],trucks:[],authorities:[],byDriver:{}}; return; }
+      if(!vals.length){ S365.roster={drivers:[],trucks:[],fleetTrucks:[],authorities:[],byDriver:{}}; return loadFleetTrucks(); }
       var head=vals[0];
       var iF=colIndex(head,m.colFirst), iL=colIndex(head,m.colLast), iN=colIndex(head,m.colName);
       var iT=colIndex(head,m.colTruck), iA=colIndex(head,m.colAuthority), iD=colIndex(head,m.colDot);
@@ -5720,8 +5723,27 @@
         }
       }
       var sortAlpha=function(a,b){ return String(a).localeCompare(String(b), undefined, {sensitivity:"base", numeric:true}); };
-      S365.roster={ drivers:drivers, trucks:Object.keys(trucks), authorities:Object.keys(auths).sort(sortAlpha), byDriver:byDriver, byAuthorityDot:byAuthorityDot };
+      S365.roster={ drivers:drivers, trucks:Object.keys(trucks), fleetTrucks:[], authorities:Object.keys(auths).sort(sortAlpha), byDriver:byDriver, byAuthorityDot:byAuthorityDot };
+      return loadFleetTrucks();
     });
+  }
+  function loadFleetTrucks(){
+    return readSheet("Trucks").then(function(vals){
+      if(!S365.roster) S365.roster={drivers:[],trucks:[],fleetTrucks:[],authorities:[],byDriver:{}};
+      var seen={};
+      if(vals && vals.length){
+        var head=vals[0]||[], idx=colIndex(head,"Truck #");
+        if(idx<0) idx=0;
+        for(var r=1;r<vals.length;r++){
+          var row=vals[r]; if(!row) continue;
+          var truck=String(row[idx]||"").trim();
+          if(truck) seen[truck]=1;
+        }
+      }
+      var sortAlpha=function(a,b){ return String(a).localeCompare(String(b), undefined, {sensitivity:"base", numeric:true}); };
+      S365.roster.fleetTrucks=Object.keys(seen).sort(sortAlpha);
+      if(!S365.roster.fleetTrucks.length) S365.roster.fleetTrucks=S365.roster.trucks||[];
+    }).catch(function(){ if(S365.roster) S365.roster.fleetTrucks=S365.roster.trucks||[]; });
   }
 
   function onPickDriver(key, card){
