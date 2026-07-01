@@ -15,7 +15,7 @@ A hosted procedures and checklists dashboard for Ultimate Logistics LLC office s
 - **Edit any step or item** — hover a step or checklist item and click ✎ to edit the text, add a link, or change the chip label. Changes save to SharePoint and are visible to all users
 - **Add and delete steps** on any card — click + Add step at the bottom of a card's step list, or ✕ to remove a step
 - **Create new cards** — click + New card in the All Procedures view to build a custom card with steps and/or owner blocks (KJ does / Amie does / Your tasks / etc.)
-- **SharePoint sync** — all customizations (edits, new steps, new cards) save to `dashboard-config.json` on SharePoint so every signed-in user sees the same version
+- **SharePoint sync** — all customizations (edits, new steps, new cards) save to `procedures-dashboard-config.json` on SharePoint so every signed-in user sees the same version
 - **Live driver dropdown** — pulls current drivers directly from `Current Trucks & Drivers.xlsx` on SharePoint at load time, no manual updates needed
 - **Folder links** — selecting a driver shows direct links to their SharePoint folder and truck folder
 - **File path links** throughout — procedure steps link directly to relevant SharePoint folders and Excel files (permit sheets, Current Quartix, etc.), all opening in browser
@@ -40,7 +40,7 @@ On first open, users are redirected to Microsoft login. After signing in, tokens
 | What | Location |
 |---|---|
 | Live driver list | `Driver Documents/Current Trucks & Drivers.xlsx` |
-| Dashboard config (edits, custom cards, step changes) | `Office Documents/dashboard-config.json` |
+| Dashboard config (edits, custom cards, step changes) | `procedures-dashboard-config.json` |
 
 The config file is created automatically on first save. It stores all customizations in JSON format and is loaded after auth on every page open.
 
