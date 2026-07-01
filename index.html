@@ -3367,7 +3367,7 @@
   "eventType": "new-driver",
   "blocks": [
    {
-    "label": "Before driver leaves — your tasks",
+    "label": "Before driver leaves — Majkaela's tasks",
     "kind": "before",
     "items": [
      {
@@ -3394,7 +3394,7 @@
     "id": "chk-new-driver-b1"
    },
    {
-    "label": "No rush — your tasks",
+    "label": "No rush — Majkaela's tasks",
     "kind": "norush",
     "items": [
      {
@@ -3538,7 +3538,7 @@
   "eventType": "authority-change",
   "blocks": [
    {
-    "label": "Before driver leaves — your tasks",
+    "label": "Before driver leaves — Majkaela's tasks",
     "kind": "before",
     "items": [
      {
@@ -3575,7 +3575,7 @@
     "id": "chk-authority-change-b1"
    },
    {
-    "label": "No rush — your tasks",
+    "label": "No rush — Majkaela's tasks",
     "kind": "norush",
     "items": [
      {
@@ -3704,7 +3704,7 @@
   "eventType": "driver-quits",
   "blocks": [
    {
-    "label": "No rush — your tasks",
+    "label": "No rush — Majkaela's tasks",
     "kind": "norush",
     "items": [
      {
@@ -3797,7 +3797,7 @@
   "eventType": "perm-truck",
   "blocks": [
    {
-    "label": "Before driver leaves — your tasks",
+    "label": "Before driver leaves — Majkaela's tasks",
     "kind": "before",
     "items": [
      {
@@ -3828,7 +3828,7 @@
     "id": "chk-perm-truck-b1"
    },
    {
-    "label": "No rush — your tasks",
+    "label": "No rush — Majkaela's tasks",
     "kind": "norush",
     "items": [
      {
@@ -3908,7 +3908,7 @@
   "eventType": "temp-truck",
   "blocks": [
    {
-    "label": "Before driver leaves — your tasks",
+    "label": "Before driver leaves — Majkaela's tasks",
     "kind": "before",
     "items": [
      {
@@ -3935,7 +3935,7 @@
     "id": "chk-temp-truck-b1"
    },
    {
-    "label": "No rush — your tasks",
+    "label": "No rush — Majkaela's tasks",
     "kind": "norush",
     "items": [
      {
@@ -4015,7 +4015,7 @@
   "eventType": "out-temp",
   "blocks": [
    {
-    "label": "No rush — your tasks",
+    "label": "No rush — Majkaela's tasks",
     "kind": "norush",
     "items": [
      {
@@ -4147,8 +4147,8 @@
   var SEC_BY_ID = {}; SECTIONS.forEach(function(s){ SEC_BY_ID[s.id]=s; });
 
   var BLOCK_PRESETS = [
-    {kind:"before", label:"Before driver leaves — your tasks"},
-    {kind:"norush", label:"No rush — your tasks"},
+    {kind:"before", label:"Before driver leaves — Majkaela's tasks"},
+    {kind:"norush", label:"No rush — Majkaela's tasks"},
     {kind:"kj",     label:"KJ does"},
     {kind:"amie",   label:"Amie does"},
     {kind:"custom", label:""}
@@ -4170,15 +4170,35 @@
   config.cardOverrides = config.cardOverrides || {};
   config.customCards = config.customCards || [];
   config.hiddenCards = config.hiddenCards || [];
+  config.deletedSessions = config.deletedSessions || {};
 
-  // state = device-local (pins, recents, in-progress sessions)
+  // Pins and recents stay personal. In-progress sessions sync through SharePoint when signed in.
   var state = safeParse(STATE_KEY, null) || {pins:[], recents:[], sessions:[]};
   state.pins = state.pins || []; state.recents = state.recents || []; state.sessions = state.sessions || [];
+  state.sessions = pruneDeletedSessions(state.sessions);
 
   var saveTimer=null;
   function scheduleSave(){ if(saveTimer) clearTimeout(saveTimer); saveTimer=setTimeout(flushConfig, 1500); }
   function flushConfig(){ try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){} saveTimer=null; if(typeof pushRemoteConfig==="function") pushRemoteConfig(); }
   function saveState(){ try{ localStorage.setItem(STATE_KEY, JSON.stringify(state)); }catch(e){} }
+  function saveSharedSessions(){ saveState(); if(typeof pushRemoteConfig==="function") pushRemoteConfig(); }
+  function sessionStamp(s){ return Number((s && (s.updatedAt || s.savedAt)) || 0); }
+  function pruneDeletedSessions(list){
+    var del=config.deletedSessions||{};
+    return (Array.isArray(list)?list:[]).filter(function(s){ return s && s.id && !(del[s.id] && Number(del[s.id]) >= sessionStamp(s)); });
+  }
+  function mergeDeletedSessions(remoteDeleted){
+    if(!remoteDeleted || typeof remoteDeleted!=="object") return;
+    config.deletedSessions=config.deletedSessions||{};
+    Object.keys(remoteDeleted).forEach(function(id){ config.deletedSessions[id]=Math.max(Number(config.deletedSessions[id]||0), Number(remoteDeleted[id]||0)); });
+  }
+  function mergeSharedSessions(remoteSessions){
+    var byId={};
+    pruneDeletedSessions(state.sessions).forEach(function(s){ byId[s.id]=s; });
+    pruneDeletedSessions(remoteSessions).forEach(function(s){ if(!byId[s.id] || sessionStamp(s) >= sessionStamp(byId[s.id])) byId[s.id]=s; });
+    state.sessions=Object.keys(byId).map(function(id){return byId[id];});
+    saveState();
+  }
   window.addEventListener("beforeunload", flushConfig);
 
   /* ---------- built-in cards (parsed safely) ---------- */
@@ -4631,7 +4651,7 @@
     ));
     return tile;
   }
-  function deleteSession(id){ state.sessions=state.sessions.filter(function(x){return x.id!==id;}); saveState(); renderHome(); }
+  function deleteSession(id){ state.sessions=state.sessions.filter(function(x){return x.id!==id;}); config.deletedSessions=config.deletedSessions||{}; config.deletedSessions[id]=Date.now(); saveSharedSessions(); renderHome(); }
 
   function togglePin(id){
     var i=state.pins.indexOf(id);
@@ -5282,12 +5302,14 @@
       checks: clone(modalState.checks),
       total: total, checked: checked,
       archived: existing ? !!existing.archived : false,
-      savedAt: Date.now()
+      savedAt: Date.now(),
+      updatedAt: Date.now()
     };
     var i=state.sessions.findIndex(function(s){return s.id===sess.id;});
     if(i>=0) state.sessions[i]=sess; else state.sessions.push(sess);
+    if(config.deletedSessions) delete config.deletedSessions[sess.id];
     modalState.sessionId=sess.id;
-    saveState();
+    saveSharedSessions();
     flashSaved();
   }
   function flashSaved(){
@@ -5386,8 +5408,8 @@
     var p=String(d).split("-"); if(p.length!==3) return false;
     return new Date(Number(p[0]), Number(p[1])-1, Number(p[2])) < today;
   }
-  function archiveSession(id){ var s=state.sessions.filter(function(x){return x.id===id;})[0]; if(s){ s.archived=true; saveState(); renderHome(); } }
-  function unarchiveSession(id){ var s=state.sessions.filter(function(x){return x.id===id;})[0]; if(s){ s.archived=false; saveState(); renderHome(); } }
+  function archiveSession(id){ var s=state.sessions.filter(function(x){return x.id===id;})[0]; if(s){ s.archived=true; s.updatedAt=Date.now(); saveSharedSessions(); renderHome(); } }
+  function unarchiveSession(id){ var s=state.sessions.filter(function(x){return x.id===id;})[0]; if(s){ s.archived=false; s.updatedAt=Date.now(); saveSharedSessions(); renderHome(); } }
 
   /* ====================================================================
      NEW CARD BUILDER
@@ -5476,7 +5498,7 @@
       blkSeg.appendChild(box);
     });
     blkSeg.appendChild(el("button",{class:"btn small",text:"+ Add block", onclick:function(){
-      builderModel.blocks.push({id:uid("blk"), kind:"before", label:"Before driver leaves — your tasks", items:[]});
+      builderModel.blocks.push({id:uid("blk"), kind:"before", label:"Before driver leaves — Majkaela's tasks", items:[]});
       renderBuilder();
     }}));
     bBody.appendChild(blkSeg);
@@ -5559,6 +5581,8 @@
       colName:"Driver", colFirst:"First", colLast:"Last", colTruck:"Truck #", colAuthority:"Authority", colDot:"DOT #" };
   config.remoteConfigStorage = config.remoteConfigStorage || SP.configStorage;
   config.remoteConfigPath = config.remoteConfigPath || SP.configFile;
+  config.remoteConfigSharePointUrl = config.remoteConfigSharePointUrl || "";
+  config.fleetUrl = config.fleetUrl || SP.fleetUrl;
   // One-time migration: anyone whose saved setting still points at personal OneDrive is moved
   // onto the shared SharePoint library so edits reach the whole office.
   if(!config._sharedStorageMigrated){ config.remoteConfigStorage="sharepoint"; config._sharedStorageMigrated=true; try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){} }
@@ -5596,7 +5620,7 @@
     var btn=document.getElementById("m365-btn");
     btn.textContent="Sign out ("+(S365.account.name||S365.account.username||"")+")";
     setSync("saving","Connecting…");
-    resolveItem().then(listWorksheets).then(loadRemoteConfig).then(loadRoster)
+    reconnectM365()
       .then(function(){ setSync("ok","Synced ✓"); rerenderAll(); })
       .catch(function(e){
         console.warn("M365 connect error", e);
@@ -5626,8 +5650,9 @@
   }
   function b64url(s){ return "u!"+btoa(unescape(encodeURIComponent(s))).replace(/=+$/,"").replace(/\+/g,"-").replace(/\//g,"_"); }
 
+  function activeFleetUrl(){ return String(config.fleetUrl || SP.fleetUrl).trim() || SP.fleetUrl; }
   function resolveItem(){
-    return graph("/shares/"+b64url(SP.fleetUrl)+"/driveItem?$select=id,name,parentReference").then(function(it){
+    return graph("/shares/"+b64url(activeFleetUrl())+"/driveItem?$select=id,name,parentReference").then(function(it){
       if(!it || it.__notfound || !it.id) return Promise.reject("Fleet sheet not found");
       S365.item=it.id; S365.driveId=it.parentReference && it.parentReference.driveId;
       if(!S365.driveId) return Promise.reject("Could not resolve document library");
@@ -5638,6 +5663,10 @@
     return graph("/drives/"+S365.driveId+"/items/"+S365.item+"/workbook/worksheets?$select=name")
       .then(function(r){ S365.worksheets=((r&&r.value)||[]).map(function(w){return w.name;}); })
       .catch(function(){ /* non-fatal */ });
+  }
+  function reconnectM365(){
+    S365.item=null; S365.driveId=null; S365.worksheets=[]; S365.roster=null;
+    return resolveItem().then(listWorksheets).then(loadRemoteConfig).then(resolveItem).then(listWorksheets).then(loadRoster);
   }
   function readSheet(name){
     var p="/drives/"+S365.driveId+"/items/"+S365.item+"/workbook/worksheets('"+encodeURIComponent(name)+"')/usedRange(valuesOnly=true)?$select=values";
@@ -5700,20 +5729,38 @@
   }
   function activeConfigFile(){ return normalizeConfigPath(config.remoteConfigPath || SP.configFile); }
   function activeConfigStorage(){ return normalizeConfigStorage(config.remoteConfigStorage || SP.configStorage); }
+  function activeConfigSharePointUrl(){ return String(config.remoteConfigSharePointUrl || "").trim(); }
   function configLocationLabel(storage){ return normalizeConfigStorage(storage)==="sharepoint" ? "SharePoint Documents" : "OneDrive My Files"; }
   function encodeDrivePath(path){ return normalizeConfigPath(path).split("/").map(encodeURIComponent).join("/"); }
-  function configPath(path, storage){
+  function resolveConfigSharePointBase(){
+    var url=activeConfigSharePointUrl();
+    if(!url) return Promise.resolve({driveId:S365.driveId, root:true, isFile:false});
+    return graph("/shares/"+b64url(url)+"/driveItem?$select=id,name,file,folder,parentReference").then(function(it){
+      if(!it || it.__notfound || !it.id) return Promise.reject("JSON SharePoint location not found");
+      return {driveId:it.parentReference && it.parentReference.driveId, itemId:it.id, name:it.name||"", isFile:!!it.file || /\.json$/i.test(it.name||"")};
+    });
+  }
+  function configPath(path, storage, content){
     var encoded=encodeDrivePath(path || activeConfigFile());
-    return normalizeConfigStorage(storage || activeConfigStorage())==="onedrive"
-      ? "/me/drive/root:/"+encoded
-      : "/drives/"+S365.driveId+"/root:/"+encoded;
+    storage=normalizeConfigStorage(storage || activeConfigStorage());
+    if(storage==="onedrive") return Promise.resolve("/me/drive/root:/"+encoded+(content?":/content":""));
+    return resolveConfigSharePointBase().then(function(base){
+      if(!base.driveId) return Promise.reject("Could not resolve JSON document library");
+      if(base.isFile) return "/drives/"+base.driveId+"/items/"+base.itemId+(content?"/content":"");
+      if(base.root) return "/drives/"+base.driveId+"/root:/"+encoded+(content?":/content":"");
+      return "/drives/"+base.driveId+"/items/"+base.itemId+":/"+encoded+(content?":/content":"");
+    });
   }
   function applyRemoteConfig(remote){
     if(remote && typeof remote==="object"){
       if(remote.cardOverrides) config.cardOverrides=remote.cardOverrides;
       if(remote.customCards) config.customCards=remote.customCards;
       if(remote.hiddenCards) config.hiddenCards=remote.hiddenCards;
+      if(remote.deletedSessions) mergeDeletedSessions(remote.deletedSessions);
+      if(remote.sessions) mergeSharedSessions(remote.sessions);
       if(remote.mapping) config.mapping=remote.mapping;
+      if(remote.fleetUrl) config.fleetUrl=String(remote.fleetUrl).trim() || SP.fleetUrl;
+      if(remote.remoteConfigSharePointUrl != null) config.remoteConfigSharePointUrl=String(remote.remoteConfigSharePointUrl||"").trim();
       if(remote.remoteConfigStorage) config.remoteConfigStorage=normalizeConfigStorage(remote.remoteConfigStorage);
       if(remote.remoteConfigPath) config.remoteConfigPath=normalizeConfigPath(remote.remoteConfigPath);
       try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){}
@@ -5721,12 +5768,12 @@
   }
   function readRemoteConfigAt(path, storage){
     storage=normalizeConfigStorage(storage || activeConfigStorage());
-    return graph(configPath(path, storage)+":/content").then(function(data){
+    return configPath(path, storage, true).then(function(contentUrl){ return graph(contentUrl); }).then(function(data){
       if(data && data.__notfound) return false;
       var remote = (typeof data==="string") ? JSON.parse(data) : data;
       applyRemoteConfig(remote);
       S365.remote.present=true; S365.remote.path=normalizeConfigPath(path); S365.remote.storage=storage;
-      graph(configPath(path, storage)+"?$select=eTag,lastModifiedDateTime,lastModifiedBy").then(function(meta){
+      configPath(path, storage, false).then(function(metaUrl){ return graph(metaUrl+"?$select=eTag,lastModifiedDateTime,lastModifiedBy"); }).then(function(meta){
         if(meta && !meta.__notfound){ S365.remote.eTag=meta.eTag; S365.remote.at=meta.lastModifiedDateTime;
           S365.remote.by=meta.lastModifiedBy && meta.lastModifiedBy.user && meta.lastModifiedBy.user.displayName; }
       }).catch(function(){});
@@ -5762,9 +5809,10 @@
   function pushRemoteConfig(){
     if(!S365.signedIn) return;        // local-only until signed in
     setSync("saving","Saving…");
-    var payload={ version:1, savedAt:new Date().toISOString(), remoteConfigStorage:activeConfigStorage(), remoteConfigPath:activeConfigFile(),
-      cardOverrides:config.cardOverrides, customCards:config.customCards, hiddenCards:config.hiddenCards, mapping:config.mapping };
-    graph(configPath()+":/content", { method:"PUT", body:JSON.stringify(payload,null,2), headers:{"Content-Type":"application/json"} })
+    var payload={ version:1, savedAt:new Date().toISOString(), remoteConfigStorage:activeConfigStorage(), remoteConfigPath:activeConfigFile(), remoteConfigSharePointUrl:activeConfigSharePointUrl(),
+      cardOverrides:config.cardOverrides, customCards:config.customCards, hiddenCards:config.hiddenCards, mapping:config.mapping, fleetUrl:activeFleetUrl(),
+      sessions:pruneDeletedSessions(state.sessions), deletedSessions:config.deletedSessions||{} };
+    configPath(null, null, true).then(function(contentUrl){ return graph(contentUrl, { method:"PUT", body:JSON.stringify(payload,null,2), headers:{"Content-Type":"application/json"} }); })
       .then(function(){ S365.remote.present=true; S365.remote.storage=activeConfigStorage(); S365.remote.path=activeConfigFile(); setSync("ok","Synced ✓"); })
       .catch(function(e){ if(String(e).indexOf("403")>=0) setSync("err","No write access"); else setSync("err","Save failed — local only"); });
   }
@@ -5778,8 +5826,9 @@
     if(S365.signedIn){
       st.appendChild(el("div",{}, el("b",{text:"Signed in: "}), (S365.account.username||S365.account.name||"")));
       st.appendChild(el("div",{}, el("b",{text:"Fleet sheet: "}), S365.item?"connected":"not found"));
+      st.appendChild(el("div",{}, el("b",{text:"Fleet link: "}), activeFleetUrl()));
       st.appendChild(el("div",{}, el("b",{text:"Saved JSON: "}), S365.remote.present?("syncing to "+configLocationLabel(S365.remote.storage)+(S365.remote.by?(" · last edit by "+S365.remote.by):"")):"not created yet (saves on first edit)"));
-      st.appendChild(el("div",{}, el("b",{text:"JSON path: "}), configLocationLabel(activeConfigStorage())+" / "+activeConfigFile()));
+      st.appendChild(el("div",{}, el("b",{text:"JSON location: "}), activeConfigStorage()==="sharepoint" && activeConfigSharePointUrl()?activeConfigSharePointUrl():(configLocationLabel(activeConfigStorage())+" / "+activeConfigFile())));
     } else {
       st.appendChild(el("div",{text:"Not signed in. Use Sign in (top right) to load drivers and sync edits across the office."}));
     }
@@ -5791,7 +5840,9 @@
     [["sharepoint","SharePoint Documents (shared with the office)"],["onedrive","OneDrive My Files (only me)"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===activeConfigStorage())o.selected=true; stoSel.appendChild(o); });
     stoRow.appendChild(stoSel); body.appendChild(stoRow);
     body.appendChild(colRow("JSON file name / path","set-config-path",activeConfigFile()));
-    body.appendChild(el("p",{class:"note",text:"For everyone to see your card edits, keep this on SharePoint Documents — the shared site library. OneDrive My Files only syncs to you. Any folders in the path must already exist."}));
+    body.appendChild(colRow("SharePoint JSON folder/file link","set-config-sp-url",activeConfigSharePointUrl()));
+    body.appendChild(colRow("Fleet Master Sheet sharing link","set-fleet-url",activeFleetUrl()));
+    body.appendChild(el("p",{class:"note",text:"To choose a SharePoint library or folder, paste its sharing link above. If the link points directly to a JSON file, the file name/path field is ignored. Leave it blank to use the Fleet Master Sheet document library."}));
 
     var wsRow=el("div",{class:"settings-row"}); wsRow.appendChild(el("label",{text:"Worksheet (tab) to read"}));
     var wsSel=el("select",{id:"set-ws"}); (S365.worksheets.length?S365.worksheets:[m.worksheet]).forEach(function(n){ var o=el("option",{value:n,text:n}); if(n===m.worksheet)o.selected=true; wsSel.appendChild(o); });
@@ -5810,8 +5861,8 @@
     body.appendChild(el("p",{class:"note",text:"Type the exact column header text from your sheet. Matching is case-insensitive and allows partial matches."}));
 
     body.appendChild(el("div",{style:"display:flex;gap:10px;justify-content:flex-end;margin-top:6px"},
-      el("button",{class:"btn",text:"Reload data", onclick:function(){ saveMapping(false); setSync("saving","Reloading…"); loadRoster().then(function(){ setSync("ok","Synced ✓"); rerenderAll(); renderSettings(); }).catch(function(){ setSync("err","Couldn’t read that tab"); }); }}),
-      el("button",{class:"btn primary",text:"Save mapping", onclick:function(){ saveMapping(true); loadRoster().then(function(){ rerenderAll(); closeSettings(); }).catch(function(){ closeSettings(); }); }})
+      el("button",{class:"btn",text:"Reload data", onclick:function(){ saveMapping(false); setSync("saving","Reloading…"); reconnectM365().then(function(){ setSync("ok","Synced ✓"); rerenderAll(); renderSettings(); }).catch(function(){ setSync("err","Couldn’t read that data"); renderSettings(); }); }}),
+      el("button",{class:"btn primary",text:"Save settings", onclick:function(){ saveMapping(true); setSync("saving","Saving…"); reconnectM365().then(function(){ setSync("ok","Synced ✓"); rerenderAll(); closeSettings(); }).catch(function(){ setSync("err","Saved locally — couldn’t reconnect"); closeSettings(); }); }})
     ));
 
     function colRow(lbl,id,val){ var r=el("div",{class:"settings-row"}); r.appendChild(el("label",{text:lbl})); var i=el("input",{type:"text",id:id}); i.value=val||""; r.appendChild(i); return r; }
@@ -5820,6 +5871,9 @@
     function gv(id){ var e=document.getElementById(id); return e?e.value:""; }
     config.remoteConfigStorage=normalizeConfigStorage(gv("set-config-storage") || activeConfigStorage());
     config.remoteConfigPath=normalizeConfigPath(gv("set-config-path") || config.remoteConfigPath || SP.configFile);
+    config.remoteConfigSharePointUrl=String(gv("set-config-sp-url") || "").trim();
+    config.fleetUrl=String(gv("set-fleet-url") || config.fleetUrl || SP.fleetUrl).trim() || SP.fleetUrl;
+    try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){}
     config.mapping={ worksheet:gv("set-ws")||config.mapping.worksheet, nameMode:gv("set-namemode")||"firstlast",
       colName:gv("set-name"), colFirst:gv("set-first"), colLast:gv("set-last"),
       colTruck:gv("set-truck"), colAuthority:gv("set-auth"), colDot:gv("set-dot") };

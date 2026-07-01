@@ -10,13 +10,13 @@ A hosted procedures and checklists dashboard for Ultimate Logistics LLC office s
 
 - **62 procedure cards** organized by section (Daily & Routine, Checklists, Driver Onboarding, Payroll, Taxes, Compliance, etc.)
 - **Driver event checklists** (New Driver, Authority Change, Truck Change, Driver Quits, etc.) with a context form — select a driver from a live dropdown and checklist items auto-fill with their name, authority, and truck numbers
-- **Home screen** with pinned cards, recently opened cards, and an In Progress section for multi-day checklists
+- **Home screen** with personal pinned/recent cards and a shared In Progress section for multi-day checklists
 - **Checkboxes** on every checklist item with strikethrough — per-session, resets on next open
 - **Edit any step or item** — hover a step or checklist item and click ✎ to edit the text, add a link, or change the chip label. Changes save to SharePoint and are visible to all users
 - **Add and delete steps** on any card — click + Add step at the bottom of a card's step list, or ✕ to remove a step
 - **Create new cards** — click + New card in the All Procedures view to build a custom card with steps and/or owner blocks (KJ does / Amie does / Your tasks / etc.)
-- **SharePoint sync** — all customizations (edits, new steps, new cards) save to `procedures-dashboard-config.json` on SharePoint so every signed-in user sees the same version
-- **Live driver dropdown** — pulls current drivers directly from `Current Trucks & Drivers.xlsx` on SharePoint at load time, no manual updates needed
+- **SharePoint sync** — customizations (edits, new steps, new cards) and saved checklist sessions save to `procedures-dashboard-config.json` on SharePoint so every signed-in user sees the same version
+- **Live driver dropdown** — pulls current drivers directly from the configured Fleet Master Sheet on SharePoint at load time, no manual updates needed
 - **Folder links** — selecting a driver shows direct links to their SharePoint folder and truck folder
 - **File path links** throughout — procedure steps link directly to relevant SharePoint folders and Excel files (permit sheets, Current Quartix, etc.), all opening in browser
 
@@ -39,10 +39,10 @@ On first open, users are redirected to Microsoft login. After signing in, tokens
 
 | What | Location |
 |---|---|
-| Live driver list | `Driver Documents/Current Trucks & Drivers.xlsx` |
+| Live driver list | Configured Fleet Master Sheet sharing link |
 | Dashboard config (edits, custom cards, step changes) | `procedures-dashboard-config.json` |
 
-The config file is created automatically on first save. It stores all customizations in JSON format and is loaded after auth on every page open.
+The config file is created automatically on first save. It stores all customizations in JSON format and is loaded after auth on every page open. Settings lets an office user update the JSON file name/path, paste a SharePoint folder/library/JSON-file link for the JSON location, and update the Fleet Master Sheet sharing link without editing the HTML.
 
 ---
 
