@@ -4176,6 +4176,7 @@
   var state = safeParse(STATE_KEY, null) || {pins:[], recents:[], sessions:[]};
   state.pins = state.pins || []; state.recents = state.recents || []; state.sessions = state.sessions || [];
   state.sessions = pruneDeletedSessions(state.sessions);
+  if(normalizeOwnerLabels()){ try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){} }
 
   var saveTimer=null;
   function scheduleSave(){ if(saveTimer) clearTimeout(saveTimer); saveTimer=setTimeout(flushConfig, 1500); }
@@ -4212,6 +4213,21 @@
   /* ---------- helpers ---------- */
   function uid(p){ return (p||"x")+"_"+Math.random().toString(36).slice(2,9); }
   function clone(o){ return o==null?o:JSON.parse(JSON.stringify(o)); }
+  function normalizeOwnerLabels(){
+    var changed=false;
+    function fixLabel(obj){
+      if(!obj || typeof obj!=="object") return;
+      if(obj.label==="Before driver leaves — your tasks"){ obj.label="Before driver leaves — Majkaela's tasks"; changed=true; }
+      if(obj.label==="No rush — your tasks"){ obj.label="No rush — Majkaela's tasks"; changed=true; }
+    }
+    function walkCard(card){
+      fixLabel(card);
+      (card.blocks||[]).forEach(function(b){ fixLabel(b); (b.items||[]).forEach(fixLabel); });
+    }
+    Object.keys(config.cardOverrides||{}).forEach(function(id){ walkCard(config.cardOverrides[id]); });
+    (config.customCards||[]).forEach(walkCard);
+    return changed;
+  }
   function el(tag, props){
     var e=document.createElement(tag);
     if(props) for(var k in props){
@@ -4871,6 +4887,7 @@
   /* ----- driver context form ----- */
   function renderContextForm(card){
     var isAuth = card.eventType==="authority-change";
+    var isNewDriver = card.eventType==="new-driver";
     var roster = (S365 && S365.roster) ? S365.roster : null;
     var hasR = roster && roster.drivers && roster.drivers.length;
     var wrap=el("div",{class:"ctx"});
@@ -4892,7 +4909,7 @@
       grid.appendChild(field("Authority / LLC", authCtrl("f-auth")));
       grid.appendChild(field("DOT #", input("f-dot")));
     }
-    grid.appendChild(field("Current truck #", truckCtrl("f-old")));
+    if(!isNewDriver) grid.appendChild(field("Current truck #", truckCtrl("f-old")));
     grid.appendChild(field("New truck #", truckCtrl("f-new")));
     wrap.appendChild(grid);
 
@@ -5763,7 +5780,9 @@
       if(remote.remoteConfigSharePointUrl != null) config.remoteConfigSharePointUrl=String(remote.remoteConfigSharePointUrl||"").trim();
       if(remote.remoteConfigStorage) config.remoteConfigStorage=normalizeConfigStorage(remote.remoteConfigStorage);
       if(remote.remoteConfigPath) config.remoteConfigPath=normalizeConfigPath(remote.remoteConfigPath);
+      var labelsChanged=normalizeOwnerLabels();
       try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){}
+      if(labelsChanged && S365.signedIn) setTimeout(pushRemoteConfig, 0);
     }
   }
   function readRemoteConfigAt(path, storage){
