@@ -4180,7 +4180,8 @@
   var state = safeParse(STATE_KEY, null) || {pins:[], recents:[], sessions:[]};
   state.pins = state.pins || []; state.recents = state.recents || []; state.sessions = state.sessions || [];
   state.sessions = pruneDeletedSessions(state.sessions);
-  if(normalizeOwnerLabels()){ try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){} }
+  // Clean up older shared/local settings after helpers and built-in cards are ready.
+  var startupConfigChanged=false;
 
   var saveTimer=null;
   function scheduleSave(){ if(saveTimer) clearTimeout(saveTimer); saveTimer=setTimeout(flushConfig, 1500); if(typeof S365!=="undefined" && S365 && S365.signedIn && typeof setSync==="function") setSync("saving","Syncing changes…"); }
@@ -4232,6 +4233,129 @@
     (config.customCards||[]).forEach(walkCard);
     return changed;
   }
+  var REQUIRED_VISIBLE_CARDS = {"chk-driver-quits":true};
+  function restoreRequiredCards(){
+    var before=(config.hiddenCards||[]).length;
+    config.hiddenCards=(config.hiddenCards||[]).filter(function(id){ return !REQUIRED_VISIBLE_CARDS[id]; });
+    return config.hiddenCards.length!==before;
+  }
+  var DRIVER_EVENT_TOKEN_TEXT = {
+    "chk-new-driver-b1i1":"Get [NEW] permits under [AUTH].",
+    "chk-new-driver-b1i2":"Add [NEW] transponder in OR under [AUTH] (non B#).",
+    "chk-new-driver-b1i3":"Truck docs for truck [NEW] under [AUTH]. Email & upload to cloud.",
+    "chk-new-driver-b1i5":"Take picture of truck [NEW].",
+    "chk-new-driver-b2i1":"Check truck [NEW] cloud file has DOT #[DOT], reg & ID card.",
+    "chk-new-driver-b2i2":"Carrier package for [DRIVER]. Upload to cloud.",
+    "chk-new-driver-b2i4":"Update permit folders on cloud for [NEW] under [AUTH].",
+    "chk-new-driver-b2i5":"Update permit sheets on cloud for [NEW] under [AUTH].",
+    "chk-new-driver-b2i6":"Update Quartix. Add truck [NEW] to dispatch and active group; add [DRIVER] to truck name.",
+    "chk-new-driver-b2i7":"Scan & upload 2-pg lease to [DRIVER] cloud folder.",
+    "chk-new-driver-b2i8":"Scan & upload DOP to [DRIVER] cloud folder.",
+    "chk-new-driver-b3i2":"Driver’s Authority Package for [AUTH].",
+    "chk-new-driver-b3i9":"Add [NEW] to line-items to show monthly truck payment on 2-pg lease.",
+
+    "chk-authority-change-b1i1":"Cancel old permits for [OLD] under [OLD_AUTH].",
+    "chk-authority-change-b1i2":"UCR for [NEW_AUTH] (if new auth).",
+    "chk-authority-change-b1i3":"Permit accounts set-up for [NEW_AUTH] (POAs).",
+    "chk-authority-change-b1i4":"Get [NEW] permits under [NEW_AUTH].",
+    "chk-authority-change-b1i5":"Add [NEW] transponder in OR under [NEW_AUTH] (non B#).",
+    "chk-authority-change-b1i6":"Truck docs for truck [NEW] under [NEW_AUTH]. Email & upload to cloud.",
+    "chk-authority-change-b1i7":"Take picture of truck [NEW].",
+    "chk-authority-change-b2i1":"Check truck [NEW] cloud file has DOT #[NEW_DOT], reg & ID card.",
+    "chk-authority-change-b2i2":"Add [NEW_AUTH] to “Ultimate Contractual Carriers”.",
+    "chk-authority-change-b2i3":"Email Disp & Office new Carrier Packet for [NEW_AUTH].",
+    "chk-authority-change-b2i4":"Update Quartix. Old truck [OLD]: add “Shop” in front of name. New truck [NEW]: add to dispatch and active group; add [DRIVER] to truck name.",
+    "chk-authority-change-b2i6":"Carrier package for [DRIVER]. Upload to cloud; move old package to old folder.",
+    "chk-authority-change-b2i8":"Update permit folders on cloud for [NEW] under [NEW_AUTH].",
+    "chk-authority-change-b2i9":"Update permit sheets on cloud for [NEW] under [NEW_AUTH].",
+    "chk-authority-change-b2i10":"Update current trucks & drivers sheet: [DRIVER] · [OLD] → [NEW] · [NEW_AUTH].",
+    "chk-authority-change-b2i11":"Update driver authority sheet: [DRIVER] from [OLD_AUTH] to [NEW_AUTH].",
+    "chk-authority-change-b3i1":"Driver’s Authority Package for [NEW_AUTH].",
+    "chk-authority-change-b3i9":"Add [NEW_AUTH] to External Carriers in ITS.",
+    "chk-authority-change-b4i1":"Bestpass/prepass swap for [NEW] under [NEW_AUTH].",
+    "chk-authority-change-b4i3":"Email Blueline to remove [DRIVER] from [OLD_AUTH] D&A policy.",
+
+    "chk-driver-quits-b1i1":"Remove [AUTH] from “Ultimate Contractual Carriers”.",
+    "chk-driver-quits-b1i2":"Email Disp & Office new Carrier Packet for [AUTH].",
+    "chk-driver-quits-b1i3":"Cancel permits / close accounts for [AUTH].",
+    "chk-driver-quits-b1i4":"Move/rename permit files for [AUTH] to canceled.",
+    "chk-driver-quits-b1i5":"Update permit sheets for [AUTH].",
+    "chk-driver-quits-b1i6":"Move [DRIVER] cloud folder to old.",
+    "chk-driver-quits-b1i7":"Move ID card on truck [OLD] cloud to Old Docs.",
+    "chk-driver-quits-b1i8":"Update current trucks & drivers sheet: remove [DRIVER] · [OLD] · [AUTH].",
+    "chk-driver-quits-b1i9":"Update driver authority sheet: remove [DRIVER] from [AUTH].",
+    "chk-driver-quits-b1i10":"Remove [DRIVER] from safety Excel sheet (CDL/Med/MVR checklist).",
+    "chk-driver-quits-b1i11":"Remove [DRIVER] from email contacts and contact lists.",
+    "chk-driver-quits-b1i12":"Remove [DRIVER] from Drivers Information on Drivers & Locations.",
+    "chk-driver-quits-b1i13":"Disable auto-run and deactivate [DRIVER] on embark.",
+    "chk-driver-quits-b1i14":"Remove [DRIVER] mailbox tag.",
+    "chk-driver-quits-b1i15":"Quartix — remove truck [OLD] from all groups except Ult Log All and Trucks No Driver. Change name to No Driver.",
+    "chk-driver-quits-b2i1":"Email Blueline to remove [DRIVER] from [AUTH] D&A policy.",
+    "chk-driver-quits-b2i2":"Close prepass account for [AUTH].",
+
+    "chk-perm-truck-b1i2":"Cancel old permits for [OLD] under [AUTH].",
+    "chk-perm-truck-b1i3":"Get [NEW] permits under [AUTH].",
+    "chk-perm-truck-b1i4":"Add [NEW] transponder in OR under [AUTH] (non B#).",
+    "chk-perm-truck-b1i5":"Truck docs for truck [NEW] under [AUTH]. Email & upload to cloud.",
+    "chk-perm-truck-b1i6":"Take picture of truck [NEW].",
+    "chk-perm-truck-b2i1":"Check truck [NEW] cloud file has DOT #[DOT], reg & ID card.",
+    "chk-perm-truck-b2i2":"Carrier package for [DRIVER]. Upload to cloud; move old package to old folder.",
+    "chk-perm-truck-b2i3":"Update Quartix. Old truck [OLD]: remove from all groups except “Ultimate Logistics All Vehicles”, rename to “No Driver”. New truck [NEW]: add to dispatch and active group; add [DRIVER].",
+    "chk-perm-truck-b2i4":"Scan & upload 2-pg lease to cloud for [DRIVER]. Move old truck lease to old folder.",
+    "chk-perm-truck-b2i6":"Update permit folders on cloud for [NEW] under [AUTH].",
+    "chk-perm-truck-b2i7":"Update permit sheets on cloud for [NEW] under [AUTH].",
+    "chk-perm-truck-b2i8":"Update current trucks & drivers sheet: [DRIVER] · [OLD] → [NEW] · [AUTH].",
+    "chk-perm-truck-b3i1":"Add [NEW] to line-items to show monthly truck payment on 2-pg lease.",
+    "chk-perm-truck-b4i1":"Bestpass/prepass swap for [NEW] under [AUTH].",
+
+    "chk-temp-truck-b1i2":"Get [NEW] permits under [AUTH].",
+    "chk-temp-truck-b1i3":"Add [NEW] transponder in OR under [AUTH] (non B#).",
+    "chk-temp-truck-b1i4":"Truck docs for truck [NEW] under [AUTH]. Email & upload to cloud.",
+    "chk-temp-truck-b1i5":"Take picture of truck [NEW].",
+    "chk-temp-truck-b2i1":"Check truck [NEW] cloud file has DOT #[DOT], reg & ID card.",
+    "chk-temp-truck-b2i2":"Carrier package for [DRIVER]. Upload to cloud; move old package to old folder.",
+    "chk-temp-truck-b2i3":"Update Quartix. Old truck [OLD]: add “Shop” in front of name. New truck [NEW]: add to dispatch and active group; add [DRIVER], add “Temp” in front of name.",
+    "chk-temp-truck-b2i4":"Scan & upload 2-pg lease to cloud for [DRIVER]. Add “TEMP” to the end of the file name.",
+    "chk-temp-truck-b2i6":"Update permit folders on cloud for [NEW] under [AUTH].",
+    "chk-temp-truck-b2i7":"Update permit sheets on cloud for [NEW] under [AUTH]. Add “in shop” note to [OLD] and “temp truck” note to [NEW].",
+    "chk-temp-truck-b2i8":"Update current trucks & drivers sheet: [DRIVER] · temp [NEW] replacing [OLD] · [AUTH].",
+    "chk-temp-truck-b4i1":"Bestpass/prepass swap for [NEW] under [AUTH].",
+
+    "chk-out-temp-b1i1":"Cancel temp permits for [OLD] under [AUTH].",
+    "chk-out-temp-b1i2":"Check normal permits are still active for [NEW] under [AUTH].",
+    "chk-out-temp-b1i3":"Move temp carrier package for [DRIVER] to old folder.",
+    "chk-out-temp-b1i4":"Move/rename temp truck [OLD] lease to old folder (if there is one).",
+    "chk-out-temp-b1i5":"Update Quartix. Old truck [OLD]: remove from all groups except “Ultimate Logistics All Vehicles”, rename to “No Driver”. New truck [NEW]: remove “Shop” from name.",
+    "chk-out-temp-b1i6":"Check truck [NEW] cloud file has DOT #[DOT], reg & ID card.",
+    "chk-out-temp-b1i7":"Update permit folders on cloud for [NEW] under [AUTH].",
+    "chk-out-temp-b1i8":"Update permit sheets on cloud for [NEW] under [AUTH]. Leave notes until next tax period.",
+    "chk-out-temp-b1i9":"Update current trucks & drivers sheet: [DRIVER] · temp [OLD] was, normal [NEW] active · [AUTH]."
+  };
+  function hasContextToken(text){ return /\[(DRIVER|AUTH|OLD|NEW|DOT|OLD_AUTH|NEW_AUTH|OLD_DOT|NEW_DOT)\]/i.test(String(text||"")); }
+  function shouldTokenizeItem(it){
+    if(!it || !it.id || !DRIVER_EVENT_TOKEN_TEXT[it.id]) return false;
+    if(hasContextToken(it.text)) return false;
+    // Only migrate stock/auto-fill style lines. User-written lines with tokens are left alone.
+    return true;
+  }
+  function normalizeDriverEventTokens(){
+    var changed=false;
+    function walkCard(card){
+      if(!card || card.type!=="driver-event") return;
+      (card.steps||[]).forEach(function(it){ if(shouldTokenizeItem(it)){ it.text=DRIVER_EVENT_TOKEN_TEXT[it.id]; changed=true; } });
+      (card.blocks||[]).forEach(function(b){ (b.items||[]).forEach(function(it){ if(shouldTokenizeItem(it)){ it.text=DRIVER_EVENT_TOKEN_TEXT[it.id]; changed=true; } }); });
+    }
+    BUILTIN.forEach(walkCard);
+    Object.keys(config.cardOverrides||{}).forEach(function(id){ walkCard(config.cardOverrides[id]); });
+    (config.customCards||[]).forEach(walkCard);
+    return changed;
+  }
+  // Run migrations now that helpers, token maps, and built-in card data are loaded.
+  if(restoreRequiredCards()) startupConfigChanged=true;
+  if(normalizeOwnerLabels()) startupConfigChanged=true;
+  if(normalizeDriverEventTokens()) startupConfigChanged=true;
+  if(startupConfigChanged){ try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){} }
+
   function el(tag, props){
     var e=document.createElement(tag);
     if(props) for(var k in props){
@@ -4897,6 +5021,9 @@
     mActions.textContent="";
     if(card.type==="driver-event"){
       mActions.appendChild(el("button",{class:"icon-btn",text:"💾 Save progress", onclick:saveSession}));
+      if(modalState.sessionId){
+        mActions.appendChild(el("button",{class:"icon-btn", style:"border-color:#e6b5ae;color:var(--bad)", text:"🗑 Delete saved copy", onclick:function(){ deleteSession(modalState.sessionId); closeCard(); }}));
+      }
     }
     if(isEditable(card)){
       var editBtn=el("button",{class:"icon-btn"+(modalState.editMode?" on":""), text:modalState.editMode?"✓ Done editing":"✎ Edit card", onclick:function(){
@@ -4912,7 +5039,9 @@
           persistCardEdit(card.id);
           renderModal();
         }}));
-        mActions.appendChild(el("button",{class:"icon-btn", style:"border-color:#e6b5ae;color:var(--bad)", text:"🗑 Delete card", onclick:function(){ confirmDelete(card.id); }}));
+        if(!modalState.sessionId){
+          mActions.appendChild(el("button",{class:"icon-btn", style:"border-color:#e6b5ae;color:var(--bad)", text:"🗑 Delete card", onclick:function(){ confirmDelete(card.id); }}));
+        }
       }
     }else{
       // email cards: delete affordance lives directly in header (no edit mode)
@@ -5166,8 +5295,11 @@
       }
 
       var txtSpan=el("span",{class:"txt"});
-      var displayText = substitute(it.text, ctx);
-      displayText = enrichChecklistText(displayText, ctx, card);
+      var rawText = it.text || "";
+      var displayText = substitute(rawText, ctx);
+      // If the checklist line uses explicit [DATA] tokens, trust that wording exactly.
+      // The older auto-fill helper only runs for legacy lines that do not have tokens yet.
+      if(!hasContextToken(rawText)) displayText = enrichChecklistText(displayText, ctx, card);
       txtSpan.appendChild(document.createTextNode(displayText));
       if(it.newAuthOnly){ txtSpan.appendChild(el("span",{class:"new-auth-only", text:"new auth only"})); }
       if(it.toggle){ var _tg=cardToggle(card, it.toggle); if(_tg) txtSpan.appendChild(el("span",{class:"only-marker", text:(it.toggleNot?"hide when: ":"only: ")+_tg.label})); }
@@ -5363,6 +5495,10 @@
       config.customCards=config.customCards.filter(function(c){return c.id!==cardId;});
       delete config.cardOverrides[cardId];
     }else{
+      if(REQUIRED_VISIBLE_CARDS[cardId]){
+        window.alert('This default checklist is protected, so it cannot be hidden. Delete saved copies from the saved-card button instead.');
+        return;
+      }
       if(config.hiddenCards.indexOf(cardId)<0) config.hiddenCards.push(cardId);
     }
     flushConfig(); closeCard();
@@ -5875,9 +6011,12 @@
       config.remoteConfigStorage=SP.configStorage;
       config.remoteConfigPath=SP.configFile;
       config.remoteConfigSharePointUrl=SP.configSharePointUrl;
-      var labelsChanged=normalizeOwnerLabels();
+      var remoteCleanupChanged=false;
+      if(restoreRequiredCards()) remoteCleanupChanged=true;
+      if(normalizeOwnerLabels()) remoteCleanupChanged=true;
+      if(normalizeDriverEventTokens()) remoteCleanupChanged=true;
       try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){}
-      if(labelsChanged && S365.signedIn) setTimeout(pushRemoteConfig, 0);
+      if(remoteCleanupChanged && S365.signedIn) setTimeout(pushRemoteConfig, 0);
     }
   }
   function readRemoteConfigAt(path, storage){
