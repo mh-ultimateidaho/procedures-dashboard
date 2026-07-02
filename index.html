@@ -193,6 +193,12 @@
   .b-block .bb-head{display:flex;gap:8px;align-items:center;margin-bottom:8px}
   .b-block select{border:1px solid var(--line-strong);border-radius:8px;padding:6px 8px}
 
+  .block-toolbar{display:inline-flex;gap:5px;margin-left:7px;vertical-align:middle}
+  .block-toolbar .mini{padding:1px 6px;font-size:11px;background:#fff}
+  .summary-line{display:flex;align-items:center;gap:8px}
+  .summary-line .summary-text{flex:1}
+  .block-add-row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 18px}
+
   .parse-error{background:#fdf1ef;border:1px solid #e6b5ae;color:#7a241a;border-radius:10px;padding:12px 14px;margin-bottom:18px;font-size:13.5px}
   .hidden-sec .card{opacity:.7}
   .restore-row{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px}
@@ -4648,7 +4654,7 @@
     var cust=isCustom(id); if(cust) return cust;
     var base=builtinById[id]; if(!base) return null;
     var ov=config.cardOverrides[id];
-    if(ov){ var m=clone(base); if(ov.steps) m.steps=ov.steps; if(ov.blocks) m.blocks=ov.blocks; if(ov.title!=null) m.title=ov.title; if(ov.defaultMode) m.defaultMode=ov.defaultMode; if(ov.toggles) m.toggles=ov.toggles; if(ov.lastEdited) m.lastEdited=ov.lastEdited; return m; }
+    if(ov){ var m=clone(base); if(ov.steps) m.steps=ov.steps; if(ov.blocks) m.blocks=ov.blocks; if(ov.title!=null) m.title=ov.title; if(ov.defaultMode) m.defaultMode=ov.defaultMode; if(ov.toggles) m.toggles=ov.toggles; if(ov.coveringTitle!=null) m.coveringTitle=ov.coveringTitle; if(ov.lastEdited) m.lastEdited=ov.lastEdited; return m; }
     return base;
   }
   function getOriginalCard(id){
@@ -4730,6 +4736,7 @@
         title: draft.title,
         defaultMode: draft.defaultMode,
         toggles: clone(draft.toggles||null),
+        coveringTitle: draft.coveringTitle,
         lastEdited: draft.lastEdited
       };
     }
@@ -5249,25 +5256,45 @@
       host.appendChild(renderList(card, "steps", card.steps||[], {ordered:true, checkbox:false}));
     }
 
-    // blocks
+    // blocks / separator sections
     if(card.blocks && card.blocks.length){
       if(card.type==="driver-event"){
         var always=card.blocks.filter(function(b){ return !COVERING_KINDS[b.kind]; });
         var covering=card.blocks.filter(function(b){ return COVERING_KINDS[b.kind]; });
         always.forEach(function(b){ host.appendChild(renderBlock(card,b)); });
-        if(covering.length){
+        if(modalState.editMode){
+          host.appendChild(el("div",{class:"block-add-row"},
+            el("button",{class:"btn small",text:"+ Add section",onclick:function(){ addBlock(card.id,false); }}),
+            el("button",{class:"btn small",text:"+ Add KJ/Amie covering section",onclick:function(){ addBlock(card.id,true); }})
+          ));
+        }
+        if(covering.length || modalState.editMode){
           var det=el("details",{class:"disclosure"});
-          if(modalState.coveringOpen) det.setAttribute("open","open");
+          if(modalState.coveringOpen || modalState.editMode) det.setAttribute("open","open");
           det.addEventListener("toggle",function(){ modalState.coveringOpen=det.open; });
-          det.appendChild(el("summary",{text:"▸ KJ & Amie tasks (covering only)"}));
+          var sum=el("summary");
+          var line=el("div",{class:"summary-line"});
+          line.appendChild(el("span",{class:"summary-text",text:"▸ "+(card.coveringTitle||"KJ & Amie tasks (covering only)")}));
+          if(modalState.editMode){
+            line.appendChild(el("span",{class:"block-toolbar"},
+              el("button",{class:"mini",title:"Edit dropdown title",text:"✎",onclick:function(e){ e.preventDefault(); e.stopPropagation(); editCoveringTitle(card.id); }}),
+              el("button",{class:"mini del",title:"Delete all covering sections",text:"✕",onclick:function(e){ e.preventDefault(); e.stopPropagation(); deleteCoveringGroup(card.id); }})
+            ));
+          }
+          sum.appendChild(line);
+          det.appendChild(sum);
           var inner=el("div",{class:"inner"});
           covering.forEach(function(b){ inner.appendChild(renderBlock(card,b)); });
+          if(modalState.editMode){ inner.appendChild(el("button",{class:"btn small add-item",text:"+ Add covering section",onclick:function(){ addBlock(card.id,true); }})); }
           det.appendChild(inner);
           host.appendChild(det);
         }
       }else{
         card.blocks.forEach(function(b){ host.appendChild(renderBlock(card,b)); });
+        if(modalState.editMode){ host.appendChild(el("div",{class:"block-add-row"}, el("button",{class:"btn small",text:"+ Add section",onclick:function(){ addBlock(card.id,false); }}))); }
       }
+    }else if(modalState.editMode){
+      host.appendChild(el("div",{class:"block-add-row"}, el("button",{class:"btn small",text:"+ Add section",onclick:function(){ addBlock(card.id,false); }})));
     }
     return host;
   }
@@ -5275,12 +5302,82 @@
   function renderBlock(card, block){
     var wrap=el("div",{class:"content-block"});
     var kindClass="ob-"+(block.kind||"custom");
-    var lbl=el("div",{class:"owner-label "+kindClass, text:block.label||"Tasks"});
+    var lbl=el("div",{class:"owner-label "+kindClass});
+    lbl.appendChild(document.createTextNode(block.label||"Tasks"));
+    if(modalState.editMode){
+      lbl.appendChild(el("span",{class:"block-toolbar"},
+        el("button",{class:"mini",title:"Edit section title/color",text:"✎",onclick:function(e){ e.stopPropagation(); editBlockMeta(card.id, block.id); }}),
+        el("button",{class:"mini del",title:"Delete section",text:"✕",onclick:function(e){ e.stopPropagation(); deleteBlock(card.id, block.id); }})
+      ));
+    }
     wrap.appendChild(lbl);
     var body=el("div",{class:"owner-body "+kindClass});
     body.appendChild(renderList(card, block.id, block.items||[], {ordered:false, checkbox:true}));
     wrap.appendChild(body);
     return wrap;
+  }
+
+  function blockById(card, blockId){
+    if(!card || !card.blocks) return null;
+    for(var i=0;i<card.blocks.length;i++){ if(card.blocks[i].id===blockId) return card.blocks[i]; }
+    return null;
+  }
+  function blockKindPrompt(current){
+    var k=window.prompt("Section color/type: before, norush, kj, amie, or custom", current||"custom");
+    if(k==null) return null;
+    k=String(k).trim().toLowerCase();
+    if(!k) k="custom";
+    if(!({before:1,norush:1,kj:1,amie:1,custom:1})[k]){
+      window.alert("Please use one of: before, norush, kj, amie, custom.");
+      return null;
+    }
+    return k;
+  }
+  function editBlockMeta(cardId, blockId){
+    captureContextForm(); captureChecks();
+    var mut=getMutableCard(cardId); var b=blockById(mut, blockId); if(!b) return;
+    var label=window.prompt("Section title", b.label||"Tasks");
+    if(label==null) return;
+    var kind=blockKindPrompt(b.kind||"custom");
+    if(kind==null) return;
+    b.label=String(label).trim()||"Tasks";
+    b.kind=kind;
+    persistCardEdit(cardId); reRenderModalPreserving();
+  }
+  function addBlock(cardId, covering){
+    captureContextForm(); captureChecks();
+    var mut=getMutableCard(cardId); if(!mut.blocks) mut.blocks=[];
+    var label=window.prompt("New section title", covering ? "KJ does" : "New section");
+    if(label==null) return;
+    var kind=blockKindPrompt(covering ? "kj" : "custom");
+    if(kind==null) return;
+    mut.blocks.push({id:uid("blk"), label:String(label).trim()||"Tasks", kind:kind, items:[]});
+    if(covering) modalState.coveringOpen=true;
+    persistCardEdit(cardId); reRenderModalPreserving();
+  }
+  function deleteBlock(cardId, blockId){
+    var mut=getMutableCard(cardId); if(!mut.blocks) return;
+    var b=blockById(mut, blockId); if(!b) return;
+    if(!window.confirm('Delete the section "'+(b.label||"Tasks")+'" and all items inside it?')) return;
+    mut.blocks=mut.blocks.filter(function(x){return x.id!==blockId;});
+    persistCardEdit(cardId); reRenderModalPreserving();
+  }
+  function editCoveringTitle(cardId){
+    captureContextForm(); captureChecks();
+    var mut=getMutableCard(cardId);
+    var cur=mut.coveringTitle || "KJ & Amie tasks (covering only)";
+    var title=window.prompt("Dropdown title", cur);
+    if(title==null) return;
+    mut.coveringTitle=String(title).trim()||"KJ & Amie tasks (covering only)";
+    persistCardEdit(cardId); reRenderModalPreserving();
+  }
+  function deleteCoveringGroup(cardId){
+    var mut=getMutableCard(cardId); if(!mut.blocks) return;
+    var count=mut.blocks.filter(function(b){return COVERING_KINDS[b.kind];}).length;
+    if(!count) return;
+    if(!window.confirm("Delete the KJ/Amie covering dropdown and all covering sections inside it?")) return;
+    mut.blocks=mut.blocks.filter(function(b){return !COVERING_KINDS[b.kind];});
+    persistCardEdit(cardId); reRenderModalPreserving();
   }
 
   // listKey: "steps" or a block id
@@ -5346,9 +5443,16 @@
       var rawText = itemRawText(it);
       var displayText = substitute(rawText, ctx);
       txtSpan.appendChild(document.createTextNode(displayText));
-      if(it.newAuthOnly){ txtSpan.appendChild(el("span",{class:"new-auth-only", text:"new auth only"})); }
-      // Special-instruction visibility markers are intentionally hidden from the checklist text.
-      // The rule is still editable in the item popup.
+      if(modalState.editMode){
+        // Show visibility-rule chips only while editing, so the normal checklist stays clean
+        // but it is obvious which rows are conditional when editing the card.
+        if(it.newAuthOnly){ txtSpan.appendChild(el("span",{class:"only-marker", text:"hide when: Driver's Authority"})); }
+        if(it.toggle){
+          var t=cardToggle(card, it.toggle);
+          var label=t ? t.label : "special instruction";
+          txtSpan.appendChild(el("span",{class:"only-marker", text:(it.toggleNot ? "hide when: " : "only when: ")+label}));
+        }
+      }
       if(it.linkUrl){
         var label=it.linkLabel ? ("↗ "+it.linkLabel) : deriveChip(it.linkUrl);
         txtSpan.appendChild(el("a",{class:"chip-link", href:it.linkUrl, target:"_blank", rel:"noopener", text:label, onclick:function(e){ e.stopPropagation(); }}));
