@@ -144,6 +144,10 @@
   .row:hover .note-btn{opacity:.95}
   .note-btn.has{opacity:1}
   .only-marker{display:inline-block;font-size:10.5px;font-weight:700;color:#5b3ea1;background:#efeaff;border-radius:5px;padding:0 5px;margin-left:6px;vertical-align:middle}
+  .token-bar{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin:7px 0 2px}
+  .token-hint{font-size:11px;font-weight:700;color:var(--muted)}
+  .token-btn{border:1px solid #d4e0f6;background:var(--accent-soft);color:var(--accent);border-radius:6px;padding:2px 8px;font-size:11.5px;font-weight:600;cursor:pointer}
+  .token-btn:hover{background:#dfeafb}
   .toggle-bar{display:flex;flex-direction:column;gap:7px;margin-bottom:16px}
   .toggle-bar .tg{display:flex;align-items:center;gap:9px;font-size:13.5px;font-weight:600;background:var(--accent-soft);border:1px solid #d4e0f6;border-radius:9px;padding:8px 11px}
   .toggle-bar .tg input{width:16px;height:16px;flex:none}
@@ -4261,10 +4265,10 @@
     return Math.floor(d/7)+"w ago";
   }
 
-  var TOKEN_RE=/\[(DRIVER|AUTH|OLD|NEW|DOT|OLD_AUTH|NEW_AUTH|OLD_DOT|NEW_DOT)\]/g;
+  var TOKEN_RE=/\[(DRIVER|AUTH|OLD|NEW|DOT|OLD_AUTH|NEW_AUTH|OLD_DOT|NEW_DOT)\]/gi;
   function substitute(text, ctx){
     if(!ctx) return text;
-    return String(text).replace(TOKEN_RE, function(m,k){ return ctx[k] ? ctx[k] : m; });
+    return String(text).replace(TOKEN_RE, function(m,k){ var key=String(k).toUpperCase(); return ctx[key] ? ctx[key] : m; });
   }
 
   // Adds only the context that is directly useful for that checklist line.
@@ -5089,9 +5093,10 @@
     var list = (listKey==="steps") ? el("ol",{class:"steps"}) : el("div",{class:"steps"});
 
     items.forEach(function(it){
-      // conditional visibility: new-auth-only + custom special-instruction toggles
+      // conditional visibility: new-auth-only + custom special-instruction toggles (normal or inverted)
       var newAuthHidden = it.newAuthOnly && card.eventType==="authority-change" && !modalState.brandNewAuth;
-      var toggleHidden = it.toggle && !toggleOn(it.toggle);
+      var toggleHidden = false;
+      if(it.toggle){ var _on=toggleOn(it.toggle); toggleHidden = it.toggleNot ? _on : !_on; }
       var row=el("div",{class:"row"});
       row.setAttribute("data-list", listKey);
       row.setAttribute("data-id", it.id);
@@ -5124,7 +5129,7 @@
       displayText = enrichChecklistText(displayText, ctx, card);
       txtSpan.appendChild(document.createTextNode(displayText));
       if(it.newAuthOnly){ txtSpan.appendChild(el("span",{class:"new-auth-only", text:"new auth only"})); }
-      if(it.toggle){ var _tg=cardToggle(card, it.toggle); if(_tg) txtSpan.appendChild(el("span",{class:"only-marker", text:"only: "+_tg.label})); }
+      if(it.toggle){ var _tg=cardToggle(card, it.toggle); if(_tg) txtSpan.appendChild(el("span",{class:"only-marker", text:(it.toggleNot?"hide when: ":"only: ")+_tg.label})); }
       if(it.linkUrl){
         var label=it.linkLabel ? ("↗ "+it.linkLabel) : deriveChip(it.linkUrl);
         txtSpan.appendChild(el("a",{class:"chip-link", href:it.linkUrl, target:"_blank", rel:"noopener", text:label, onclick:function(e){ e.stopPropagation(); }}));
@@ -5232,9 +5237,19 @@
     var item=list.find(function(x){return x.id===itemId;}); if(!item) return;
 
     popup=el("div",{class:"popup"});
+    function insertAtCursor(t, text){ var s=t.selectionStart||0, e=t.selectionEnd||0, v=t.value; t.value=v.slice(0,s)+text+v.slice(e); var pos=s+text.length; t.focus(); t.setSelectionRange(pos,pos); }
     var ta=el("textarea"); ta.value=item.text||"";
     popup.appendChild(el("label",{style:"font-size:11px;font-weight:700;color:var(--muted)",text:"Text"}));
     popup.appendChild(ta);
+    var tokDefs=null;
+    if(card.eventType==="authority-change") tokDefs=[["[DRIVER]","Driver"],["[OLD_AUTH]","Old auth"],["[NEW_AUTH]","New auth"],["[OLD]","Cur. truck"],["[NEW]","New truck"],["[OLD_DOT]","Old DOT"],["[NEW_DOT]","New DOT"]];
+    else if(card.type==="driver-event") tokDefs=[["[DRIVER]","Driver"],["[AUTH]","Authority"],["[OLD]","Cur. truck"],["[NEW]","New truck"],["[DOT]","DOT #"]];
+    if(tokDefs){
+      var tokBar=el("div",{class:"token-bar"});
+      tokBar.appendChild(el("span",{class:"token-hint",text:"Insert:"}));
+      tokDefs.forEach(function(p){ tokBar.appendChild(el("button",{class:"token-btn",type:"button",title:"Inserts "+p[0]+", auto-filled from the driver context",text:p[1], onclick:function(ev){ ev.preventDefault(); insertAtCursor(ta, p[0]); }})); });
+      popup.appendChild(tokBar);
+    }
     var labelF=el("input",{type:"text",placeholder:"e.g. SharePoint"}); labelF.value=item.linkLabel||"";
     var urlF=el("input",{type:"text",placeholder:"https://…"}); urlF.value=item.linkUrl||"";
     popup.appendChild(el("div",{class:"field"}, el("label",{text:"Link label (optional)"}), labelF));
@@ -5244,7 +5259,13 @@
     popup.appendChild(el("div",{class:"field"}, el("label",{text:"Item style"}), modeSel));
     var tgSel=el("select");
     tgSel.appendChild(el("option",{value:"",text:"Always show"}));
-    (mut.toggles||[]).forEach(function(t){ var o=el("option",{value:t.id,text:"Only when: "+t.label}); if(item.toggle===t.id)o.selected=true; tgSel.appendChild(o); });
+    (mut.toggles||[]).forEach(function(t){
+      var oOnly=el("option",{value:t.id,text:"Only when: "+t.label});
+      var oNot=el("option",{value:"!"+t.id,text:"Only when NOT: "+t.label});
+      if(item.toggle===t.id && !item.toggleNot) oOnly.selected=true;
+      if(item.toggle===t.id && item.toggleNot) oNot.selected=true;
+      tgSel.appendChild(oOnly); tgSel.appendChild(oNot);
+    });
     popup.appendChild(el("div",{class:"field"}, el("label",{text:"Show only when (special-instruction checkbox)"}), tgSel));
     popup.appendChild(el("div",{class:"pop-actions"},
       el("button",{class:"btn small primary",text:"Save", onclick:function(){
@@ -5253,12 +5274,14 @@
         if(u){ item.linkUrl=u; item.linkLabel=labelF.value.trim()||undefined; }
         else { delete item.linkUrl; delete item.linkLabel; }
         if(modeSel.value){ item.mode=modeSel.value; } else { delete item.mode; }
-        if(tgSel.value){ item.toggle=tgSel.value; } else { delete item.toggle; }
+        var tv=tgSel.value;
+        if(tv){ if(tv.charAt(0)==="!"){ item.toggle=tv.slice(1); item.toggleNot=true; } else { item.toggle=tv; delete item.toggleNot; } }
+        else { delete item.toggle; delete item.toggleNot; }
         touchCard(card.id); scheduleSave(); closePopup(); reRenderModalPreserving();
       }}),
       el("button",{class:"btn small",text:"Reset to original", onclick:function(){
         var orig=findOriginalItem(card.id, listKey, itemId);
-        if(orig){ ta.value=orig.text||""; labelF.value=orig.linkLabel||""; urlF.value=orig.linkUrl||""; modeSel.value=orig.mode||""; tgSel.value=orig.toggle||""; }
+        if(orig){ ta.value=orig.text||""; labelF.value=orig.linkLabel||""; urlF.value=orig.linkUrl||""; modeSel.value=orig.mode||""; tgSel.value=(orig.toggle?((orig.toggleNot?"!":"")+orig.toggle):""); }
         else { ta.value=""; labelF.value=""; urlF.value=""; modeSel.value=""; tgSel.value=""; }
       }}),
       el("button",{class:"btn small",text:"Cancel", onclick:closePopup})
@@ -5380,8 +5403,8 @@
     if(!window.confirm("Delete this checkbox? Items set to “only show when” it will become always-visible.")) return;
     var mut=getMutableCard(cardId);
     mut.toggles=(mut.toggles||[]).filter(function(x){return x.id!==tid;});
-    (mut.steps||[]).forEach(function(s){ if(s.toggle===tid) delete s.toggle; });
-    (mut.blocks||[]).forEach(function(b){ (b.items||[]).forEach(function(it){ if(it.toggle===tid) delete it.toggle; }); });
+    (mut.steps||[]).forEach(function(s){ if(s.toggle===tid){ delete s.toggle; delete s.toggleNot; } });
+    (mut.blocks||[]).forEach(function(b){ (b.items||[]).forEach(function(it){ if(it.toggle===tid){ delete it.toggle; delete it.toggleNot; } }); });
     if(modalState.toggleState) delete modalState.toggleState[tid];
     touchCard(cardId); scheduleSave(); reRenderModalPreserving();
   }
@@ -5584,28 +5607,26 @@
     tenantId: "2c6b3d13-b98c-4605-8fcc-d8eed3579136",
     scopes: ["https://graph.microsoft.com/Sites.ReadWrite.All", "https://graph.microsoft.com/Files.ReadWrite.All"],
     fleetUrl: "https://ultimatecorp.sharepoint.com/:x:/r/sites/UltimateLogisticsLLC/_layouts/15/Doc.aspx?sourcedoc=%7B36A2C772-3F8C-42ED-A901-797013BCFBC0%7D&file=Fleet%20Master%20Sheet.xlsx&action=default&mobileredirect=true",
-    // Default: the shared SharePoint site library (the Ultimate Logistics team site).
-    // Everyone with site access can read it; office staff with Edit access can write it.
+    // Shared edits are intentionally locked to one SharePoint JSON file.
+    // Do not let per-browser settings point users at old/personal JSON files.
     configStorage: "sharepoint",
     configFile: "procedures-dashboard-config.json",
-    // Older locations are checked once so existing edits migrate into the shared file automatically.
-    legacyConfigFiles: [
-      {storage:"onedrive", path:"procedures-dashboard-config.json"},
-      {storage:"sharepoint", path:"Office Documents/procedures-dashboard-config.json"}
-    ]
+    configSharePointUrl: "https://ultimatecorp.sharepoint.com/:u:/s/UltimateLogisticsLLC/IQAA_lEjkUZOQ4jMqknocs-UAfimnjCbwJTxwjdpZzgG9u4?e=7Wwpdk",
+    legacyConfigFiles: []
   };
   var S365 = { msal:null, account:null, signedIn:false, item:null, driveId:null,
                roster:null, worksheets:[], remote:{eTag:null, by:null, at:null, present:false} };
 
   config.mapping = config.mapping || { worksheet:"Current Roster", nameMode:"firstlast",
       colName:"Driver", colFirst:"First", colLast:"Last", colTruck:"Truck #", colAuthority:"Authority", colDot:"DOT #" };
-  config.remoteConfigStorage = config.remoteConfigStorage || SP.configStorage;
-  config.remoteConfigPath = config.remoteConfigPath || SP.configFile;
-  config.remoteConfigSharePointUrl = config.remoteConfigSharePointUrl || "";
+  // Force all browsers/users onto the same shared JSON file, even if localStorage
+  // still contains an old OneDrive/SharePoint path from a previous version.
+  config.remoteConfigStorage = SP.configStorage;
+  config.remoteConfigPath = SP.configFile;
+  config.remoteConfigSharePointUrl = SP.configSharePointUrl;
   config.fleetUrl = config.fleetUrl || SP.fleetUrl;
-  // One-time migration: anyone whose saved setting still points at personal OneDrive is moved
-  // onto the shared SharePoint library so edits reach the whole office.
-  if(!config._sharedStorageMigrated){ config.remoteConfigStorage="sharepoint"; config._sharedStorageMigrated=true; try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){} }
+  config._sharedStorageMigrated = true;
+  try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){}
 
   function setSync(kind, text, detail){ var c=document.getElementById("sync-status"); if(c){ c.className="sync-chip "+kind; c.textContent=text; c.title=detail||text; } }
   function chipErr(e){ var s=String(e); var head=s.split(":")[0].trim(); if(head.length>46) head=head.slice(0,46); return head||"Error"; }
@@ -5764,12 +5785,12 @@
     return path || SP.configFile;
   }
   function normalizeConfigStorage(storage){
-    return String(storage||SP.configStorage).toLowerCase()==="sharepoint" ? "sharepoint" : "onedrive";
+    return "sharepoint";
   }
-  function activeConfigFile(){ return normalizeConfigPath(config.remoteConfigPath || SP.configFile); }
-  function activeConfigStorage(){ return normalizeConfigStorage(config.remoteConfigStorage || SP.configStorage); }
-  function activeConfigSharePointUrl(){ return String(config.remoteConfigSharePointUrl || "").trim(); }
-  function configLocationLabel(storage){ return normalizeConfigStorage(storage)==="sharepoint" ? "SharePoint Documents" : "OneDrive My Files"; }
+  function activeConfigFile(){ return SP.configFile; }
+  function activeConfigStorage(){ return SP.configStorage; }
+  function activeConfigSharePointUrl(){ return SP.configSharePointUrl; }
+  function configLocationLabel(storage){ return "Fixed SharePoint JSON"; }
   function encodeDrivePath(path){ return normalizeConfigPath(path).split("/").map(encodeURIComponent).join("/"); }
   function resolveConfigSharePointBase(){
     var url=activeConfigSharePointUrl();
@@ -5799,9 +5820,10 @@
       if(remote.sessions) mergeSharedSessions(remote.sessions);
       if(remote.mapping) config.mapping=remote.mapping;
       if(remote.fleetUrl) config.fleetUrl=String(remote.fleetUrl).trim() || SP.fleetUrl;
-      if(remote.remoteConfigSharePointUrl != null) config.remoteConfigSharePointUrl=String(remote.remoteConfigSharePointUrl||"").trim();
-      if(remote.remoteConfigStorage) config.remoteConfigStorage=normalizeConfigStorage(remote.remoteConfigStorage);
-      if(remote.remoteConfigPath) config.remoteConfigPath=normalizeConfigPath(remote.remoteConfigPath);
+      // Never allow the remote JSON (or stale browser data) to change where sync saves.
+      config.remoteConfigStorage=SP.configStorage;
+      config.remoteConfigPath=SP.configFile;
+      config.remoteConfigSharePointUrl=SP.configSharePointUrl;
       var labelsChanged=normalizeOwnerLabels();
       try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){}
       if(labelsChanged && S365.signedIn) setTimeout(pushRemoteConfig, 0);
@@ -5868,22 +5890,16 @@
       st.appendChild(el("div",{}, el("b",{text:"Signed in: "}), (S365.account.username||S365.account.name||"")));
       st.appendChild(el("div",{}, el("b",{text:"Fleet sheet: "}), S365.item?"connected":"not found"));
       st.appendChild(el("div",{}, el("b",{text:"Fleet link: "}), activeFleetUrl()));
-      st.appendChild(el("div",{}, el("b",{text:"Saved JSON: "}), S365.remote.present?("syncing to "+configLocationLabel(S365.remote.storage)+(S365.remote.by?(" · last edit by "+S365.remote.by):"")):"not created yet (saves on first edit)"));
-      st.appendChild(el("div",{}, el("b",{text:"JSON location: "}), activeConfigStorage()==="sharepoint" && activeConfigSharePointUrl()?activeConfigSharePointUrl():(configLocationLabel(activeConfigStorage())+" / "+activeConfigFile())));
+      st.appendChild(el("div",{}, el("b",{text:"Saved JSON: "}), S365.remote.present?("syncing to the fixed shared SharePoint JSON"+(S365.remote.by?(" · last edit by "+S365.remote.by):"")):"not created yet (saves on first edit)"));
+      st.appendChild(el("div",{}, el("b",{text:"JSON location: "}), activeConfigSharePointUrl()));
     } else {
       st.appendChild(el("div",{text:"Not signed in. Use Sign in (top right) to load drivers and sync edits across the office."}));
     }
     body.appendChild(st);
     if(!S365.signedIn) return;
 
-    var stoRow=el("div",{class:"settings-row"}); stoRow.appendChild(el("label",{text:"Where shared edits are saved"}));
-    var stoSel=el("select",{id:"set-config-storage"});
-    [["sharepoint","SharePoint Documents (shared with the office)"],["onedrive","OneDrive My Files (only me)"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===activeConfigStorage())o.selected=true; stoSel.appendChild(o); });
-    stoRow.appendChild(stoSel); body.appendChild(stoRow);
-    body.appendChild(colRow("JSON file name / path","set-config-path",activeConfigFile()));
-    body.appendChild(colRow("SharePoint JSON folder/file link","set-config-sp-url",activeConfigSharePointUrl()));
+    body.appendChild(el("p",{class:"note",text:"Shared card edits are locked to the fixed SharePoint JSON above so every office user syncs to the same file. This location cannot be changed from individual browsers."}));
     body.appendChild(colRow("Fleet Master Sheet sharing link","set-fleet-url",activeFleetUrl()));
-    body.appendChild(el("p",{class:"note",text:"To choose a SharePoint library or folder, paste its sharing link above. If the link points directly to a JSON file, the file name/path field is ignored. Leave it blank to use the Fleet Master Sheet document library."}));
 
     var wsRow=el("div",{class:"settings-row"}); wsRow.appendChild(el("label",{text:"Worksheet (tab) to read"}));
     var wsSel=el("select",{id:"set-ws"}); (S365.worksheets.length?S365.worksheets:[m.worksheet]).forEach(function(n){ var o=el("option",{value:n,text:n}); if(n===m.worksheet)o.selected=true; wsSel.appendChild(o); });
@@ -5910,9 +5926,9 @@
   }
   function saveMapping(persist){
     function gv(id){ var e=document.getElementById(id); return e?e.value:""; }
-    config.remoteConfigStorage=normalizeConfigStorage(gv("set-config-storage") || activeConfigStorage());
-    config.remoteConfigPath=normalizeConfigPath(gv("set-config-path") || config.remoteConfigPath || SP.configFile);
-    config.remoteConfigSharePointUrl=String(gv("set-config-sp-url") || "").trim();
+    config.remoteConfigStorage=SP.configStorage;
+    config.remoteConfigPath=SP.configFile;
+    config.remoteConfigSharePointUrl=SP.configSharePointUrl;
     config.fleetUrl=String(gv("set-fleet-url") || config.fleetUrl || SP.fleetUrl).trim() || SP.fleetUrl;
     try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){}
     config.mapping={ worksheet:gv("set-ws")||config.mapping.worksheet, nameMode:gv("set-namemode")||"firstlast",
