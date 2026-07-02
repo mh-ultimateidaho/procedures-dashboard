@@ -4179,7 +4179,7 @@
   if(normalizeOwnerLabels()){ try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){} }
 
   var saveTimer=null;
-  function scheduleSave(){ if(saveTimer) clearTimeout(saveTimer); saveTimer=setTimeout(flushConfig, 1500); }
+  function scheduleSave(){ if(saveTimer) clearTimeout(saveTimer); saveTimer=setTimeout(flushConfig, 1500); if(typeof S365!=="undefined" && S365 && S365.signedIn && typeof setSync==="function") setSync("saving","Syncing changes…"); }
   function flushConfig(){ try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){} saveTimer=null; if(typeof pushRemoteConfig==="function") pushRemoteConfig(); }
   function saveState(){ try{ localStorage.setItem(STATE_KEY, JSON.stringify(state)); }catch(e){} }
   function saveSharedSessions(){ saveState(); if(typeof pushRemoteConfig==="function") pushRemoteConfig(); }
@@ -5582,7 +5582,7 @@
   var SP = {
     clientId: "2688e58a-1841-4c5b-8630-f92ff88238cc",
     tenantId: "2c6b3d13-b98c-4605-8fcc-d8eed3579136",
-    scopes: ["https://graph.microsoft.com/Files.Read.All", "https://graph.microsoft.com/Files.ReadWrite", "https://graph.microsoft.com/Sites.Read.All", "https://graph.microsoft.com/Sites.ReadWrite.All"],
+    scopes: ["https://graph.microsoft.com/Sites.ReadWrite.All", "https://graph.microsoft.com/Files.ReadWrite.All"],
     fleetUrl: "https://ultimatecorp.sharepoint.com/:x:/r/sites/UltimateLogisticsLLC/_layouts/15/Doc.aspx?sourcedoc=%7B36A2C772-3F8C-42ED-A901-797013BCFBC0%7D&file=Fleet%20Master%20Sheet.xlsx&action=default&mobileredirect=true",
     // Default: the shared SharePoint site library (the Ultimate Logistics team site).
     // Everyone with site access can read it; office staff with Edit access can write it.
@@ -5607,7 +5607,8 @@
   // onto the shared SharePoint library so edits reach the whole office.
   if(!config._sharedStorageMigrated){ config.remoteConfigStorage="sharepoint"; config._sharedStorageMigrated=true; try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){} }
 
-  function setSync(kind, text){ var c=document.getElementById("sync-status"); if(c){ c.className="sync-chip "+kind; c.textContent=text; } }
+  function setSync(kind, text, detail){ var c=document.getElementById("sync-status"); if(c){ c.className="sync-chip "+kind; c.textContent=text; c.title=detail||text; } }
+  function chipErr(e){ var s=String(e); var head=s.split(":")[0].trim(); if(head.length>46) head=head.slice(0,46); return head||"Error"; }
   function rerenderAll(){ if(currentView==="home") renderHome(); else renderBrowse(); }
 
   function m365Init(){
@@ -5644,8 +5645,7 @@
       .then(function(){ setSync("ok","Synced ✓"); rerenderAll(); })
       .catch(function(e){
         console.warn("M365 connect error", e);
-        if(String(e).indexOf("403")>=0 || String(e).toLowerCase().indexOf("authoriz")>=0) setSync("err","No access — check app permissions");
-        else setSync("err","Data error — open Settings");
+        setSync("err", chipErr(e), String(e));
         rerenderAll();
       });
   }
@@ -5655,7 +5655,7 @@
     return S365.msal.acquireTokenSilent(req).then(function(r){ return r.accessToken; })
       .catch(function(){ S365.msal.acquireTokenRedirect(req); return Promise.reject("redirecting"); });
   }
-  function graph(url, opts){
+  function graph(url, opts, op){
     opts=opts||{};
     return getToken().then(function(tok){
       var h=opts.headers||{}; h["Authorization"]="Bearer "+tok;
@@ -5663,7 +5663,7 @@
       return fetch(full, { method:opts.method||"GET", headers:h, body:opts.body });
     }).then(function(r){
       if(r.status===404) return {__notfound:true};
-      if(!r.ok) return r.text().then(function(t){ return Promise.reject(r.status+" "+t.slice(0,180)); });
+      if(!r.ok) return r.text().then(function(t){ return Promise.reject((op?op+" — ":"")+r.status+(t?(": "+t.slice(0,140)):"")); });
       var ct=r.headers.get("content-type")||"";
       return ct.indexOf("json")>=0 ? r.json() : r.text();
     });
@@ -5672,7 +5672,7 @@
 
   function activeFleetUrl(){ return String(config.fleetUrl || SP.fleetUrl).trim() || SP.fleetUrl; }
   function resolveItem(){
-    return graph("/shares/"+b64url(activeFleetUrl())+"/driveItem?$select=id,name,parentReference").then(function(it){
+    return graph("/shares/"+b64url(activeFleetUrl())+"/driveItem?$select=id,name,parentReference", null, "reading Fleet sheet").then(function(it){
       if(!it || it.__notfound || !it.id) return Promise.reject("Fleet sheet not found");
       S365.item=it.id; S365.driveId=it.parentReference && it.parentReference.driveId;
       if(!S365.driveId) return Promise.reject("Could not resolve document library");
@@ -5680,7 +5680,7 @@
     });
   }
   function listWorksheets(){
-    return graph("/drives/"+S365.driveId+"/items/"+S365.item+"/workbook/worksheets?$select=name")
+    return graph("/drives/"+S365.driveId+"/items/"+S365.item+"/workbook/worksheets?$select=name", null, "reading tabs")
       .then(function(r){ S365.worksheets=((r&&r.value)||[]).map(function(w){return w.name;}); })
       .catch(function(){ /* non-fatal */ });
   }
@@ -5690,7 +5690,7 @@
   }
   function readSheet(name){
     var p="/drives/"+S365.driveId+"/items/"+S365.item+"/workbook/worksheets('"+encodeURIComponent(name)+"')/usedRange(valuesOnly=true)?$select=values";
-    return graph(p).then(function(r){ return (r && r.values) || []; });
+    return graph(p, null, "reading roster tab").then(function(r){ return (r && r.values) || []; });
   }
   function colIndex(head, want){
     if(!want) return -1; var w=String(want).trim().toLowerCase();
@@ -5774,7 +5774,7 @@
   function resolveConfigSharePointBase(){
     var url=activeConfigSharePointUrl();
     if(!url) return Promise.resolve({driveId:S365.driveId, root:true, isFile:false});
-    return graph("/shares/"+b64url(url)+"/driveItem?$select=id,name,file,folder,parentReference").then(function(it){
+    return graph("/shares/"+b64url(url)+"/driveItem?$select=id,name,file,folder,parentReference", null, "resolving JSON link").then(function(it){
       if(!it || it.__notfound || !it.id) return Promise.reject("JSON SharePoint location not found");
       return {driveId:it.parentReference && it.parentReference.driveId, itemId:it.id, name:it.name||"", isFile:!!it.file || /\.json$/i.test(it.name||"")};
     });
@@ -5809,12 +5809,12 @@
   }
   function readRemoteConfigAt(path, storage){
     storage=normalizeConfigStorage(storage || activeConfigStorage());
-    return configPath(path, storage, true).then(function(contentUrl){ return graph(contentUrl); }).then(function(data){
+    return configPath(path, storage, true).then(function(contentUrl){ return graph(contentUrl, null, "reading JSON"); }).then(function(data){
       if(data && data.__notfound) return false;
       var remote = (typeof data==="string") ? JSON.parse(data) : data;
       applyRemoteConfig(remote);
       S365.remote.present=true; S365.remote.path=normalizeConfigPath(path); S365.remote.storage=storage;
-      configPath(path, storage, false).then(function(metaUrl){ return graph(metaUrl+"?$select=eTag,lastModifiedDateTime,lastModifiedBy"); }).then(function(meta){
+      configPath(path, storage, false).then(function(metaUrl){ return graph(metaUrl+"?$select=eTag,lastModifiedDateTime,lastModifiedBy", null, "reading JSON info"); }).then(function(meta){
         if(meta && !meta.__notfound){ S365.remote.eTag=meta.eTag; S365.remote.at=meta.lastModifiedDateTime;
           S365.remote.by=meta.lastModifiedBy && meta.lastModifiedBy.user && meta.lastModifiedBy.user.displayName; }
       }).catch(function(){});
@@ -5849,13 +5849,13 @@
   }
   function pushRemoteConfig(){
     if(!S365.signedIn) return;        // local-only until signed in
-    setSync("saving","Saving…");
+    setSync("saving","Syncing changes…");
     var payload={ version:1, savedAt:new Date().toISOString(), remoteConfigStorage:activeConfigStorage(), remoteConfigPath:activeConfigFile(), remoteConfigSharePointUrl:activeConfigSharePointUrl(),
       cardOverrides:config.cardOverrides, customCards:config.customCards, hiddenCards:config.hiddenCards, mapping:config.mapping, fleetUrl:activeFleetUrl(),
       sessions:pruneDeletedSessions(state.sessions), deletedSessions:config.deletedSessions||{} };
-    configPath(null, null, true).then(function(contentUrl){ return graph(contentUrl, { method:"PUT", body:JSON.stringify(payload,null,2), headers:{"Content-Type":"application/json"} }); })
+    configPath(null, null, true).then(function(contentUrl){ return graph(contentUrl, { method:"PUT", body:JSON.stringify(payload,null,2), headers:{"Content-Type":"application/json"} }, "saving JSON"); })
       .then(function(){ S365.remote.present=true; S365.remote.storage=activeConfigStorage(); S365.remote.path=activeConfigFile(); setSync("ok","Synced ✓"); })
-      .catch(function(e){ if(String(e).indexOf("403")>=0) setSync("err","No write access"); else setSync("err","Save failed — local only"); });
+      .catch(function(e){ setSync("err", chipErr(e), String(e)); });
   }
 
   /* ----- settings modal ----- */
@@ -5903,7 +5903,7 @@
 
     body.appendChild(el("div",{style:"display:flex;gap:10px;justify-content:flex-end;margin-top:6px"},
       el("button",{class:"btn",text:"Reload data", onclick:function(){ saveMapping(false); setSync("saving","Reloading…"); reconnectM365().then(function(){ setSync("ok","Synced ✓"); rerenderAll(); renderSettings(); }).catch(function(){ setSync("err","Couldn’t read that data"); renderSettings(); }); }}),
-      el("button",{class:"btn primary",text:"Save settings", onclick:function(){ saveMapping(true); setSync("saving","Saving…"); reconnectM365().then(function(){ setSync("ok","Synced ✓"); rerenderAll(); closeSettings(); }).catch(function(){ setSync("err","Saved locally — couldn’t reconnect"); closeSettings(); }); }})
+      el("button",{class:"btn primary",text:"Save settings", onclick:function(){ saveMapping(true); setSync("saving","Syncing changes…"); reconnectM365().then(function(){ setSync("ok","Synced ✓"); rerenderAll(); closeSettings(); }).catch(function(){ setSync("err","Saved locally — couldn’t reconnect"); closeSettings(); }); }})
     ));
 
     function colRow(lbl,id,val){ var r=el("div",{class:"settings-row"}); r.appendChild(el("label",{text:lbl})); var i=el("input",{type:"text",id:id}); i.value=val||""; r.appendChild(i); return r; }
