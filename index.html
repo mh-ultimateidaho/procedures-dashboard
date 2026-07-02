@@ -4540,6 +4540,48 @@
     if(cust){ cust.lastEdited=Date.now(); }
     else { getMutableCard(cardId).lastEdited=Date.now(); }
   }
+  function cardItemIds(card){
+    var ids={};
+    (card.steps||[]).forEach(function(it){ if(it && it.id) ids[it.id]=1; });
+    (card.blocks||[]).forEach(function(b){ (b.items||[]).forEach(function(it){ if(it && it.id) ids[it.id]=1; }); });
+    return ids;
+  }
+  function sessionCheckIdsForCard(card, sess){
+    var out=[];
+    function includeItem(it, listKey, opts){
+      if(!it || !it.id) return;
+      var newAuthHidden = it.newAuthOnly && card.eventType==="authority-change" && !(sess && sess.brandNewAuth);
+      var toggleHidden = false;
+      if(it.toggle){
+        var on = !!(sess && sess.toggleState && sess.toggleState[it.toggle]);
+        toggleHidden = it.toggleNot ? on : !on;
+      }
+      if(newAuthHidden || toggleHidden) return;
+      if(itemDisplayMode(card, listKey, it, opts)==="check") out.push(it.id);
+    }
+    (card.steps||[]).forEach(function(it){ includeItem(it, "steps", {ordered:true, checkbox:false}); });
+    (card.blocks||[]).forEach(function(b){ (b.items||[]).forEach(function(it){ includeItem(it, b.id, {ordered:false, checkbox:true}); }); });
+    return out;
+  }
+  function syncSessionsForCard(cardId){
+    var card=getEffectiveCard(cardId); if(!card || !state || !Array.isArray(state.sessions)) return;
+    var valid=cardItemIds(card);
+    state.sessions.forEach(function(sess){
+      if(!sess || sess.cardId!==cardId) return;
+      if(sess.checks){ Object.keys(sess.checks).forEach(function(id){ if(!valid[id]) delete sess.checks[id]; }); }
+      if(sess.notes){ Object.keys(sess.notes).forEach(function(id){ if(!valid[id]) delete sess.notes[id]; }); }
+      var checkIds=sessionCheckIdsForCard(card, sess);
+      sess.total=checkIds.length;
+      sess.checked=checkIds.filter(function(id){ return !!(sess.checks && sess.checks[id]); }).length;
+      sess.updatedAt=Date.now();
+    });
+    saveState();
+  }
+  function persistCardEdit(cardId){
+    touchCard(cardId);
+    syncSessionsForCard(cardId);
+    scheduleSave();
+  }
   function fmtMDY(ts){
     if(!ts) return "n/a";
     var d=new Date(ts); if(isNaN(d.getTime())) return "n/a";
@@ -4858,7 +4900,7 @@
     }
     if(isEditable(card)){
       var editBtn=el("button",{class:"icon-btn"+(modalState.editMode?" on":""), text:modalState.editMode?"✓ Done editing":"✎ Edit card", onclick:function(){
-        captureContextForm(); captureChecks(); modalState.editMode=!modalState.editMode; renderModal();
+        closePopup(); captureContextForm(); captureChecks(); modalState.editMode=!modalState.editMode; renderModal();
       }});
       mActions.appendChild(editBtn);
       if(modalState.editMode){
@@ -4867,8 +4909,7 @@
           captureContextForm(); captureChecks();
           var mut=getMutableCard(card.id);
           mut.defaultMode = effectiveCardDefaultMode(mut)==="number" ? "check" : "number";
-          touchCard(card.id);
-          scheduleSave();
+          persistCardEdit(card.id);
           renderModal();
         }}));
         mActions.appendChild(el("button",{class:"icon-btn", style:"border-color:#e6b5ae;color:var(--bad)", text:"🗑 Delete card", onclick:function(){ confirmDelete(card.id); }}));
@@ -5178,7 +5219,7 @@
     var mut=getMutableCard(cardId);
     var list=getList(mut, listKey);
     list.push({id:uid("it"), text:"New "+(listKey==="steps"?"step":"item")});
-    touchCard(cardId); scheduleSave(); reRenderModalPreserving();
+    persistCardEdit(cardId); reRenderModalPreserving();
   }
   function deleteItem(cardId, listKey, itemId){
     var mut=getMutableCard(cardId);
@@ -5186,7 +5227,7 @@
     var i=list.findIndex(function(x){return x.id===itemId;});
     if(i>=0) list.splice(i,1);
     delete modalState.checks[itemId];
-    touchCard(cardId); scheduleSave(); reRenderModalPreserving();
+    persistCardEdit(cardId); reRenderModalPreserving();
   }
   function moveWithin(list, fromId, toId, after){
     var fi=list.findIndex(function(x){return x.id===fromId;}); if(fi<0) return;
@@ -5220,7 +5261,7 @@
       e.preventDefault();
       var rect=row.getBoundingClientRect(); var after=(e.clientY-rect.top)>rect.height/2;
       var mut=getMutableCard(card.id); var list=getList(mut, listKey);
-      if(dragInfo.id!==itemId){ moveWithin(list, dragInfo.id, itemId, after); touchCard(card.id); scheduleSave(); }
+      if(dragInfo.id!==itemId){ moveWithin(list, dragInfo.id, itemId, after); persistCardEdit(card.id); }
       clearDragMarks(); dragInfo=null;
       reRenderModalPreserving();
     });
@@ -5229,7 +5270,12 @@
 
   /* ----- edit popup ----- */
   var popup=null;
-  function closePopup(){ if(popup){ popup.remove(); popup=null; document.removeEventListener("mousedown", popupOutside, true); } }
+  function closePopup(opts){
+    if(popup){
+      if(!(opts && opts.discard) && typeof popup._commit==="function" && !popup._committed){ popup._commit(); }
+      popup.remove(); popup=null; document.removeEventListener("mousedown", popupOutside, true);
+    }
+  }
   function popupOutside(e){ if(popup && !popup.contains(e.target)) closePopup(); }
   function openEditPopup(card, listKey, itemId, anchorBtn){
     closePopup();
@@ -5267,24 +5313,29 @@
       tgSel.appendChild(oOnly); tgSel.appendChild(oNot);
     });
     popup.appendChild(el("div",{class:"field"}, el("label",{text:"Show only when (special-instruction checkbox)"}), tgSel));
+    function commitItemEdit(){
+      item.text=ta.value;
+      var u=urlF.value.trim();
+      if(u){ item.linkUrl=u; item.linkLabel=labelF.value.trim()||undefined; }
+      else { delete item.linkUrl; delete item.linkLabel; }
+      if(modeSel.value){ item.mode=modeSel.value; } else { delete item.mode; }
+      var tv=tgSel.value;
+      if(tv){ if(tv.charAt(0)==="!"){ item.toggle=tv.slice(1); item.toggleNot=true; } else { item.toggle=tv; delete item.toggleNot; } }
+      else { delete item.toggle; delete item.toggleNot; }
+      popup._committed=true;
+      persistCardEdit(card.id);
+    }
+    popup._commit=function(){ commitItemEdit(); reRenderModalPreserving(); };
     popup.appendChild(el("div",{class:"pop-actions"},
       el("button",{class:"btn small primary",text:"Save", onclick:function(){
-        item.text=ta.value;
-        var u=urlF.value.trim();
-        if(u){ item.linkUrl=u; item.linkLabel=labelF.value.trim()||undefined; }
-        else { delete item.linkUrl; delete item.linkLabel; }
-        if(modeSel.value){ item.mode=modeSel.value; } else { delete item.mode; }
-        var tv=tgSel.value;
-        if(tv){ if(tv.charAt(0)==="!"){ item.toggle=tv.slice(1); item.toggleNot=true; } else { item.toggle=tv; delete item.toggleNot; } }
-        else { delete item.toggle; delete item.toggleNot; }
-        touchCard(card.id); scheduleSave(); closePopup(); reRenderModalPreserving();
+        commitItemEdit(); closePopup({discard:true}); reRenderModalPreserving();
       }}),
       el("button",{class:"btn small",text:"Reset to original", onclick:function(){
         var orig=findOriginalItem(card.id, listKey, itemId);
         if(orig){ ta.value=orig.text||""; labelF.value=orig.linkLabel||""; urlF.value=orig.linkUrl||""; modeSel.value=orig.mode||""; tgSel.value=(orig.toggle?((orig.toggleNot?"!":"")+orig.toggle):""); }
         else { ta.value=""; labelF.value=""; urlF.value=""; modeSel.value=""; tgSel.value=""; }
       }}),
-      el("button",{class:"btn small",text:"Cancel", onclick:closePopup})
+      el("button",{class:"btn small",text:"Cancel", onclick:function(){ closePopup({discard:true}); }})
     ));
 
     document.body.appendChild(popup);
@@ -5392,12 +5443,12 @@
     if(label==null) return; label=String(label).trim(); if(!label) return;
     var mut=getMutableCard(cardId); mut.toggles=mut.toggles||[];
     mut.toggles.push({id:uid("tg"), label:label});
-    touchCard(cardId); scheduleSave(); reRenderModalPreserving();
+    persistCardEdit(cardId); reRenderModalPreserving();
   }
   function renameToggle(cardId, tid){
     var mut=getMutableCard(cardId); var t=(mut.toggles||[]).filter(function(x){return x.id===tid;})[0]; if(!t) return;
     var label=window.prompt("Rename this checkbox:", t.label); if(label==null) return; label=String(label).trim(); if(!label) return;
-    t.label=label; touchCard(cardId); scheduleSave(); reRenderModalPreserving();
+    t.label=label; persistCardEdit(cardId); reRenderModalPreserving();
   }
   function deleteToggle(cardId, tid){
     if(!window.confirm("Delete this checkbox? Items set to “only show when” it will become always-visible.")) return;
@@ -5406,7 +5457,7 @@
     (mut.steps||[]).forEach(function(s){ if(s.toggle===tid){ delete s.toggle; delete s.toggleNot; } });
     (mut.blocks||[]).forEach(function(b){ (b.items||[]).forEach(function(it){ if(it.toggle===tid){ delete it.toggle; delete it.toggleNot; } }); });
     if(modalState.toggleState) delete modalState.toggleState[tid];
-    touchCard(cardId); scheduleSave(); reRenderModalPreserving();
+    persistCardEdit(cardId); reRenderModalPreserving();
   }
 
   /* ----- per-step bold notes (operational, saved with the session) ----- */
