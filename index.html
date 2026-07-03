@@ -4181,8 +4181,10 @@
   config.customCards = config.customCards || [];
   config.hiddenCards = config.hiddenCards || [];
   config.deletedSessions = config.deletedSessions || {};
+  config.userPins = config.userPins || {};
 
-  // Pins and recents stay personal. In-progress sessions sync through SharePoint when signed in.
+  // Recents stay personal. Pins are saved per signed-in user in the shared JSON.
+  // In-progress sessions sync through SharePoint when signed in.
   var state = safeParse(STATE_KEY, null) || {pins:[], recents:[], sessions:[]};
   state.pins = state.pins || []; state.recents = state.recents || []; state.sessions = state.sessions || [];
   state.sessions = pruneDeletedSessions(state.sessions);
@@ -4194,6 +4196,48 @@
   function flushConfig(){ try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){} saveTimer=null; if(typeof pushRemoteConfig==="function") pushRemoteConfig(); }
   function saveState(){ try{ localStorage.setItem(STATE_KEY, JSON.stringify(state)); }catch(e){} }
   function saveSharedSessions(){ saveState(); if(typeof pushRemoteConfig==="function") pushRemoteConfig(); }
+  function currentUserKey(){
+    if(S365 && S365.account){
+      return String(S365.account.username || S365.account.homeAccountId || S365.account.localAccountId || S365.account.name || "").trim().toLowerCase() || "local";
+    }
+    return "local";
+  }
+  function normalizePins(list){
+    var seen={};
+    return (Array.isArray(list)?list:[]).filter(function(id){
+      id=String(id||"");
+      if(!id || seen[id]) return false;
+      seen[id]=true;
+      return !!getEffectiveCard(id) && !isHidden(id);
+    });
+  }
+  function loadPinsForCurrentUser(){
+    config.userPins = config.userPins || {};
+    var key=currentUserKey();
+    var remotePins=normalizePins(config.userPins[key] || []);
+    if(S365 && S365.signedIn){
+      // One-time migration: if this person has old local pins but no JSON pin entry yet,
+      // keep them instead of wiping their setup during the upgrade.
+      var localPins=normalizePins(state.pins || []);
+      if(remotePins.length===0 && localPins.length>0 && !config.userPins[key]){
+        remotePins=localPins;
+        config.userPins[key]=remotePins;
+        try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){}
+        setTimeout(pushRemoteConfig,0);
+      }
+    }
+    state.pins=remotePins;
+    saveState();
+  }
+  function savePinsForCurrentUser(){
+    config.userPins = config.userPins || {};
+    var key=currentUserKey();
+    state.pins=normalizePins(state.pins || []);
+    config.userPins[key]=state.pins.slice();
+    saveState();
+    try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){}
+    if(S365 && S365.signedIn) pushRemoteConfig();
+  }
   function sessionStamp(s){ return Number((s && (s.updatedAt || s.savedAt)) || 0); }
   function pruneDeletedSessions(list){
     var del=config.deletedSessions||{};
@@ -4887,7 +4931,7 @@
   function togglePin(id){
     var i=state.pins.indexOf(id);
     if(i>=0) state.pins.splice(i,1); else state.pins.push(id);
-    saveState();
+    savePinsForCurrentUser();
     if(currentView==="home") renderHome(); else renderBrowse();
   }
   function pushRecent(id){
@@ -6153,10 +6197,12 @@
       if(remote.cardOverrides) config.cardOverrides=remote.cardOverrides;
       if(remote.customCards) config.customCards=remote.customCards;
       if(remote.hiddenCards) config.hiddenCards=remote.hiddenCards;
+      if(remote.userPins && typeof remote.userPins==="object") config.userPins=remote.userPins;
       if(remote.deletedSessions) mergeDeletedSessions(remote.deletedSessions);
       if(remote.sessions) mergeSharedSessions(remote.sessions);
       if(remote.mapping) config.mapping=remote.mapping;
       if(remote.fleetUrl) config.fleetUrl=String(remote.fleetUrl).trim() || SP.fleetUrl;
+      loadPinsForCurrentUser();
       // Never allow the remote JSON (or stale browser data) to change where sync saves.
       config.remoteConfigStorage=SP.configStorage;
       config.remoteConfigPath=SP.configFile;
@@ -6213,7 +6259,7 @@
     if(!S365.signedIn) return;        // local-only until signed in
     setSync("saving","Syncing changes…");
     var payload={ version:1, savedAt:new Date().toISOString(), remoteConfigStorage:activeConfigStorage(), remoteConfigPath:activeConfigFile(), remoteConfigSharePointUrl:activeConfigSharePointUrl(),
-      cardOverrides:config.cardOverrides, customCards:config.customCards, hiddenCards:config.hiddenCards, mapping:config.mapping, fleetUrl:activeFleetUrl(),
+      cardOverrides:config.cardOverrides, customCards:config.customCards, hiddenCards:config.hiddenCards, userPins:config.userPins||{}, mapping:config.mapping, fleetUrl:activeFleetUrl(),
       sessions:pruneDeletedSessions(state.sessions), deletedSessions:config.deletedSessions||{} };
     configPath(null, null, true).then(function(contentUrl){ return graph(contentUrl, { method:"PUT", body:JSON.stringify(payload,null,2), headers:{"Content-Type":"application/json"} }, "saving JSON"); })
       .then(function(){ S365.remote.present=true; S365.remote.storage=activeConfigStorage(); S365.remote.path=activeConfigFile(); setSync("ok","Synced ✓"); })
@@ -6232,6 +6278,7 @@
       st.appendChild(el("div",{}, el("b",{text:"Fleet link: "}), activeFleetUrl()));
       st.appendChild(el("div",{}, el("b",{text:"Saved JSON: "}), S365.remote.present?("syncing to the fixed shared SharePoint JSON"+(S365.remote.by?(" · last edit by "+S365.remote.by):"")):"not created yet (saves on first edit)"));
       st.appendChild(el("div",{}, el("b",{text:"JSON location: "}), activeConfigSharePointUrl()));
+      st.appendChild(el("div",{}, el("b",{text:"Your pins: "}), String((state.pins||[]).length)+" saved for "+(S365.account.username||S365.account.name||"this sign-in")));
     } else {
       st.appendChild(el("div",{text:"Not signed in. Use Sign in (top right) to load drivers and sync edits across the office."}));
     }
