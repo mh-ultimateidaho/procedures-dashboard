@@ -111,9 +111,6 @@
   .toggle-row{display:flex;align-items:center;gap:9px;margin-top:10px;font-size:13.5px;font-weight:600}
   .toggle-row input{width:16px;height:16px}
   .ctx-apply{margin-top:12px}
-  .folder-link-row{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
-  .folder-link-row .folder-btn{display:inline-flex;align-items:center;gap:6px;text-decoration:none;border:1px solid #c7d7f2;background:#fff;color:var(--accent);border-radius:9px;padding:7px 10px;font-size:13px;font-weight:700}
-  .folder-link-row .folder-btn:hover{background:#edf4ff;border-color:var(--accent)}
 
   /* Content */
   .content-block{margin-bottom:18px}
@@ -151,6 +148,29 @@
   .token-hint{font-size:11px;font-weight:700;color:var(--muted)}
   .token-btn{border:1px solid #d4e0f6;background:var(--accent-soft);color:var(--accent);border-radius:6px;padding:2px 8px;font-size:11.5px;font-weight:600;cursor:pointer}
   .token-btn:hover{background:#dfeafb}
+
+  /* --- cover page generator --- */
+  .cover-controls{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .cover-controls .field{flex:1;min-width:150px}
+  .cover-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px}
+  .cover-fields .field label{font-size:11px;font-weight:700;color:var(--muted)}
+  .cover-fields input{border:1px solid var(--line-strong);border-radius:8px;padding:7px 9px;width:100%}
+  .cover-preview{border:1px solid var(--line);border-radius:12px;background:#fff;padding:8px;margin-bottom:4px}
+  .cover-sheet{max-width:520px;margin:0 auto;padding:40px 30px;text-align:center;font-family:var(--sans);color:#000}
+  .cover-sheet .cs-sm{font-size:14px;font-weight:700;letter-spacing:.02em}
+  .cover-sheet .cs-md{font-size:17px;font-weight:700;margin-top:2px}
+  .cover-sheet .cs-lg{font-size:26px;font-weight:800;margin:4px 0}
+  .cover-sheet .cs-row{font-size:15px;font-weight:700;margin-top:1px}
+  #cover-print-area{display:none}
+  @media print{
+    body{visibility:hidden}
+    #cover-print-area{display:block;visibility:visible;position:absolute;left:0;top:0;width:100%}
+    #cover-print-area *{visibility:visible}
+    #cover-print-area .cover-sheet{max-width:none;padding:120px 40px}
+    #cover-print-area .cs-lg{font-size:34px}
+    #cover-print-area .cs-md{font-size:20px}
+    #cover-print-area .cs-row{font-size:18px}
+  }
   .toggle-bar{display:flex;flex-direction:column;gap:7px;margin-bottom:16px}
   .toggle-bar .tg{display:flex;align-items:center;gap:9px;font-size:13.5px;font-weight:600;background:var(--accent-soft);border:1px solid #d4e0f6;border-radius:9px;padding:8px 11px}
   .toggle-bar .tg input{width:16px;height:16px;flex:none}
@@ -195,12 +215,6 @@
   .b-block{border:1px solid var(--line);border-radius:9px;padding:10px;margin-bottom:10px}
   .b-block .bb-head{display:flex;gap:8px;align-items:center;margin-bottom:8px}
   .b-block select{border:1px solid var(--line-strong);border-radius:8px;padding:6px 8px}
-
-  .block-toolbar{display:inline-flex;gap:5px;margin-left:7px;vertical-align:middle}
-  .block-toolbar .mini{padding:1px 6px;font-size:11px;background:#fff}
-  .summary-line{display:flex;align-items:center;gap:8px}
-  .summary-line .summary-text{flex:1}
-  .block-add-row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 18px}
 
   .parse-error{background:#fdf1ef;border:1px solid #e6b5ae;color:#7a241a;border-radius:10px;padding:12px 14px;margin-bottom:18px;font-size:13.5px}
   .hidden-sec .card{opacity:.7}
@@ -3384,15 +3398,15 @@
     "kind": "before",
     "items": [
      {
-      "text": "Get [NEW] permits under [AUTH].",
+      "text": "Get permits.",
       "id": "chk-new-driver-b1i1"
      },
      {
-      "text": "Add [NEW] transponder in OR under [AUTH] (non B#).",
+      "text": "Add transponder in OR (non B#).",
       "id": "chk-new-driver-b1i2"
      },
      {
-      "text": "Truck docs for truck [NEW] under [AUTH]. Email & upload to cloud.",
+      "text": "Truck docs. Email & upload to cloud.",
       "id": "chk-new-driver-b1i3"
      },
      {
@@ -3400,7 +3414,7 @@
       "id": "chk-new-driver-b1i4"
      },
      {
-      "text": "Take picture of truck [NEW].",
+      "text": "Take picture of truck.",
       "id": "chk-new-driver-b1i5"
      }
     ],
@@ -3411,11 +3425,11 @@
     "kind": "norush",
     "items": [
      {
-      "text": "Check truck [NEW] cloud file has DOT #[DOT], reg & ID card.",
+      "text": "Check truck cloud file has DOT, reg & ID card.",
       "id": "chk-new-driver-b2i1"
      },
      {
-      "text": "Carrier package for [DRIVER]. Upload to cloud.",
+      "text": "Carrier package. Upload to cloud.",
       "id": "chk-new-driver-b2i2"
      },
      {
@@ -3423,25 +3437,25 @@
       "id": "chk-new-driver-b2i3"
      },
      {
-      "text": "Update permit folders on cloud for [NEW] under [AUTH].",
+      "text": "Update permit folders on cloud.",
       "id": "chk-new-driver-b2i4"
      },
      {
-      "text": "Update permit sheets on cloud for [NEW] under [AUTH].",
+      "text": "Update permit sheets on cloud.",
       "id": "chk-new-driver-b2i5"
      },
      {
-      "text": "Update Quartix. Add truck [NEW] to dispatch and active group; add [DRIVER] to truck name.",
+      "text": "Update Quartix. Add truck to dispatch and active group; add driver name to truck name.",
       "linkUrl": "https://www.quartix.com/",
       "linkLabel": "Quartix",
       "id": "chk-new-driver-b2i6"
      },
      {
-      "text": "Scan & upload 2-pg lease to [DRIVER] cloud folder.",
+      "text": "Scan & upload 2-pg lease to the driver cloud folder.",
       "id": "chk-new-driver-b2i7"
      },
      {
-      "text": "Scan & upload DOP to [DRIVER] cloud folder.",
+      "text": "Scan & upload DOP to the driver cloud folder.",
       "id": "chk-new-driver-b2i8"
      },
      {
@@ -3492,7 +3506,7 @@
       "id": "chk-new-driver-b3i1"
      },
      {
-      "text": "Driver’s Authority Package for [AUTH].",
+      "text": "Two-pg Lease w/ Form.",
       "id": "chk-new-driver-b3i2"
      },
      {
@@ -3520,7 +3534,7 @@
       "id": "chk-new-driver-b3i8"
      },
      {
-      "text": "Add [NEW] to line-items to show monthly truck payment on 2-pg lease.",
+      "text": "Add to line-items to show monthly truck payment on 2-pg lease.",
       "id": "chk-new-driver-b3i9"
      }
     ],
@@ -3555,33 +3569,33 @@
     "kind": "before",
     "items": [
      {
-      "text": "Cancel old permits for [OLD] under [OLD_AUTH].",
+      "text": "Cancel old permits.",
       "id": "chk-authority-change-b1i1"
      },
      {
-      "text": "UCR for [NEW_AUTH] (if new auth).",
+      "text": "UCR (if new auth).",
       "newAuthOnly": true,
       "id": "chk-authority-change-b1i2"
      },
      {
-      "text": "Permit accounts set-up for [NEW_AUTH] (POAs).",
+      "text": "Permit accounts set-up (POAs).",
       "newAuthOnly": true,
       "id": "chk-authority-change-b1i3"
      },
      {
-      "text": "Get [NEW] permits under [NEW_AUTH].",
+      "text": "Get new permits.",
       "id": "chk-authority-change-b1i4"
      },
      {
-      "text": "Add [NEW] transponder in OR under [NEW_AUTH] (non B#).",
+      "text": "Add transponder in OR (non B#).",
       "id": "chk-authority-change-b1i5"
      },
      {
-      "text": "Truck docs for truck [NEW] under [NEW_AUTH]. Email & upload to cloud.",
+      "text": "Truck docs. Email & upload to cloud.",
       "id": "chk-authority-change-b1i6"
      },
      {
-      "text": "Take picture of truck [NEW].",
+      "text": "Take picture of truck.",
       "id": "chk-authority-change-b1i7"
      }
     ],
@@ -3592,19 +3606,19 @@
     "kind": "norush",
     "items": [
      {
-      "text": "Check truck [NEW] cloud file has DOT #[NEW_DOT], reg & ID card.",
+      "text": "Check truck cloud file has DOT, reg & ID card.",
       "id": "chk-authority-change-b2i1"
      },
      {
-      "text": "Add [NEW_AUTH] to “Ultimate Contractual Carriers”.",
+      "text": "Add auth to “Ultimate Contractual Carriers”.",
       "id": "chk-authority-change-b2i2"
      },
      {
-      "text": "Email Disp & Office new Carrier Packet for [NEW_AUTH].",
+      "text": "Email Disp & Office new Carrier Packet (replace ^).",
       "id": "chk-authority-change-b2i3"
      },
      {
-      "text": "Update Quartix. Old truck [OLD]: add “Shop” in front of name. New truck [NEW]: add to dispatch and active group; add [DRIVER] to truck name.",
+      "text": "Get new MVR.",
       "id": "chk-authority-change-b2i4"
      },
      {
@@ -3612,7 +3626,7 @@
       "id": "chk-authority-change-b2i5"
      },
      {
-      "text": "Carrier package for [DRIVER]. Upload to cloud; move old package to old folder.",
+      "text": "Carrier package. Upload to cloud; move old package to old folder.",
       "id": "chk-authority-change-b2i6"
      },
      {
@@ -3621,19 +3635,19 @@
       "id": "chk-authority-change-b2i7"
      },
      {
-      "text": "Update permit folders on cloud for [NEW] under [NEW_AUTH].",
+      "text": "Update permit folders on cloud.",
       "id": "chk-authority-change-b2i8"
      },
      {
-      "text": "Update permit sheets on cloud for [NEW] under [NEW_AUTH].",
+      "text": "Update permit sheets on cloud.",
       "id": "chk-authority-change-b2i9"
      },
      {
-      "text": "Update current trucks & drivers sheet: [DRIVER] · [OLD] → [NEW] · [NEW_AUTH].",
+      "text": "Update current trucks & drivers sheet.",
       "id": "chk-authority-change-b2i10"
      },
      {
-      "text": "Update driver authority sheet: [DRIVER] from [OLD_AUTH] to [NEW_AUTH].",
+      "text": "Update driver authority sheet.",
       "id": "chk-authority-change-b2i11"
      }
     ],
@@ -3644,7 +3658,7 @@
     "kind": "kj",
     "items": [
      {
-      "text": "Driver’s Authority Package for [NEW_AUTH].",
+      "text": "Driver’s Authority Package.",
       "id": "chk-authority-change-b3i1"
      },
      {
@@ -3682,7 +3696,7 @@
       "id": "chk-authority-change-b3i8"
      },
      {
-      "text": "Add [NEW_AUTH] to External Carriers in ITS.",
+      "text": "Add authority to External Carriers in ITS.",
       "id": "chk-authority-change-b3i9"
      }
     ],
@@ -3693,7 +3707,7 @@
     "kind": "amie",
     "items": [
      {
-      "text": "Bestpass/prepass swap for [NEW] under [NEW_AUTH].",
+      "text": "Bestpass/prepass swap.",
       "id": "chk-authority-change-b4i1"
      },
      {
@@ -3701,7 +3715,7 @@
       "id": "chk-authority-change-b4i2"
      },
      {
-      "text": "Email Blueline to remove [DRIVER] from [OLD_AUTH] D&A policy.",
+      "text": "Email Blueline to remove from previous company.",
       "id": "chk-authority-change-b4i3"
      }
     ],
@@ -3721,63 +3735,63 @@
     "kind": "norush",
     "items": [
      {
-      "text": "Remove [AUTH] from “Ultimate Contractual Carriers”.",
+      "text": "Remove auth from “Ultimate Contractual Carriers”.",
       "id": "chk-driver-quits-b1i1"
      },
      {
-      "text": "Email Disp & Office new Carrier Packet for [AUTH].",
+      "text": "Email Disp & Office new Carrier Packet (replace ^).",
       "id": "chk-driver-quits-b1i2"
      },
      {
-      "text": "Cancel permits / close accounts for [AUTH].",
+      "text": "Cancel permits / close accounts.",
       "id": "chk-driver-quits-b1i3"
      },
      {
-      "text": "Move/rename permit files for [AUTH] to canceled.",
+      "text": "Move/rename permit files to canceled.",
       "id": "chk-driver-quits-b1i4"
      },
      {
-      "text": "Update permit sheets for [AUTH].",
+      "text": "Update permit sheets.",
       "id": "chk-driver-quits-b1i5"
      },
      {
-      "text": "Move [DRIVER] cloud folder to old.",
+      "text": "Move driver cloud folder to old.",
       "id": "chk-driver-quits-b1i6"
      },
      {
-      "text": "Move ID card on truck [OLD] cloud to Old Docs.",
+      "text": "Move ID card on truck cloud to Old Docs.",
       "id": "chk-driver-quits-b1i7"
      },
      {
-      "text": "Update current trucks & drivers sheet: remove [DRIVER] · [OLD] · [AUTH].",
+      "text": "Update current trucks & drivers sheet.",
       "id": "chk-driver-quits-b1i8"
      },
      {
-      "text": "Update driver authority sheet: remove [DRIVER] from [AUTH].",
+      "text": "Update driver authority sheet.",
       "id": "chk-driver-quits-b1i9"
      },
      {
-      "text": "Remove [DRIVER] from safety Excel sheet (CDL/Med/MVR checklist).",
+      "text": "Remove from safety Excel sheet (CDL/Med/MVR checklist).",
       "id": "chk-driver-quits-b1i10"
      },
      {
-      "text": "Remove [DRIVER] from email contacts and contact lists.",
+      "text": "Remove from email contacts and contact lists.",
       "id": "chk-driver-quits-b1i11"
      },
      {
-      "text": "Remove [DRIVER] from Drivers Information on Drivers & Locations.",
+      "text": "Remove from Drivers Information on Drivers & Locations.",
       "id": "chk-driver-quits-b1i12"
      },
      {
-      "text": "Disable auto-run and deactivate [DRIVER] on embark.",
+      "text": "Disable auto-run and deactivate on embark.",
       "id": "chk-driver-quits-b1i13"
      },
      {
-      "text": "Remove [DRIVER] mailbox tag.",
+      "text": "Remove mailbox tag.",
       "id": "chk-driver-quits-b1i14"
      },
      {
-      "text": "Quartix — remove truck [OLD] from all groups except Ult Log All and Trucks No Driver. Change name to No Driver.",
+      "text": "Quartix — remove truck from all groups except Ult Log All and Trucks No Driver. Change name to No Driver.",
       "linkUrl": "https://www.quartix.com/",
       "linkLabel": "Quartix",
       "id": "chk-driver-quits-b1i15"
@@ -3790,11 +3804,11 @@
     "kind": "amie",
     "items": [
      {
-      "text": "Email Blueline to remove [DRIVER] from [AUTH] D&A policy.",
+      "text": "Email Blueline to close D&A policy.",
       "id": "chk-driver-quits-b2i1"
      },
      {
-      "text": "Close prepass account for [AUTH].",
+      "text": "Close prepass account.",
       "id": "chk-driver-quits-b2i2"
      }
     ],
@@ -3818,23 +3832,23 @@
       "id": "chk-perm-truck-b1i1"
      },
      {
-      "text": "Cancel old permits for [OLD] under [AUTH].",
+      "text": "Cancel old permits.",
       "id": "chk-perm-truck-b1i2"
      },
      {
-      "text": "Get [NEW] permits under [AUTH].",
+      "text": "Get new permits.",
       "id": "chk-perm-truck-b1i3"
      },
      {
-      "text": "Add [NEW] transponder in OR under [AUTH] (non B#).",
+      "text": "Add transponder in OR (non B#).",
       "id": "chk-perm-truck-b1i4"
      },
      {
-      "text": "Truck docs for truck [NEW] under [AUTH]. Email & upload to cloud.",
+      "text": "Truck docs. Email & upload to cloud.",
       "id": "chk-perm-truck-b1i5"
      },
      {
-      "text": "Take picture of truck [NEW].",
+      "text": "Take picture of truck.",
       "id": "chk-perm-truck-b1i6"
      }
     ],
@@ -3845,21 +3859,21 @@
     "kind": "norush",
     "items": [
      {
-      "text": "Check truck [NEW] cloud file has DOT #[DOT], reg & ID card.",
+      "text": "Check truck cloud file has DOT, reg & ID card.",
       "id": "chk-perm-truck-b2i1"
      },
      {
-      "text": "Carrier package for [DRIVER]. Upload to cloud; move old package to old folder.",
+      "text": "Carrier package. Upload to cloud; move old package to old folder.",
       "id": "chk-perm-truck-b2i2"
      },
      {
-      "text": "Update Quartix. Old truck [OLD]: remove from all groups except “Ultimate Logistics All Vehicles”, rename to “No Driver”. New truck [NEW]: add to dispatch and active group; add [DRIVER].",
+      "text": "Update Quartix. Old truck: remove from all groups except “Ultimate Logistics All Vehicles”, rename to “No Driver”. New truck: add to dispatch and active group, add driver name.",
       "linkUrl": "https://www.quartix.com/",
       "linkLabel": "Quartix",
       "id": "chk-perm-truck-b2i3"
      },
      {
-      "text": "Scan & upload 2-pg lease to cloud for [DRIVER]. Move old truck lease to old folder.",
+      "text": "Scan & upload 2-pg lease to cloud. Move old truck lease to old folder.",
       "id": "chk-perm-truck-b2i4"
      },
      {
@@ -3867,15 +3881,15 @@
       "id": "chk-perm-truck-b2i5"
      },
      {
-      "text": "Update permit folders on cloud for [NEW] under [AUTH].",
+      "text": "Update permit folders on cloud.",
       "id": "chk-perm-truck-b2i6"
      },
      {
-      "text": "Update permit sheets on cloud for [NEW] under [AUTH].",
+      "text": "Update permit sheets on cloud.",
       "id": "chk-perm-truck-b2i7"
      },
      {
-      "text": "Update current trucks & drivers sheet: [DRIVER] · [OLD] → [NEW] · [AUTH].",
+      "text": "Update current trucks & drivers sheet.",
       "id": "chk-perm-truck-b2i8"
      }
     ],
@@ -3886,7 +3900,7 @@
     "kind": "kj",
     "items": [
      {
-      "text": "Add [NEW] to line-items to show monthly truck payment on 2-pg lease.",
+      "text": "SRS (if new graphics/DOT#).",
       "id": "chk-perm-truck-b3i1"
      },
      {
@@ -3905,7 +3919,7 @@
     "kind": "amie",
     "items": [
      {
-      "text": "Bestpass/prepass swap for [NEW] under [AUTH].",
+      "text": "Bestpass/prepass swap.",
       "id": "chk-perm-truck-b4i1"
      }
     ],
@@ -3929,19 +3943,19 @@
       "id": "chk-temp-truck-b1i1"
      },
      {
-      "text": "Get [NEW] permits under [AUTH].",
+      "text": "Get new permits.",
       "id": "chk-temp-truck-b1i2"
      },
      {
-      "text": "Add [NEW] transponder in OR under [AUTH] (non B#).",
+      "text": "Add transponder in OR (non B#).",
       "id": "chk-temp-truck-b1i3"
      },
      {
-      "text": "Truck docs for truck [NEW] under [AUTH]. Email & upload to cloud.",
+      "text": "Truck docs. Email & upload to cloud.",
       "id": "chk-temp-truck-b1i4"
      },
      {
-      "text": "Take picture of truck [NEW].",
+      "text": "Take picture of truck.",
       "id": "chk-temp-truck-b1i5"
      }
     ],
@@ -3952,21 +3966,21 @@
     "kind": "norush",
     "items": [
      {
-      "text": "Check truck [NEW] cloud file has DOT #[DOT], reg & ID card.",
+      "text": "Check truck cloud file has DOT, reg & ID card.",
       "id": "chk-temp-truck-b2i1"
      },
      {
-      "text": "Carrier package for [DRIVER]. Upload to cloud; move old package to old folder.",
+      "text": "Carrier package. Upload to cloud; move old package to old folder.",
       "id": "chk-temp-truck-b2i2"
      },
      {
-      "text": "Update Quartix. Old truck [OLD]: add “Shop” in front of name. New truck [NEW]: add to dispatch and active group; add [DRIVER], add “Temp” in front of name.",
+      "text": "Update Quartix. Old truck: add “Shop” in front of name. New truck: add to dispatch and active group, add driver name, add “Temp” in front of name.",
       "linkUrl": "https://www.quartix.com/",
       "linkLabel": "Quartix",
       "id": "chk-temp-truck-b2i3"
      },
      {
-      "text": "Scan & upload 2-pg lease to cloud for [DRIVER]. Add “TEMP” to the end of the file name.",
+      "text": "Scan & upload 2-pg lease to cloud. Add “TEMP” to the end of the file name.",
       "id": "chk-temp-truck-b2i4"
      },
      {
@@ -3974,15 +3988,15 @@
       "id": "chk-temp-truck-b2i5"
      },
      {
-      "text": "Update permit folders on cloud for [NEW] under [AUTH].",
+      "text": "Update permit folders on cloud.",
       "id": "chk-temp-truck-b2i6"
      },
      {
-      "text": "Update permit sheets on cloud for [NEW] under [AUTH]. Add “in shop” note to [OLD] and “temp truck” note to [NEW].",
+      "text": "Update permit sheets on cloud. Add “in shop (date)” to normal truck notes, and “temp truck” to temporary truck notes.",
       "id": "chk-temp-truck-b2i7"
      },
      {
-      "text": "Update current trucks & drivers sheet: [DRIVER] · temp [NEW] replacing [OLD] · [AUTH].",
+      "text": "Update current trucks & drivers sheet. Mark normal truck as in shop and temporary as a temp truck.",
       "id": "chk-temp-truck-b2i8"
      }
     ],
@@ -4012,7 +4026,7 @@
     "kind": "amie",
     "items": [
      {
-      "text": "Bestpass/prepass swap for [NEW] under [AUTH].",
+      "text": "Bestpass/prepass swap.",
       "id": "chk-temp-truck-b4i1"
      }
     ],
@@ -4032,41 +4046,41 @@
     "kind": "norush",
     "items": [
      {
-      "text": "Cancel temp permits for [OLD] under [AUTH].",
+      "text": "Cancel temp permits.",
       "id": "chk-out-temp-b1i1"
      },
      {
-      "text": "Check normal permits are still active for [NEW] under [AUTH].",
+      "text": "Check normal permits are still active.",
       "id": "chk-out-temp-b1i2"
      },
      {
-      "text": "Move temp carrier package for [DRIVER] to old folder.",
+      "text": "Move temp carrier package to old folder.",
       "id": "chk-out-temp-b1i3"
      },
      {
-      "text": "Move/rename temp truck [OLD] lease to old folder (if there is one).",
+      "text": "Move/rename temp truck lease to old folder (if there is one).",
       "id": "chk-out-temp-b1i4"
      },
      {
-      "text": "Update Quartix. Old truck [OLD]: remove from all groups except “Ultimate Logistics All Vehicles”, rename to “No Driver”. New truck [NEW]: remove “Shop” from name.",
+      "text": "Update Quartix. Old truck: remove from all groups except “Ultimate Logistics All Vehicles”, rename to “No Driver”. New truck: remove “Shop” from name.",
       "linkUrl": "https://www.quartix.com/",
       "linkLabel": "Quartix",
       "id": "chk-out-temp-b1i5"
      },
      {
-      "text": "Check truck [NEW] cloud file has DOT #[DOT], reg & ID card.",
+      "text": "Check truck cloud file has DOT, reg & ID card.",
       "id": "chk-out-temp-b1i6"
      },
      {
-      "text": "Update permit folders on cloud for [NEW] under [AUTH].",
+      "text": "Update permit folders on cloud.",
       "id": "chk-out-temp-b1i7"
      },
      {
-      "text": "Update permit sheets on cloud for [NEW] under [AUTH]. Leave notes until next tax period.",
+      "text": "Update permit sheets on cloud. Leave notes until next tax period.",
       "id": "chk-out-temp-b1i8"
      },
      {
-      "text": "Update current trucks & drivers sheet: [DRIVER] · temp [OLD] was, normal [NEW] active · [AUTH].",
+      "text": "Update current trucks & drivers sheet. Mark temp truck as “was”, and remove shop notes from normal truck.",
       "id": "chk-out-temp-b1i9"
      }
     ],
@@ -4086,6 +4100,7 @@
     </div>
     <div class="auth-wrap">
       <span id="sync-status" class="sync-chip local" title="Where your edits are saved">Local only</span>
+      <button id="cover-btn" class="btn small" title="Generate a truck-docs cover page">🖨 Cover page</button>
       <button id="m365-btn" class="btn small">Sign in</button>
       <button id="settings-btn" class="gear" title="Data settings" aria-label="Data settings">⚙</button>
     </div>
@@ -4137,6 +4152,21 @@
   </div>
 </div>
 
+<!-- Cover Page generator -->
+<div id="cover-overlay" class="overlay hidden" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" style="max-width:680px">
+    <div class="m-head">
+      <div class="t"><h2 style="margin-top:0">Truck docs — cover page</h2></div>
+      <div class="m-actions">
+        <button class="icon-btn x" id="cover-close" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div class="m-body" id="cover-body"></div>
+  </div>
+</div>
+<!-- Hidden element used only for printing the cover page -->
+<div id="cover-print-area" aria-hidden="true"></div>
+
 <script>
 "use strict";
 (function(){
@@ -4184,63 +4214,18 @@
   config.customCards = config.customCards || [];
   config.hiddenCards = config.hiddenCards || [];
   config.deletedSessions = config.deletedSessions || {};
-  config.userPins = config.userPins || {};
 
-  // Recents stay personal. Pins are saved per signed-in user in the shared JSON.
-  // In-progress sessions sync through SharePoint when signed in.
+  // Pins and recents stay personal. In-progress sessions sync through SharePoint when signed in.
   var state = safeParse(STATE_KEY, null) || {pins:[], recents:[], sessions:[]};
   state.pins = state.pins || []; state.recents = state.recents || []; state.sessions = state.sessions || [];
   state.sessions = pruneDeletedSessions(state.sessions);
-  // Clean up older shared/local settings after helpers and built-in cards are ready.
-  var startupConfigChanged=false;
+  if(normalizeOwnerLabels()){ try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){} }
 
   var saveTimer=null;
   function scheduleSave(){ if(saveTimer) clearTimeout(saveTimer); saveTimer=setTimeout(flushConfig, 1500); if(typeof S365!=="undefined" && S365 && S365.signedIn && typeof setSync==="function") setSync("saving","Syncing changes…"); }
   function flushConfig(){ try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){} saveTimer=null; if(typeof pushRemoteConfig==="function") pushRemoteConfig(); }
   function saveState(){ try{ localStorage.setItem(STATE_KEY, JSON.stringify(state)); }catch(e){} }
   function saveSharedSessions(){ saveState(); if(typeof pushRemoteConfig==="function") pushRemoteConfig(); }
-  function currentUserKey(){
-    if(S365 && S365.account){
-      return String(S365.account.username || S365.account.homeAccountId || S365.account.localAccountId || S365.account.name || "").trim().toLowerCase() || "local";
-    }
-    return "local";
-  }
-  function normalizePins(list){
-    var seen={};
-    return (Array.isArray(list)?list:[]).filter(function(id){
-      id=String(id||"");
-      if(!id || seen[id]) return false;
-      seen[id]=true;
-      return !!getEffectiveCard(id) && !isHidden(id);
-    });
-  }
-  function loadPinsForCurrentUser(){
-    config.userPins = config.userPins || {};
-    var key=currentUserKey();
-    var remotePins=normalizePins(config.userPins[key] || []);
-    if(S365 && S365.signedIn){
-      // One-time migration: if this person has old local pins but no JSON pin entry yet,
-      // keep them instead of wiping their setup during the upgrade.
-      var localPins=normalizePins(state.pins || []);
-      if(remotePins.length===0 && localPins.length>0 && !config.userPins[key]){
-        remotePins=localPins;
-        config.userPins[key]=remotePins;
-        try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){}
-        setTimeout(pushRemoteConfig,0);
-      }
-    }
-    state.pins=remotePins;
-    saveState();
-  }
-  function savePinsForCurrentUser(){
-    config.userPins = config.userPins || {};
-    var key=currentUserKey();
-    state.pins=normalizePins(state.pins || []);
-    config.userPins[key]=state.pins.slice();
-    saveState();
-    try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){}
-    if(S365 && S365.signedIn) pushRemoteConfig();
-  }
   function sessionStamp(s){ return Number((s && (s.updatedAt || s.savedAt)) || 0); }
   function pruneDeletedSessions(list){
     var del=config.deletedSessions||{};
@@ -4286,141 +4271,6 @@
     (config.customCards||[]).forEach(walkCard);
     return changed;
   }
-  var REQUIRED_VISIBLE_CARDS = {"chk-driver-quits":true};
-  function restoreRequiredCards(){
-    var before=(config.hiddenCards||[]).length;
-    config.hiddenCards=(config.hiddenCards||[]).filter(function(id){ return !REQUIRED_VISIBLE_CARDS[id]; });
-    return config.hiddenCards.length!==before;
-  }
-  var DRIVER_EVENT_TOKEN_TEXT = {
-    "chk-new-driver-b1i1":"Get [NEW] permits under [AUTH].",
-    "chk-new-driver-b1i2":"Add [NEW] transponder in OR under [AUTH] (non B#).",
-    "chk-new-driver-b1i3":"Truck docs for truck [NEW] under [AUTH]. Email & upload to cloud.",
-    "chk-new-driver-b1i5":"Take picture of truck [NEW].",
-    "chk-new-driver-b2i1":"Check truck [NEW] cloud file has DOT #[DOT], reg & ID card.",
-    "chk-new-driver-b2i2":"Carrier package for [DRIVER]. Upload to cloud.",
-    "chk-new-driver-b2i4":"Update permit folders on cloud for [NEW] under [AUTH].",
-    "chk-new-driver-b2i5":"Update permit sheets on cloud for [NEW] under [AUTH].",
-    "chk-new-driver-b2i6":"Update Quartix. Add truck [NEW] to dispatch and active group; add [DRIVER] to truck name.",
-    "chk-new-driver-b2i7":"Scan & upload 2-pg lease to [DRIVER] cloud folder.",
-    "chk-new-driver-b2i8":"Scan & upload DOP to [DRIVER] cloud folder.",
-    "chk-new-driver-b3i2":"Driver’s Authority Package for [AUTH].",
-    "chk-new-driver-b3i9":"Add [NEW] to line-items to show monthly truck payment on 2-pg lease.",
-
-    "chk-authority-change-b1i1":"Cancel old permits for [OLD] under [OLD_AUTH].",
-    "chk-authority-change-b1i2":"UCR for [NEW_AUTH] (if new auth).",
-    "chk-authority-change-b1i3":"Permit accounts set-up for [NEW_AUTH] (POAs).",
-    "chk-authority-change-b1i4":"Get [NEW] permits under [NEW_AUTH].",
-    "chk-authority-change-b1i5":"Add [NEW] transponder in OR under [NEW_AUTH] (non B#).",
-    "chk-authority-change-b1i6":"Truck docs for truck [NEW] under [NEW_AUTH]. Email & upload to cloud.",
-    "chk-authority-change-b1i7":"Take picture of truck [NEW].",
-    "chk-authority-change-b2i1":"Check truck [NEW] cloud file has DOT #[NEW_DOT], reg & ID card.",
-    "chk-authority-change-b2i2":"Add [NEW_AUTH] to “Ultimate Contractual Carriers”.",
-    "chk-authority-change-b2i3":"Email Disp & Office new Carrier Packet for [NEW_AUTH].",
-    "chk-authority-change-b2i4":"Update Quartix. Old truck [OLD]: add “Shop” in front of name. New truck [NEW]: add to dispatch and active group; add [DRIVER] to truck name.",
-    "chk-authority-change-b2i6":"Carrier package for [DRIVER]. Upload to cloud; move old package to old folder.",
-    "chk-authority-change-b2i8":"Update permit folders on cloud for [NEW] under [NEW_AUTH].",
-    "chk-authority-change-b2i9":"Update permit sheets on cloud for [NEW] under [NEW_AUTH].",
-    "chk-authority-change-b2i10":"Update current trucks & drivers sheet: [DRIVER] · [OLD] → [NEW] · [NEW_AUTH].",
-    "chk-authority-change-b2i11":"Update driver authority sheet: [DRIVER] from [OLD_AUTH] to [NEW_AUTH].",
-    "chk-authority-change-b3i1":"Driver’s Authority Package for [NEW_AUTH].",
-    "chk-authority-change-b3i9":"Add [NEW_AUTH] to External Carriers in ITS.",
-    "chk-authority-change-b4i1":"Bestpass/prepass swap for [NEW] under [NEW_AUTH].",
-    "chk-authority-change-b4i3":"Email Blueline to remove [DRIVER] from [OLD_AUTH] D&A policy.",
-
-    "chk-driver-quits-b1i1":"Remove [AUTH] from “Ultimate Contractual Carriers”.",
-    "chk-driver-quits-b1i2":"Email Disp & Office new Carrier Packet for [AUTH].",
-    "chk-driver-quits-b1i3":"Cancel permits / close accounts for [AUTH].",
-    "chk-driver-quits-b1i4":"Move/rename permit files for [AUTH] to canceled.",
-    "chk-driver-quits-b1i5":"Update permit sheets for [AUTH].",
-    "chk-driver-quits-b1i6":"Move [DRIVER] cloud folder to old.",
-    "chk-driver-quits-b1i7":"Move ID card on truck [OLD] cloud to Old Docs.",
-    "chk-driver-quits-b1i8":"Update current trucks & drivers sheet: remove [DRIVER] · [OLD] · [AUTH].",
-    "chk-driver-quits-b1i9":"Update driver authority sheet: remove [DRIVER] from [AUTH].",
-    "chk-driver-quits-b1i10":"Remove [DRIVER] from safety Excel sheet (CDL/Med/MVR checklist).",
-    "chk-driver-quits-b1i11":"Remove [DRIVER] from email contacts and contact lists.",
-    "chk-driver-quits-b1i12":"Remove [DRIVER] from Drivers Information on Drivers & Locations.",
-    "chk-driver-quits-b1i13":"Disable auto-run and deactivate [DRIVER] on embark.",
-    "chk-driver-quits-b1i14":"Remove [DRIVER] mailbox tag.",
-    "chk-driver-quits-b1i15":"Quartix — remove truck [OLD] from all groups except Ult Log All and Trucks No Driver. Change name to No Driver.",
-    "chk-driver-quits-b2i1":"Email Blueline to remove [DRIVER] from [AUTH] D&A policy.",
-    "chk-driver-quits-b2i2":"Close prepass account for [AUTH].",
-
-    "chk-perm-truck-b1i2":"Cancel old permits for [OLD] under [AUTH].",
-    "chk-perm-truck-b1i3":"Get [NEW] permits under [AUTH].",
-    "chk-perm-truck-b1i4":"Add [NEW] transponder in OR under [AUTH] (non B#).",
-    "chk-perm-truck-b1i5":"Truck docs for truck [NEW] under [AUTH]. Email & upload to cloud.",
-    "chk-perm-truck-b1i6":"Take picture of truck [NEW].",
-    "chk-perm-truck-b2i1":"Check truck [NEW] cloud file has DOT #[DOT], reg & ID card.",
-    "chk-perm-truck-b2i2":"Carrier package for [DRIVER]. Upload to cloud; move old package to old folder.",
-    "chk-perm-truck-b2i3":"Update Quartix. Old truck [OLD]: remove from all groups except “Ultimate Logistics All Vehicles”, rename to “No Driver”. New truck [NEW]: add to dispatch and active group; add [DRIVER].",
-    "chk-perm-truck-b2i4":"Scan & upload 2-pg lease to cloud for [DRIVER]. Move old truck lease to old folder.",
-    "chk-perm-truck-b2i6":"Update permit folders on cloud for [NEW] under [AUTH].",
-    "chk-perm-truck-b2i7":"Update permit sheets on cloud for [NEW] under [AUTH].",
-    "chk-perm-truck-b2i8":"Update current trucks & drivers sheet: [DRIVER] · [OLD] → [NEW] · [AUTH].",
-    "chk-perm-truck-b3i1":"Add [NEW] to line-items to show monthly truck payment on 2-pg lease.",
-    "chk-perm-truck-b4i1":"Bestpass/prepass swap for [NEW] under [AUTH].",
-
-    "chk-temp-truck-b1i2":"Get [NEW] permits under [AUTH].",
-    "chk-temp-truck-b1i3":"Add [NEW] transponder in OR under [AUTH] (non B#).",
-    "chk-temp-truck-b1i4":"Truck docs for truck [NEW] under [AUTH]. Email & upload to cloud.",
-    "chk-temp-truck-b1i5":"Take picture of truck [NEW].",
-    "chk-temp-truck-b2i1":"Check truck [NEW] cloud file has DOT #[DOT], reg & ID card.",
-    "chk-temp-truck-b2i2":"Carrier package for [DRIVER]. Upload to cloud; move old package to old folder.",
-    "chk-temp-truck-b2i3":"Update Quartix. Old truck [OLD]: add “Shop” in front of name. New truck [NEW]: add to dispatch and active group; add [DRIVER], add “Temp” in front of name.",
-    "chk-temp-truck-b2i4":"Scan & upload 2-pg lease to cloud for [DRIVER]. Add “TEMP” to the end of the file name.",
-    "chk-temp-truck-b2i6":"Update permit folders on cloud for [NEW] under [AUTH].",
-    "chk-temp-truck-b2i7":"Update permit sheets on cloud for [NEW] under [AUTH]. Add “in shop” note to [OLD] and “temp truck” note to [NEW].",
-    "chk-temp-truck-b2i8":"Update current trucks & drivers sheet: [DRIVER] · temp [NEW] replacing [OLD] · [AUTH].",
-    "chk-temp-truck-b4i1":"Bestpass/prepass swap for [NEW] under [AUTH].",
-
-    "chk-out-temp-b1i1":"Cancel temp permits for [OLD] under [AUTH].",
-    "chk-out-temp-b1i2":"Check normal permits are still active for [NEW] under [AUTH].",
-    "chk-out-temp-b1i3":"Move temp carrier package for [DRIVER] to old folder.",
-    "chk-out-temp-b1i4":"Move/rename temp truck [OLD] lease to old folder (if there is one).",
-    "chk-out-temp-b1i5":"Update Quartix. Old truck [OLD]: remove from all groups except “Ultimate Logistics All Vehicles”, rename to “No Driver”. New truck [NEW]: remove “Shop” from name.",
-    "chk-out-temp-b1i6":"Check truck [NEW] cloud file has DOT #[DOT], reg & ID card.",
-    "chk-out-temp-b1i7":"Update permit folders on cloud for [NEW] under [AUTH].",
-    "chk-out-temp-b1i8":"Update permit sheets on cloud for [NEW] under [AUTH]. Leave notes until next tax period.",
-    "chk-out-temp-b1i9":"Update current trucks & drivers sheet: [DRIVER] · temp [OLD] was, normal [NEW] active · [AUTH]."
-  };
-  function hasContextToken(text){ return /\[(DRIVER|AUTH|OLD|NEW|DOT|OLD_AUTH|NEW_AUTH|OLD_DOT|NEW_DOT)\]/i.test(String(text||"")); }
-  function itemTokenTemplate(it){
-    return (it && it.id && DRIVER_EVENT_TOKEN_TEXT[it.id]) ? DRIVER_EVENT_TOKEN_TEXT[it.id] : null;
-  }
-  function itemRawText(it){
-    var txt = String((it && it.text) || "");
-    var template = itemTokenTemplate(it);
-    // For old built-in auto-fill lines, ignore stale saved wording like
-    // "Cancel permits." and display/edit the explicit [DATA] token template instead.
-    // User-written token text still wins. Non-token custom lines stay literal.
-    if(template && !hasContextToken(txt)) return template;
-    return txt;
-  }
-  function shouldTokenizeItem(it){
-    if(!it || !it.id || !DRIVER_EVENT_TOKEN_TEXT[it.id]) return false;
-    if(hasContextToken(it.text)) return false;
-    // Only migrate stock/auto-fill style lines. User-written lines with tokens are left alone.
-    return true;
-  }
-  function normalizeDriverEventTokens(){
-    var changed=false;
-    function walkCard(card){
-      if(!card || card.type!=="driver-event") return;
-      (card.steps||[]).forEach(function(it){ if(shouldTokenizeItem(it)){ it.text=DRIVER_EVENT_TOKEN_TEXT[it.id]; changed=true; } });
-      (card.blocks||[]).forEach(function(b){ (b.items||[]).forEach(function(it){ if(shouldTokenizeItem(it)){ it.text=DRIVER_EVENT_TOKEN_TEXT[it.id]; changed=true; } }); });
-    }
-    BUILTIN.forEach(walkCard);
-    Object.keys(config.cardOverrides||{}).forEach(function(id){ walkCard(config.cardOverrides[id]); });
-    (config.customCards||[]).forEach(walkCard);
-    return changed;
-  }
-  // Run migrations now that helpers, token maps, and built-in card data are loaded.
-  if(restoreRequiredCards()) startupConfigChanged=true;
-  if(normalizeOwnerLabels()) startupConfigChanged=true;
-  if(normalizeDriverEventTokens()) startupConfigChanged=true;
-  if(startupConfigChanged){ try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){} }
-
   function el(tag, props){
     var e=document.createElement(tag);
     if(props) for(var k in props){
@@ -4701,7 +4551,7 @@
     var cust=isCustom(id); if(cust) return cust;
     var base=builtinById[id]; if(!base) return null;
     var ov=config.cardOverrides[id];
-    if(ov){ var m=clone(base); if(ov.steps) m.steps=ov.steps; if(ov.blocks) m.blocks=ov.blocks; if(ov.title!=null) m.title=ov.title; if(ov.defaultMode) m.defaultMode=ov.defaultMode; if(ov.toggles) m.toggles=ov.toggles; if(ov.coveringTitle!=null) m.coveringTitle=ov.coveringTitle; if(ov.lastEdited) m.lastEdited=ov.lastEdited; return m; }
+    if(ov){ var m=clone(base); if(ov.steps) m.steps=ov.steps; if(ov.blocks) m.blocks=ov.blocks; if(ov.title!=null) m.title=ov.title; if(ov.defaultMode) m.defaultMode=ov.defaultMode; if(ov.toggles) m.toggles=ov.toggles; if(ov.lastEdited) m.lastEdited=ov.lastEdited; return m; }
     return base;
   }
   function getOriginalCard(id){
@@ -4710,7 +4560,6 @@
   }
   // returns mutable object whose .steps/.blocks can be edited & persisted
   function getMutableCard(id){
-    if(modalState && modalState.editMode && modalState.editDraft && modalState.cardId===id) return modalState.editDraft;
     var cust=isCustom(id); if(cust) return cust;
     var base=builtinById[id];
     if(!config.cardOverrides[id]) config.cardOverrides[id]={steps:clone(base.steps||null), blocks:clone(base.blocks||null), title:base.title};
@@ -4729,74 +4578,6 @@
     var cust=isCustom(cardId);
     if(cust){ cust.lastEdited=Date.now(); }
     else { getMutableCard(cardId).lastEdited=Date.now(); }
-  }
-  function cardItemIds(card){
-    var ids={};
-    (card.steps||[]).forEach(function(it){ if(it && it.id) ids[it.id]=1; });
-    (card.blocks||[]).forEach(function(b){ (b.items||[]).forEach(function(it){ if(it && it.id) ids[it.id]=1; }); });
-    return ids;
-  }
-  function sessionCheckIdsForCard(card, sess){
-    var out=[];
-    function includeItem(it, listKey, opts){
-      if(!it || !it.id) return;
-      var newAuthHidden = it.newAuthOnly && card.eventType==="authority-change" && !(sess && sess.brandNewAuth);
-      var toggleHidden = false;
-      if(it.toggle){
-        var on = !!(sess && sess.toggleState && sess.toggleState[it.toggle]);
-        toggleHidden = it.toggleNot ? on : !on;
-      }
-      if(newAuthHidden || toggleHidden) return;
-      if(itemDisplayMode(card, listKey, it, opts)==="check") out.push(it.id);
-    }
-    (card.steps||[]).forEach(function(it){ includeItem(it, "steps", {ordered:true, checkbox:false}); });
-    (card.blocks||[]).forEach(function(b){ (b.items||[]).forEach(function(it){ includeItem(it, b.id, {ordered:false, checkbox:true}); }); });
-    return out;
-  }
-  function syncSessionsForCard(cardId){
-    var card=getEffectiveCard(cardId); if(!card || !state || !Array.isArray(state.sessions)) return;
-    var valid=cardItemIds(card);
-    state.sessions.forEach(function(sess){
-      if(!sess || sess.cardId!==cardId) return;
-      if(sess.checks){ Object.keys(sess.checks).forEach(function(id){ if(!valid[id]) delete sess.checks[id]; }); }
-      if(sess.notes){ Object.keys(sess.notes).forEach(function(id){ if(!valid[id]) delete sess.notes[id]; }); }
-      var checkIds=sessionCheckIdsForCard(card, sess);
-      sess.total=checkIds.length;
-      sess.checked=checkIds.filter(function(id){ return !!(sess.checks && sess.checks[id]); }).length;
-      sess.updatedAt=Date.now();
-    });
-    saveState();
-  }
-  function commitEditDraft(){
-    if(!modalState || !modalState.editDraft) return;
-    var cardId=modalState.cardId;
-    var draft=clone(modalState.editDraft);
-    draft.lastEdited=Date.now();
-    var cust=isCustom(cardId);
-    if(cust){
-      var ci=config.customCards.findIndex(function(c){return c.id===cardId;});
-      if(ci>=0) config.customCards[ci]=draft;
-    }else{
-      config.cardOverrides[cardId]={
-        steps: clone(draft.steps||null),
-        blocks: clone(draft.blocks||null),
-        title: draft.title,
-        defaultMode: draft.defaultMode,
-        toggles: clone(draft.toggles||null),
-        coveringTitle: draft.coveringTitle,
-        lastEdited: draft.lastEdited
-      };
-    }
-    syncSessionsForCard(cardId);
-    scheduleSave();
-  }
-  function persistCardEdit(cardId){
-    // While Edit mode is open, changes live only in the modal draft.
-    // They sync/save to the shared JSON only after clicking "Done editing".
-    if(modalState && modalState.editMode && modalState.editDraft && modalState.cardId===cardId) return;
-    touchCard(cardId);
-    syncSessionsForCard(cardId);
-    scheduleSave();
   }
   function fmtMDY(ts){
     if(!ts) return "n/a";
@@ -4934,7 +4715,7 @@
   function togglePin(id){
     var i=state.pins.indexOf(id);
     if(i>=0) state.pins.splice(i,1); else state.pins.push(id);
-    savePinsForCurrentUser();
+    saveState();
     if(currentView==="home") renderHome(); else renderBrowse();
   }
   function pushRecent(id){
@@ -4967,7 +4748,7 @@
     if((SEC_BY_ID[card.section]||{}).name && SEC_BY_ID[card.section].name.toLowerCase().indexOf(q)>=0) return true;
     var hit=false;
     (card.steps||[]).forEach(function(s){ if(String(s.text).toLowerCase().indexOf(q)>=0) hit=true; });
-    (card.blocks||[]).forEach(function(b){ (b.items||[]).forEach(function(it){ if(itemRawText(it).toLowerCase().indexOf(q)>=0) hit=true; }); });
+    (card.blocks||[]).forEach(function(b){ (b.items||[]).forEach(function(it){ if(String(it.text).toLowerCase().indexOf(q)>=0) hit=true; }); });
     if(card.email && card.email.toLowerCase().indexOf(q)>=0) hit=true;
     return hit;
   }
@@ -5070,7 +4851,6 @@
     modalState={
       cardId:id,
       editMode:false,
-      editDraft:null,            // unsaved card edits while Edit mode is open
       ctx:null,                 // applied token context
       checks:{},                // slotId -> bool
       formValues:{},            // raw context-form values
@@ -5096,21 +4876,16 @@
     if(session){ restoreContextForm(); } // ensure fields show session values
   }
   function closeCard(){
-    if(modalState && modalState.editMode && modalState.editDraft){
-      var discard = window.confirm("You have unsaved card edits. Close without saving them?");
-      if(!discard) return;
-      closePopup({discard:true});
-    }
     overlay.classList.add("hidden"); overlay.setAttribute("aria-hidden","true");
     document.body.style.overflow="";
-    closePopup({discard:true});
+    closePopup();
     modalState=null;
     if(currentView==="home") renderHome(); else renderBrowse();
   }
   overlay.addEventListener("click", function(e){ if(e.target===overlay) closeCard(); });
 
   function renderModal(){
-    var card=(modalState && modalState.editMode && modalState.editDraft) ? modalState.editDraft : getEffectiveCard(modalState.cardId);
+    var card=getEffectiveCard(modalState.cardId);
     var sec=SEC_BY_ID[card.section]||{name:"—",color:"#999"};
     mBadge.textContent=sec.name; mBadge.style.background=sec.color;
     mTitle.textContent=card.title;
@@ -5119,17 +4894,10 @@
     mActions.textContent="";
     if(card.type==="driver-event"){
       mActions.appendChild(el("button",{class:"icon-btn",text:"💾 Save progress", onclick:saveSession}));
-      if(modalState.sessionId){
-        mActions.appendChild(el("button",{class:"icon-btn", style:"border-color:#e6b5ae;color:var(--bad)", text:"🗑 Delete saved copy", onclick:function(){ deleteSession(modalState.sessionId); closeCard(); }}));
-      }
     }
     if(isEditable(card)){
       var editBtn=el("button",{class:"icon-btn"+(modalState.editMode?" on":""), text:modalState.editMode?"✓ Done editing":"✎ Edit card", onclick:function(){
-        if(modalState.editMode){
-          closePopup(); captureContextForm(); captureChecks(); commitEditDraft(); modalState.editMode=false; modalState.editDraft=null; renderModal();
-        }else{
-          captureContextForm(); captureChecks(); modalState.editDraft=clone(getEffectiveCard(modalState.cardId)); modalState.editMode=true; renderModal();
-        }
+        captureContextForm(); captureChecks(); modalState.editMode=!modalState.editMode; renderModal();
       }});
       mActions.appendChild(editBtn);
       if(modalState.editMode){
@@ -5138,12 +4906,11 @@
           captureContextForm(); captureChecks();
           var mut=getMutableCard(card.id);
           mut.defaultMode = effectiveCardDefaultMode(mut)==="number" ? "check" : "number";
-          persistCardEdit(card.id);
+          touchCard(card.id);
+          scheduleSave();
           renderModal();
         }}));
-        if(!modalState.sessionId){
-          mActions.appendChild(el("button",{class:"icon-btn", style:"border-color:#e6b5ae;color:var(--bad)", text:"🗑 Delete card", onclick:function(){ confirmDelete(card.id); }}));
-        }
+        mActions.appendChild(el("button",{class:"icon-btn", style:"border-color:#e6b5ae;color:var(--bad)", text:"🗑 Delete card", onclick:function(){ confirmDelete(card.id); }}));
       }
     }else{
       // email cards: delete affordance lives directly in header (no edit mode)
@@ -5187,7 +4954,6 @@
     }
     if(!isNewDriver) grid.appendChild(field("Current truck #", truckCtrl("f-old")));
     grid.appendChild(field("New truck #", truckCtrl("f-new", true)));
-    grid.appendChild(renderFolderLinks());
     wrap.appendChild(grid);
 
     if(isAuth){
@@ -5237,52 +5003,6 @@
     function selectPlaceholder(){
       var s=el("select",{disabled:"disabled"}); s.appendChild(el("option",{text:"Sign in to load drivers"})); return s;
     }
-  }
-
-  function spSharedFolderUrl(path, viewid){
-    var base="https://ultimatecorp-my.sharepoint.com/shared";
-    var listurl="https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared Documents";
-    var q="?id="+encodeURIComponent(path)+"&listurl="+encodeURIComponent(listurl);
-    if(viewid) q += "&viewid="+encodeURIComponent(viewid);
-    return base+q;
-  }
-  function driverFolderUrl(driverName){
-    var name=String(driverName||"").trim();
-    if(!name) return "";
-    return spSharedFolderUrl("/sites/UltimateLogisticsLLC/Shared Documents/Driver Documents/"+name);
-  }
-  function tractorFolderUrl(truckNo){
-    var n=String(truckNo||"").trim();
-    if(!n) return "";
-    return spSharedFolderUrl("/sites/UltimateLogisticsLLC/Shared Documents/Equipment/Tractors/"+n, "a44e9030-a3e0-4738-9c7a-c6af2d6baa51");
-  }
-  function renderFolderLinks(){
-    var row=el("div",{class:"folder-link-row"});
-    var driverBtn=folderBtn("Driver folder", function(){
-      captureContextForm();
-      return driverFolderUrl(modalState.formValues.driver);
-    });
-    var oldBtn=folderBtn("Current tractor folder", function(){
-      captureContextForm();
-      return tractorFolderUrl(modalState.formValues.old);
-    });
-    var newBtn=folderBtn("New tractor folder", function(){
-      captureContextForm();
-      return tractorFolderUrl(modalState.formValues.new);
-    });
-    row.appendChild(driverBtn);
-    row.appendChild(oldBtn);
-    row.appendChild(newBtn);
-    return row;
-  }
-  function folderBtn(label, getUrl){
-    var a=el("a",{class:"folder-btn",href:"#",target:"_blank",rel:"noopener",text:"📁 "+label});
-    a.addEventListener("click",function(e){
-      var url=getUrl();
-      if(!url){ e.preventDefault(); window.alert("Pick/fill the matching driver or tractor first."); return; }
-      a.href=url;
-    });
-    return a;
   }
 
   function captureContextForm(){
@@ -5350,45 +5070,25 @@
       host.appendChild(renderList(card, "steps", card.steps||[], {ordered:true, checkbox:false}));
     }
 
-    // blocks / separator sections
+    // blocks
     if(card.blocks && card.blocks.length){
       if(card.type==="driver-event"){
         var always=card.blocks.filter(function(b){ return !COVERING_KINDS[b.kind]; });
         var covering=card.blocks.filter(function(b){ return COVERING_KINDS[b.kind]; });
         always.forEach(function(b){ host.appendChild(renderBlock(card,b)); });
-        if(modalState.editMode){
-          host.appendChild(el("div",{class:"block-add-row"},
-            el("button",{class:"btn small",text:"+ Add section",onclick:function(){ addBlock(card.id,false); }}),
-            el("button",{class:"btn small",text:"+ Add KJ/Amie covering section",onclick:function(){ addBlock(card.id,true); }})
-          ));
-        }
-        if(covering.length || modalState.editMode){
+        if(covering.length){
           var det=el("details",{class:"disclosure"});
-          if(modalState.coveringOpen || modalState.editMode) det.setAttribute("open","open");
+          if(modalState.coveringOpen) det.setAttribute("open","open");
           det.addEventListener("toggle",function(){ modalState.coveringOpen=det.open; });
-          var sum=el("summary");
-          var line=el("div",{class:"summary-line"});
-          line.appendChild(el("span",{class:"summary-text",text:"▸ "+(card.coveringTitle||"KJ & Amie tasks (covering only)")}));
-          if(modalState.editMode){
-            line.appendChild(el("span",{class:"block-toolbar"},
-              el("button",{class:"mini",title:"Edit dropdown title",text:"✎",onclick:function(e){ e.preventDefault(); e.stopPropagation(); editCoveringTitle(card.id); }}),
-              el("button",{class:"mini del",title:"Delete all covering sections",text:"✕",onclick:function(e){ e.preventDefault(); e.stopPropagation(); deleteCoveringGroup(card.id); }})
-            ));
-          }
-          sum.appendChild(line);
-          det.appendChild(sum);
+          det.appendChild(el("summary",{text:"▸ KJ & Amie tasks (covering only)"}));
           var inner=el("div",{class:"inner"});
           covering.forEach(function(b){ inner.appendChild(renderBlock(card,b)); });
-          if(modalState.editMode){ inner.appendChild(el("button",{class:"btn small add-item",text:"+ Add covering section",onclick:function(){ addBlock(card.id,true); }})); }
           det.appendChild(inner);
           host.appendChild(det);
         }
       }else{
         card.blocks.forEach(function(b){ host.appendChild(renderBlock(card,b)); });
-        if(modalState.editMode){ host.appendChild(el("div",{class:"block-add-row"}, el("button",{class:"btn small",text:"+ Add section",onclick:function(){ addBlock(card.id,false); }}))); }
       }
-    }else if(modalState.editMode){
-      host.appendChild(el("div",{class:"block-add-row"}, el("button",{class:"btn small",text:"+ Add section",onclick:function(){ addBlock(card.id,false); }})));
     }
     return host;
   }
@@ -5396,82 +5096,12 @@
   function renderBlock(card, block){
     var wrap=el("div",{class:"content-block"});
     var kindClass="ob-"+(block.kind||"custom");
-    var lbl=el("div",{class:"owner-label "+kindClass});
-    lbl.appendChild(document.createTextNode(block.label||"Tasks"));
-    if(modalState.editMode){
-      lbl.appendChild(el("span",{class:"block-toolbar"},
-        el("button",{class:"mini",title:"Edit section title/color",text:"✎",onclick:function(e){ e.stopPropagation(); editBlockMeta(card.id, block.id); }}),
-        el("button",{class:"mini del",title:"Delete section",text:"✕",onclick:function(e){ e.stopPropagation(); deleteBlock(card.id, block.id); }})
-      ));
-    }
+    var lbl=el("div",{class:"owner-label "+kindClass, text:block.label||"Tasks"});
     wrap.appendChild(lbl);
     var body=el("div",{class:"owner-body "+kindClass});
     body.appendChild(renderList(card, block.id, block.items||[], {ordered:false, checkbox:true}));
     wrap.appendChild(body);
     return wrap;
-  }
-
-  function blockById(card, blockId){
-    if(!card || !card.blocks) return null;
-    for(var i=0;i<card.blocks.length;i++){ if(card.blocks[i].id===blockId) return card.blocks[i]; }
-    return null;
-  }
-  function blockKindPrompt(current){
-    var k=window.prompt("Section color/type: before, norush, kj, amie, or custom", current||"custom");
-    if(k==null) return null;
-    k=String(k).trim().toLowerCase();
-    if(!k) k="custom";
-    if(!({before:1,norush:1,kj:1,amie:1,custom:1})[k]){
-      window.alert("Please use one of: before, norush, kj, amie, custom.");
-      return null;
-    }
-    return k;
-  }
-  function editBlockMeta(cardId, blockId){
-    captureContextForm(); captureChecks();
-    var mut=getMutableCard(cardId); var b=blockById(mut, blockId); if(!b) return;
-    var label=window.prompt("Section title", b.label||"Tasks");
-    if(label==null) return;
-    var kind=blockKindPrompt(b.kind||"custom");
-    if(kind==null) return;
-    b.label=String(label).trim()||"Tasks";
-    b.kind=kind;
-    persistCardEdit(cardId); reRenderModalPreserving();
-  }
-  function addBlock(cardId, covering){
-    captureContextForm(); captureChecks();
-    var mut=getMutableCard(cardId); if(!mut.blocks) mut.blocks=[];
-    var label=window.prompt("New section title", covering ? "KJ does" : "New section");
-    if(label==null) return;
-    var kind=blockKindPrompt(covering ? "kj" : "custom");
-    if(kind==null) return;
-    mut.blocks.push({id:uid("blk"), label:String(label).trim()||"Tasks", kind:kind, items:[]});
-    if(covering) modalState.coveringOpen=true;
-    persistCardEdit(cardId); reRenderModalPreserving();
-  }
-  function deleteBlock(cardId, blockId){
-    var mut=getMutableCard(cardId); if(!mut.blocks) return;
-    var b=blockById(mut, blockId); if(!b) return;
-    if(!window.confirm('Delete the section "'+(b.label||"Tasks")+'" and all items inside it?')) return;
-    mut.blocks=mut.blocks.filter(function(x){return x.id!==blockId;});
-    persistCardEdit(cardId); reRenderModalPreserving();
-  }
-  function editCoveringTitle(cardId){
-    captureContextForm(); captureChecks();
-    var mut=getMutableCard(cardId);
-    var cur=mut.coveringTitle || "KJ & Amie tasks (covering only)";
-    var title=window.prompt("Dropdown title", cur);
-    if(title==null) return;
-    mut.coveringTitle=String(title).trim()||"KJ & Amie tasks (covering only)";
-    persistCardEdit(cardId); reRenderModalPreserving();
-  }
-  function deleteCoveringGroup(cardId){
-    var mut=getMutableCard(cardId); if(!mut.blocks) return;
-    var count=mut.blocks.filter(function(b){return COVERING_KINDS[b.kind];}).length;
-    if(!count) return;
-    if(!window.confirm("Delete the KJ/Amie covering dropdown and all covering sections inside it?")) return;
-    mut.blocks=mut.blocks.filter(function(b){return !COVERING_KINDS[b.kind];});
-    persistCardEdit(cardId); reRenderModalPreserving();
   }
 
   // listKey: "steps" or a block id
@@ -5534,19 +5164,11 @@
       }
 
       var txtSpan=el("span",{class:"txt"});
-      var rawText = itemRawText(it);
-      var displayText = substitute(rawText, ctx);
+      var displayText = substitute(it.text, ctx);
+      displayText = enrichChecklistText(displayText, ctx, card);
       txtSpan.appendChild(document.createTextNode(displayText));
-      if(modalState.editMode){
-        // Show visibility-rule chips only while editing, so the normal checklist stays clean
-        // but it is obvious which rows are conditional when editing the card.
-        if(it.newAuthOnly){ txtSpan.appendChild(el("span",{class:"only-marker", text:"hide when: Driver's Authority"})); }
-        if(it.toggle){
-          var t=cardToggle(card, it.toggle);
-          var label=t ? t.label : "special instruction";
-          txtSpan.appendChild(el("span",{class:"only-marker", text:(it.toggleNot ? "hide when: " : "only when: ")+label}));
-        }
-      }
+      if(it.newAuthOnly){ txtSpan.appendChild(el("span",{class:"new-auth-only", text:"new auth only"})); }
+      if(it.toggle){ var _tg=cardToggle(card, it.toggle); if(_tg) txtSpan.appendChild(el("span",{class:"only-marker", text:(it.toggleNot?"hide when: ":"only: ")+_tg.label})); }
       if(it.linkUrl){
         var label=it.linkLabel ? ("↗ "+it.linkLabel) : deriveChip(it.linkUrl);
         txtSpan.appendChild(el("a",{class:"chip-link", href:it.linkUrl, target:"_blank", rel:"noopener", text:label, onclick:function(e){ e.stopPropagation(); }}));
@@ -5595,7 +5217,7 @@
     var mut=getMutableCard(cardId);
     var list=getList(mut, listKey);
     list.push({id:uid("it"), text:"New "+(listKey==="steps"?"step":"item")});
-    persistCardEdit(cardId); reRenderModalPreserving();
+    touchCard(cardId); scheduleSave(); reRenderModalPreserving();
   }
   function deleteItem(cardId, listKey, itemId){
     var mut=getMutableCard(cardId);
@@ -5603,7 +5225,7 @@
     var i=list.findIndex(function(x){return x.id===itemId;});
     if(i>=0) list.splice(i,1);
     delete modalState.checks[itemId];
-    persistCardEdit(cardId); reRenderModalPreserving();
+    touchCard(cardId); scheduleSave(); reRenderModalPreserving();
   }
   function moveWithin(list, fromId, toId, after){
     var fi=list.findIndex(function(x){return x.id===fromId;}); if(fi<0) return;
@@ -5637,7 +5259,7 @@
       e.preventDefault();
       var rect=row.getBoundingClientRect(); var after=(e.clientY-rect.top)>rect.height/2;
       var mut=getMutableCard(card.id); var list=getList(mut, listKey);
-      if(dragInfo.id!==itemId){ moveWithin(list, dragInfo.id, itemId, after); persistCardEdit(card.id); }
+      if(dragInfo.id!==itemId){ moveWithin(list, dragInfo.id, itemId, after); touchCard(card.id); scheduleSave(); }
       clearDragMarks(); dragInfo=null;
       reRenderModalPreserving();
     });
@@ -5646,12 +5268,7 @@
 
   /* ----- edit popup ----- */
   var popup=null;
-  function closePopup(opts){
-    if(popup){
-      if(!(opts && opts.discard) && typeof popup._commit==="function" && !popup._committed){ popup._commit(); }
-      popup.remove(); popup=null; document.removeEventListener("mousedown", popupOutside, true);
-    }
-  }
+  function closePopup(){ if(popup){ popup.remove(); popup=null; document.removeEventListener("mousedown", popupOutside, true); } }
   function popupOutside(e){ if(popup && !popup.contains(e.target)) closePopup(); }
   function openEditPopup(card, listKey, itemId, anchorBtn){
     closePopup();
@@ -5660,7 +5277,7 @@
 
     popup=el("div",{class:"popup"});
     function insertAtCursor(t, text){ var s=t.selectionStart||0, e=t.selectionEnd||0, v=t.value; t.value=v.slice(0,s)+text+v.slice(e); var pos=s+text.length; t.focus(); t.setSelectionRange(pos,pos); }
-    var ta=el("textarea"); ta.value=itemRawText(item);
+    var ta=el("textarea"); ta.value=item.text||"";
     popup.appendChild(el("label",{style:"font-size:11px;font-weight:700;color:var(--muted)",text:"Text"}));
     popup.appendChild(ta);
     var tokDefs=null;
@@ -5689,29 +5306,24 @@
       tgSel.appendChild(oOnly); tgSel.appendChild(oNot);
     });
     popup.appendChild(el("div",{class:"field"}, el("label",{text:"Show only when (special-instruction checkbox)"}), tgSel));
-    function commitItemEdit(){
-      item.text=ta.value;
-      var u=urlF.value.trim();
-      if(u){ item.linkUrl=u; item.linkLabel=labelF.value.trim()||undefined; }
-      else { delete item.linkUrl; delete item.linkLabel; }
-      if(modeSel.value){ item.mode=modeSel.value; } else { delete item.mode; }
-      var tv=tgSel.value;
-      if(tv){ if(tv.charAt(0)==="!"){ item.toggle=tv.slice(1); item.toggleNot=true; } else { item.toggle=tv; delete item.toggleNot; } }
-      else { delete item.toggle; delete item.toggleNot; }
-      popup._committed=true;
-      persistCardEdit(card.id);
-    }
-    popup._commit=function(){ commitItemEdit(); reRenderModalPreserving(); };
     popup.appendChild(el("div",{class:"pop-actions"},
       el("button",{class:"btn small primary",text:"Save", onclick:function(){
-        commitItemEdit(); closePopup({discard:true}); reRenderModalPreserving();
+        item.text=ta.value;
+        var u=urlF.value.trim();
+        if(u){ item.linkUrl=u; item.linkLabel=labelF.value.trim()||undefined; }
+        else { delete item.linkUrl; delete item.linkLabel; }
+        if(modeSel.value){ item.mode=modeSel.value; } else { delete item.mode; }
+        var tv=tgSel.value;
+        if(tv){ if(tv.charAt(0)==="!"){ item.toggle=tv.slice(1); item.toggleNot=true; } else { item.toggle=tv; delete item.toggleNot; } }
+        else { delete item.toggle; delete item.toggleNot; }
+        touchCard(card.id); scheduleSave(); closePopup(); reRenderModalPreserving();
       }}),
       el("button",{class:"btn small",text:"Reset to original", onclick:function(){
         var orig=findOriginalItem(card.id, listKey, itemId);
-        if(orig){ ta.value=itemRawText(orig); labelF.value=orig.linkLabel||""; urlF.value=orig.linkUrl||""; modeSel.value=orig.mode||""; tgSel.value=(orig.toggle?((orig.toggleNot?"!":"")+orig.toggle):""); }
+        if(orig){ ta.value=orig.text||""; labelF.value=orig.linkLabel||""; urlF.value=orig.linkUrl||""; modeSel.value=orig.mode||""; tgSel.value=(orig.toggle?((orig.toggleNot?"!":"")+orig.toggle):""); }
         else { ta.value=""; labelF.value=""; urlF.value=""; modeSel.value=""; tgSel.value=""; }
       }}),
-      el("button",{class:"btn small",text:"Cancel", onclick:function(){ closePopup({discard:true}); }})
+      el("button",{class:"btn small",text:"Cancel", onclick:closePopup})
     ));
 
     document.body.appendChild(popup);
@@ -5739,10 +5351,6 @@
       config.customCards=config.customCards.filter(function(c){return c.id!==cardId;});
       delete config.cardOverrides[cardId];
     }else{
-      if(REQUIRED_VISIBLE_CARDS[cardId]){
-        window.alert('This default checklist is protected, so it cannot be hidden. Delete saved copies from the saved-card button instead.');
-        return;
-      }
       if(config.hiddenCards.indexOf(cardId)<0) config.hiddenCards.push(cardId);
     }
     flushConfig(); closeCard();
@@ -5823,12 +5431,12 @@
     if(label==null) return; label=String(label).trim(); if(!label) return;
     var mut=getMutableCard(cardId); mut.toggles=mut.toggles||[];
     mut.toggles.push({id:uid("tg"), label:label});
-    persistCardEdit(cardId); reRenderModalPreserving();
+    touchCard(cardId); scheduleSave(); reRenderModalPreserving();
   }
   function renameToggle(cardId, tid){
     var mut=getMutableCard(cardId); var t=(mut.toggles||[]).filter(function(x){return x.id===tid;})[0]; if(!t) return;
     var label=window.prompt("Rename this checkbox:", t.label); if(label==null) return; label=String(label).trim(); if(!label) return;
-    t.label=label; persistCardEdit(cardId); reRenderModalPreserving();
+    t.label=label; touchCard(cardId); scheduleSave(); reRenderModalPreserving();
   }
   function deleteToggle(cardId, tid){
     if(!window.confirm("Delete this checkbox? Items set to “only show when” it will become always-visible.")) return;
@@ -5837,7 +5445,7 @@
     (mut.steps||[]).forEach(function(s){ if(s.toggle===tid){ delete s.toggle; delete s.toggleNot; } });
     (mut.blocks||[]).forEach(function(b){ (b.items||[]).forEach(function(it){ if(it.toggle===tid){ delete it.toggle; delete it.toggleNot; } }); });
     if(modalState.toggleState) delete modalState.toggleState[tid];
-    persistCardEdit(cardId); reRenderModalPreserving();
+    touchCard(cardId); scheduleSave(); reRenderModalPreserving();
   }
 
   /* ----- per-step bold notes (operational, saved with the session) ----- */
@@ -6025,6 +5633,8 @@
   document.addEventListener("keydown", function(e){
     if(e.key==="Escape"){
       if(popup){ closePopup(); return; }
+      var cov=document.getElementById("cover-overlay");
+      if(cov && !cov.classList.contains("hidden")){ closeCoverPage(); return; }
       var sov=document.getElementById("settings-overlay");
       if(sov && !sov.classList.contains("hidden")){ closeSettings(); return; }
       if(!bOverlay.classList.contains("hidden")){ closeBuilder(); return; }
@@ -6038,26 +5648,30 @@
     tenantId: "2c6b3d13-b98c-4605-8fcc-d8eed3579136",
     scopes: ["https://graph.microsoft.com/Sites.ReadWrite.All", "https://graph.microsoft.com/Files.ReadWrite.All"],
     fleetUrl: "https://ultimatecorp.sharepoint.com/:x:/r/sites/UltimateLogisticsLLC/_layouts/15/Doc.aspx?sourcedoc=%7B36A2C772-3F8C-42ED-A901-797013BCFBC0%7D&file=Fleet%20Master%20Sheet.xlsx&action=default&mobileredirect=true",
-    // Shared edits are intentionally locked to one SharePoint JSON file.
-    // Do not let per-browser settings point users at old/personal JSON files.
+    // Default: the shared SharePoint site library (the Ultimate Logistics team site).
+    // Everyone with site access can read it; office staff with Edit access can write it.
     configStorage: "sharepoint",
     configFile: "procedures-dashboard-config.json",
-    configSharePointUrl: "https://ultimatecorp.sharepoint.com/:u:/s/UltimateLogisticsLLC/IQAA_lEjkUZOQ4jMqknocs-UAfimnjCbwJTxwjdpZzgG9u4?e=7Wwpdk",
-    legacyConfigFiles: []
+    // Older locations are checked once so existing edits migrate into the shared file automatically.
+    legacyConfigFiles: [
+      {storage:"onedrive", path:"procedures-dashboard-config.json"},
+      {storage:"sharepoint", path:"Office Documents/procedures-dashboard-config.json"}
+    ]
   };
   var S365 = { msal:null, account:null, signedIn:false, item:null, driveId:null,
                roster:null, worksheets:[], remote:{eTag:null, by:null, at:null, present:false} };
 
   config.mapping = config.mapping || { worksheet:"Current Roster", nameMode:"firstlast",
       colName:"Driver", colFirst:"First", colLast:"Last", colTruck:"Truck #", colAuthority:"Authority", colDot:"DOT #" };
-  // Force all browsers/users onto the same shared JSON file, even if localStorage
-  // still contains an old OneDrive/SharePoint path from a previous version.
-  config.remoteConfigStorage = SP.configStorage;
-  config.remoteConfigPath = SP.configFile;
-  config.remoteConfigSharePointUrl = SP.configSharePointUrl;
+  if(!config.mapping.trucksSheet) config.mapping.trucksSheet="Trucks";
+  if(!config.mapping.authoritiesSheet) config.mapping.authoritiesSheet="Authorities";
+  config.remoteConfigStorage = config.remoteConfigStorage || SP.configStorage;
+  config.remoteConfigPath = config.remoteConfigPath || SP.configFile;
+  config.remoteConfigSharePointUrl = config.remoteConfigSharePointUrl || "";
   config.fleetUrl = config.fleetUrl || SP.fleetUrl;
-  config._sharedStorageMigrated = true;
-  try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){}
+  // One-time migration: anyone whose saved setting still points at personal OneDrive is moved
+  // onto the shared SharePoint library so edits reach the whole office.
+  if(!config._sharedStorageMigrated){ config.remoteConfigStorage="sharepoint"; config._sharedStorageMigrated=true; try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){} }
 
   function setSync(kind, text, detail){ var c=document.getElementById("sync-status"); if(c){ c.className="sync-chip "+kind; c.textContent=text; c.title=detail||text; } }
   function chipErr(e){ var s=String(e); var head=s.split(":")[0].trim(); if(head.length>46) head=head.slice(0,46); return head||"Error"; }
@@ -6068,6 +5682,9 @@
     document.getElementById("settings-btn").addEventListener("click", openSettings);
     document.getElementById("settings-close").addEventListener("click", closeSettings);
     document.getElementById("settings-overlay").addEventListener("click", function(e){ if(e.target.id==="settings-overlay") closeSettings(); });
+    document.getElementById("cover-btn").addEventListener("click", openCoverPage);
+    document.getElementById("cover-close").addEventListener("click", closeCoverPage);
+    document.getElementById("cover-overlay").addEventListener("click", function(e){ if(e.target.id==="cover-overlay") closeCoverPage(); });
 
     if(typeof msal==="undefined"){ setSync("err","Sign-in unavailable"); btn.textContent="Sign-in unavailable"; btn.disabled=true; return; }
 
@@ -6198,6 +5815,128 @@
     }).catch(function(){ if(S365.roster) S365.roster.fleetTrucks=S365.roster.trucks||[]; });
   }
 
+  /* ==================== cover-page generator ==================== */
+  var coverState=null;
+  function blankCover(){ return {company:"",ein:"",mc:"",dot:"",unit:"",ymm:"",plate:"",vin:"",color:"",driver:""}; }
+  function readTable(sheetName, op){
+    var p="/drives/"+S365.driveId+"/items/"+S365.item+"/workbook/worksheets('"+encodeURIComponent(sheetName)+"')/usedRange(valuesOnly=true)?$select=values";
+    return graph(p, null, op||("reading "+sheetName)).then(function(r){ var vals=(r&&r.values)||[]; if(!vals.length) return null; return {head:vals[0], rows:vals.slice(1)}; });
+  }
+  function coverFindRow(tbl, keyCols, keyVal){
+    if(!tbl||keyVal==null||keyVal==="") return null;
+    var ki=-1; for(var c=0;c<keyCols.length && ki<0;c++) ki=colIndex(tbl.head, keyCols[c]);
+    if(ki<0) return null;
+    var kv=String(keyVal).trim().toLowerCase();
+    for(var r=0;r<tbl.rows.length;r++){ if(String((tbl.rows[r]||[])[ki]||"").trim().toLowerCase()===kv) return tbl.rows[r]; }
+    return null;
+  }
+  function coverCell(tbl,row,names){ if(!tbl||!row) return ""; for(var i=0;i<names.length;i++){ var ci=colIndex(tbl.head,names[i]); if(ci>=0){ var v=row[ci]; if(v!=null && String(v).trim()!=="") return String(v).trim(); } } return ""; }
+  function loadCoverTables(){
+    if(!S365.signedIn || !S365.driveId) return Promise.resolve();
+    var m=config.mapping;
+    return Promise.all([
+      readTable(m.trucksSheet||"Trucks","reading Trucks tab").then(function(t){ S365.trucksTbl=t; }, function(){ S365.trucksTbl=null; return Promise.reject("trucks"); }),
+      readTable(m.authoritiesSheet||"Authorities","reading Authorities tab").then(function(t){ S365.authTbl=t; }, function(){ S365.authTbl=null; return Promise.reject("auth"); })
+    ]);
+  }
+  function buildCover(driver, authority, unit){
+    var tt=S365.trucksTbl, at=S365.authTbl;
+    var trow=coverFindRow(tt, ["unit","truck","tractor"], unit);
+    var arow=coverFindRow(at, ["authority","carrier","llc","name","legal"], authority);
+    var year=coverCell(tt,trow,["year"]);
+    var make=coverCell(tt,trow,["make"]);
+    var model=coverCell(tt,trow,["model"]);
+    var type=coverCell(tt,trow,["type","make/model","make & model"]);
+    var mm=[make,model].filter(Boolean).join(" ").trim() || type;
+    var ymm=[year, mm].filter(Boolean).join(" ").trim();
+    return {
+      company: coverCell(at,arow,["legal","llc","company","dba","carrier","name","authority"]) || authority || "",
+      ein: coverCell(at,arow,["ein","fein","tax id","tax-id"]),
+      mc: coverCell(at,arow,["mc#","mc ","mc","docket"]),
+      dot: coverCell(at,arow,["usdot","us dot","dot#","dot"]),
+      unit: unit||"",
+      ymm: ymm,
+      plate: coverCell(tt,trow,["plate","license","tag"]),
+      vin: coverCell(tt,trow,["vin"]),
+      color: coverCell(tt,trow,["color","colour"]),
+      driver: driver||""
+    };
+  }
+  function buildCoverSheet(d){
+    function line(cls,txt,style){ var e=el("div",{class:cls,text:txt}); if(style)e.setAttribute("style",style); return e; }
+    var s=el("div",{class:"cover-sheet"});
+    s.appendChild(line("cs-sm","OPERATED BY"));
+    s.appendChild(line("cs-lg",(d.company||"__________")+", LLC"));
+    s.appendChild(line("cs-sm","Carrier Responsible for Safety:","margin-top:16px"));
+    s.appendChild(line("cs-md",(d.company||"__________")+", LLC"));
+    s.appendChild(line("cs-row","EIN: "+(d.ein||"__-_______"),"margin-top:10px"));
+    s.appendChild(line("cs-row","MC#: "+(d.mc||"_______")));
+    s.appendChild(line("cs-row","U.S. DOT#: "+(d.dot||"_______")));
+    s.appendChild(line("cs-lg","UNIT# "+(d.unit||"____"),"margin-top:18px"));
+    s.appendChild(line("cs-md",d.ymm||"Year Make Model"));
+    s.appendChild(line("cs-md",d.plate||"Plate"));
+    s.appendChild(line("cs-md",d.vin||"VIN#"));
+    s.appendChild(line("cs-md",(d.color||"Color")+"; "+(d.driver||"Driver")));
+    return s;
+  }
+  function syncCoverPrint(){ var pa=document.getElementById("cover-print-area"); if(pa && coverState){ pa.textContent=""; pa.appendChild(buildCoverSheet(coverState.data)); } }
+  function updateCoverPreview(){ var p=document.querySelector("#cover-body .cover-preview"); if(p){ p.textContent=""; p.appendChild(buildCoverSheet(coverState.data)); } syncCoverPrint(); }
+  function renderCoverStatus(msg){ var e=document.getElementById("cover-status"); if(e) e.textContent=msg||""; }
+  function openCoverPage(){
+    coverState={ sel:{driver:"",authority:"",truck:""}, data:blankCover() };
+    document.getElementById("cover-overlay").classList.remove("hidden"); document.body.style.overflow="hidden";
+    renderCover();
+    if(S365.signedIn && S365.driveId && !S365.trucksTbl && !S365.authTbl){
+      renderCoverStatus("Loading Trucks & Authorities tabs…");
+      loadCoverTables().then(function(){ renderCoverStatus(""); }, function(){ renderCoverStatus("Couldn’t read those tabs — check the tab names in ⚙ Settings, or just fill the fields below manually."); });
+    }
+  }
+  function closeCoverPage(){ document.getElementById("cover-overlay").classList.add("hidden"); document.body.style.overflow=""; }
+  function coverFillFromSheet(){
+    var r=S365.roster;
+    var driverName = (coverState.sel.driver && r && r.byDriver[coverState.sel.driver]) ? r.byDriver[coverState.sel.driver].name : coverState.sel.driver;
+    coverState.data = buildCover(driverName, coverState.sel.authority, coverState.sel.truck);
+    renderCover();
+  }
+  function coverPick(label, opts, cur, onchange){
+    var f=el("div",{class:"field"}); f.appendChild(el("label",{text:label}));
+    var s=el("select"); s.appendChild(el("option",{value:"",text:"—"}));
+    opts.forEach(function(o){ var op=el("option",{value:o.v,text:o.t}); if(o.v===cur)op.selected=true; s.appendChild(op); });
+    s.addEventListener("change", function(){ onchange(s.value); });
+    f.appendChild(s); return f;
+  }
+  function renderCover(){
+    var body=document.getElementById("cover-body"); if(!body) return; body.textContent="";
+    var r=S365.roster;
+    body.appendChild(el("p",{class:"note", id:"cover-status", text:(S365.signedIn ? "" : "Sign in to load drivers/trucks, or fill the fields below manually.")}));
+    if(r && r.drivers && r.drivers.length){
+      var ctrls=el("div",{class:"cover-controls"});
+      ctrls.appendChild(coverPick("Driver", r.drivers.map(function(d){return {v:d.key,t:d.label};}), coverState.sel.driver, function(v){
+        coverState.sel.driver=v;
+        if(v && r.byDriver[v]){ if(r.byDriver[v].authority) coverState.sel.authority=r.byDriver[v].authority; if(r.byDriver[v].truck) coverState.sel.truck=r.byDriver[v].truck; }
+        coverFillFromSheet();
+      }));
+      ctrls.appendChild(coverPick("Authority", r.authorities.map(function(a){return {v:a,t:a};}), coverState.sel.authority, function(v){ coverState.sel.authority=v; coverFillFromSheet(); }));
+      ctrls.appendChild(coverPick("Truck / Unit #", r.trucks.map(function(t){return {v:t,t:t};}), coverState.sel.truck, function(v){ coverState.sel.truck=v; coverFillFromSheet(); }));
+      body.appendChild(ctrls);
+    }
+    var grid=el("div",{class:"cover-fields"});
+    [["company","Carrier / LLC name"],["ein","EIN"],["mc","MC#"],["dot","U.S. DOT#"],["unit","Unit #"],["ymm","Year Make Model"],["plate","Plate"],["vin","VIN"],["color","Color"],["driver","Driver"]].forEach(function(f){
+      var fld=el("div",{class:"field"});
+      fld.appendChild(el("label",{text:f[1]}));
+      var inp=el("input",{type:"text"}); inp.value=coverState.data[f[0]]||"";
+      inp.addEventListener("input", function(){ coverState.data[f[0]]=inp.value; updateCoverPreview(); });
+      fld.appendChild(inp); grid.appendChild(fld);
+    });
+    body.appendChild(grid);
+    body.appendChild(el("div",{class:"cover-preview"}, buildCoverSheet(coverState.data)));
+    syncCoverPrint();
+    body.appendChild(el("div",{style:"display:flex;gap:10px;justify-content:flex-end;margin-top:14px"},
+      el("button",{class:"btn",text:"Close", onclick:closeCoverPage}),
+      el("button",{class:"btn primary",text:"🖨 Print / Save as PDF", onclick:function(){ syncCoverPrint(); window.print(); }})
+    ));
+  }
+
   function onPickDriver(key, card){
     if(!S365.roster || !S365.roster.byDriver[key]) return;
     captureContextForm();
@@ -6216,12 +5955,12 @@
     return path || SP.configFile;
   }
   function normalizeConfigStorage(storage){
-    return "sharepoint";
+    return String(storage||SP.configStorage).toLowerCase()==="sharepoint" ? "sharepoint" : "onedrive";
   }
-  function activeConfigFile(){ return SP.configFile; }
-  function activeConfigStorage(){ return SP.configStorage; }
-  function activeConfigSharePointUrl(){ return SP.configSharePointUrl; }
-  function configLocationLabel(storage){ return "Fixed SharePoint JSON"; }
+  function activeConfigFile(){ return normalizeConfigPath(config.remoteConfigPath || SP.configFile); }
+  function activeConfigStorage(){ return normalizeConfigStorage(config.remoteConfigStorage || SP.configStorage); }
+  function activeConfigSharePointUrl(){ return String(config.remoteConfigSharePointUrl || "").trim(); }
+  function configLocationLabel(storage){ return normalizeConfigStorage(storage)==="sharepoint" ? "SharePoint Documents" : "OneDrive My Files"; }
   function encodeDrivePath(path){ return normalizeConfigPath(path).split("/").map(encodeURIComponent).join("/"); }
   function resolveConfigSharePointBase(){
     var url=activeConfigSharePointUrl();
@@ -6247,22 +5986,16 @@
       if(remote.cardOverrides) config.cardOverrides=remote.cardOverrides;
       if(remote.customCards) config.customCards=remote.customCards;
       if(remote.hiddenCards) config.hiddenCards=remote.hiddenCards;
-      if(remote.userPins && typeof remote.userPins==="object") config.userPins=remote.userPins;
       if(remote.deletedSessions) mergeDeletedSessions(remote.deletedSessions);
       if(remote.sessions) mergeSharedSessions(remote.sessions);
       if(remote.mapping) config.mapping=remote.mapping;
       if(remote.fleetUrl) config.fleetUrl=String(remote.fleetUrl).trim() || SP.fleetUrl;
-      loadPinsForCurrentUser();
-      // Never allow the remote JSON (or stale browser data) to change where sync saves.
-      config.remoteConfigStorage=SP.configStorage;
-      config.remoteConfigPath=SP.configFile;
-      config.remoteConfigSharePointUrl=SP.configSharePointUrl;
-      var remoteCleanupChanged=false;
-      if(restoreRequiredCards()) remoteCleanupChanged=true;
-      if(normalizeOwnerLabels()) remoteCleanupChanged=true;
-      if(normalizeDriverEventTokens()) remoteCleanupChanged=true;
+      if(remote.remoteConfigSharePointUrl != null) config.remoteConfigSharePointUrl=String(remote.remoteConfigSharePointUrl||"").trim();
+      if(remote.remoteConfigStorage) config.remoteConfigStorage=normalizeConfigStorage(remote.remoteConfigStorage);
+      if(remote.remoteConfigPath) config.remoteConfigPath=normalizeConfigPath(remote.remoteConfigPath);
+      var labelsChanged=normalizeOwnerLabels();
       try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){}
-      if(remoteCleanupChanged && S365.signedIn) setTimeout(pushRemoteConfig, 0);
+      if(labelsChanged && S365.signedIn) setTimeout(pushRemoteConfig, 0);
     }
   }
   function readRemoteConfigAt(path, storage){
@@ -6309,7 +6042,7 @@
     if(!S365.signedIn) return;        // local-only until signed in
     setSync("saving","Syncing changes…");
     var payload={ version:1, savedAt:new Date().toISOString(), remoteConfigStorage:activeConfigStorage(), remoteConfigPath:activeConfigFile(), remoteConfigSharePointUrl:activeConfigSharePointUrl(),
-      cardOverrides:config.cardOverrides, customCards:config.customCards, hiddenCards:config.hiddenCards, userPins:config.userPins||{}, mapping:config.mapping, fleetUrl:activeFleetUrl(),
+      cardOverrides:config.cardOverrides, customCards:config.customCards, hiddenCards:config.hiddenCards, mapping:config.mapping, fleetUrl:activeFleetUrl(),
       sessions:pruneDeletedSessions(state.sessions), deletedSessions:config.deletedSessions||{} };
     configPath(null, null, true).then(function(contentUrl){ return graph(contentUrl, { method:"PUT", body:JSON.stringify(payload,null,2), headers:{"Content-Type":"application/json"} }, "saving JSON"); })
       .then(function(){ S365.remote.present=true; S365.remote.storage=activeConfigStorage(); S365.remote.path=activeConfigFile(); setSync("ok","Synced ✓"); })
@@ -6326,17 +6059,22 @@
       st.appendChild(el("div",{}, el("b",{text:"Signed in: "}), (S365.account.username||S365.account.name||"")));
       st.appendChild(el("div",{}, el("b",{text:"Fleet sheet: "}), S365.item?"connected":"not found"));
       st.appendChild(el("div",{}, el("b",{text:"Fleet link: "}), activeFleetUrl()));
-      st.appendChild(el("div",{}, el("b",{text:"Saved JSON: "}), S365.remote.present?("syncing to the fixed shared SharePoint JSON"+(S365.remote.by?(" · last edit by "+S365.remote.by):"")):"not created yet (saves on first edit)"));
-      st.appendChild(el("div",{}, el("b",{text:"JSON location: "}), activeConfigSharePointUrl()));
-      st.appendChild(el("div",{}, el("b",{text:"Your pins: "}), String((state.pins||[]).length)+" saved for "+(S365.account.username||S365.account.name||"this sign-in")));
+      st.appendChild(el("div",{}, el("b",{text:"Saved JSON: "}), S365.remote.present?("syncing to "+configLocationLabel(S365.remote.storage)+(S365.remote.by?(" · last edit by "+S365.remote.by):"")):"not created yet (saves on first edit)"));
+      st.appendChild(el("div",{}, el("b",{text:"JSON location: "}), activeConfigStorage()==="sharepoint" && activeConfigSharePointUrl()?activeConfigSharePointUrl():(configLocationLabel(activeConfigStorage())+" / "+activeConfigFile())));
     } else {
       st.appendChild(el("div",{text:"Not signed in. Use Sign in (top right) to load drivers and sync edits across the office."}));
     }
     body.appendChild(st);
     if(!S365.signedIn) return;
 
-    body.appendChild(el("p",{class:"note",text:"Shared card edits are locked to the fixed SharePoint JSON above so every office user syncs to the same file. This location cannot be changed from individual browsers."}));
+    var stoRow=el("div",{class:"settings-row"}); stoRow.appendChild(el("label",{text:"Where shared edits are saved"}));
+    var stoSel=el("select",{id:"set-config-storage"});
+    [["sharepoint","SharePoint Documents (shared with the office)"],["onedrive","OneDrive My Files (only me)"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===activeConfigStorage())o.selected=true; stoSel.appendChild(o); });
+    stoRow.appendChild(stoSel); body.appendChild(stoRow);
+    body.appendChild(colRow("JSON file name / path","set-config-path",activeConfigFile()));
+    body.appendChild(colRow("SharePoint JSON folder/file link","set-config-sp-url",activeConfigSharePointUrl()));
     body.appendChild(colRow("Fleet Master Sheet sharing link","set-fleet-url",activeFleetUrl()));
+    body.appendChild(el("p",{class:"note",text:"To choose a SharePoint library or folder, paste its sharing link above. If the link points directly to a JSON file, the file name/path field is ignored. Leave it blank to use the Fleet Master Sheet document library."}));
 
     var wsRow=el("div",{class:"settings-row"}); wsRow.appendChild(el("label",{text:"Worksheet (tab) to read"}));
     var wsSel=el("select",{id:"set-ws"}); (S365.worksheets.length?S365.worksheets:[m.worksheet]).forEach(function(n){ var o=el("option",{value:n,text:n}); if(n===m.worksheet)o.selected=true; wsSel.appendChild(o); });
@@ -6354,6 +6092,10 @@
     body.appendChild(colRow("DOT # column","set-dot",m.colDot));
     body.appendChild(el("p",{class:"note",text:"Type the exact column header text from your sheet. Matching is case-insensitive and allows partial matches."}));
 
+    body.appendChild(colRow("Trucks tab (for cover page)","set-trucks-sheet",m.trucksSheet||"Trucks"));
+    body.appendChild(colRow("Authorities tab (for cover page)","set-auth-sheet",m.authoritiesSheet||"Authorities"));
+    body.appendChild(el("p",{class:"note",text:"The Cover Page tool reads truck specs (Year/Make/Model, Plate, VIN, Color) from the Trucks tab and LLC name / EIN / MC# / DOT# from the Authorities tab."}));
+
     body.appendChild(el("div",{style:"display:flex;gap:10px;justify-content:flex-end;margin-top:6px"},
       el("button",{class:"btn",text:"Reload data", onclick:function(){ saveMapping(false); setSync("saving","Reloading…"); reconnectM365().then(function(){ setSync("ok","Synced ✓"); rerenderAll(); renderSettings(); }).catch(function(){ setSync("err","Couldn’t read that data"); renderSettings(); }); }}),
       el("button",{class:"btn primary",text:"Save settings", onclick:function(){ saveMapping(true); setSync("saving","Syncing changes…"); reconnectM365().then(function(){ setSync("ok","Synced ✓"); rerenderAll(); closeSettings(); }).catch(function(){ setSync("err","Saved locally — couldn’t reconnect"); closeSettings(); }); }})
@@ -6363,14 +6105,16 @@
   }
   function saveMapping(persist){
     function gv(id){ var e=document.getElementById(id); return e?e.value:""; }
-    config.remoteConfigStorage=SP.configStorage;
-    config.remoteConfigPath=SP.configFile;
-    config.remoteConfigSharePointUrl=SP.configSharePointUrl;
+    config.remoteConfigStorage=normalizeConfigStorage(gv("set-config-storage") || activeConfigStorage());
+    config.remoteConfigPath=normalizeConfigPath(gv("set-config-path") || config.remoteConfigPath || SP.configFile);
+    config.remoteConfigSharePointUrl=String(gv("set-config-sp-url") || "").trim();
     config.fleetUrl=String(gv("set-fleet-url") || config.fleetUrl || SP.fleetUrl).trim() || SP.fleetUrl;
     try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){}
     config.mapping={ worksheet:gv("set-ws")||config.mapping.worksheet, nameMode:gv("set-namemode")||"firstlast",
       colName:gv("set-name"), colFirst:gv("set-first"), colLast:gv("set-last"),
-      colTruck:gv("set-truck"), colAuthority:gv("set-auth"), colDot:gv("set-dot") };
+      colTruck:gv("set-truck"), colAuthority:gv("set-auth"), colDot:gv("set-dot"),
+      trucksSheet:gv("set-trucks-sheet")||"Trucks", authoritiesSheet:gv("set-auth-sheet")||"Authorities" };
+    S365.trucksTbl=null; S365.authTbl=null;   // force cover tables to reload with new tab names
     if(persist) scheduleSave();
   }
 
