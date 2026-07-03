@@ -111,6 +111,9 @@
   .toggle-row{display:flex;align-items:center;gap:9px;margin-top:10px;font-size:13.5px;font-weight:600}
   .toggle-row input{width:16px;height:16px}
   .ctx-apply{margin-top:12px}
+  .folder-link-row{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+  .folder-link-row .folder-btn{display:inline-flex;align-items:center;gap:6px;text-decoration:none;border:1px solid #c7d7f2;background:#fff;color:var(--accent);border-radius:9px;padding:7px 10px;font-size:13px;font-weight:700}
+  .folder-link-row .folder-btn:hover{background:#edf4ff;border-color:var(--accent)}
 
   /* Content */
   .content-block{margin-bottom:18px}
@@ -5184,6 +5187,7 @@
     }
     if(!isNewDriver) grid.appendChild(field("Current truck #", truckCtrl("f-old")));
     grid.appendChild(field("New truck #", truckCtrl("f-new", true)));
+    grid.appendChild(renderFolderLinks());
     wrap.appendChild(grid);
 
     if(isAuth){
@@ -5233,6 +5237,52 @@
     function selectPlaceholder(){
       var s=el("select",{disabled:"disabled"}); s.appendChild(el("option",{text:"Sign in to load drivers"})); return s;
     }
+  }
+
+  function spSharedFolderUrl(path, viewid){
+    var base="https://ultimatecorp-my.sharepoint.com/shared";
+    var listurl="https://ultimatecorp.sharepoint.com/sites/UltimateLogisticsLLC/Shared Documents";
+    var q="?id="+encodeURIComponent(path)+"&listurl="+encodeURIComponent(listurl);
+    if(viewid) q += "&viewid="+encodeURIComponent(viewid);
+    return base+q;
+  }
+  function driverFolderUrl(driverName){
+    var name=String(driverName||"").trim();
+    if(!name) return "";
+    return spSharedFolderUrl("/sites/UltimateLogisticsLLC/Shared Documents/Driver Documents/"+name);
+  }
+  function tractorFolderUrl(truckNo){
+    var n=String(truckNo||"").trim();
+    if(!n) return "";
+    return spSharedFolderUrl("/sites/UltimateLogisticsLLC/Shared Documents/Equipment/Tractors/"+n, "a44e9030-a3e0-4738-9c7a-c6af2d6baa51");
+  }
+  function renderFolderLinks(){
+    var row=el("div",{class:"folder-link-row"});
+    var driverBtn=folderBtn("Driver folder", function(){
+      captureContextForm();
+      return driverFolderUrl(modalState.formValues.driver);
+    });
+    var oldBtn=folderBtn("Current tractor folder", function(){
+      captureContextForm();
+      return tractorFolderUrl(modalState.formValues.old);
+    });
+    var newBtn=folderBtn("New tractor folder", function(){
+      captureContextForm();
+      return tractorFolderUrl(modalState.formValues.new);
+    });
+    row.appendChild(driverBtn);
+    row.appendChild(oldBtn);
+    row.appendChild(newBtn);
+    return row;
+  }
+  function folderBtn(label, getUrl){
+    var a=el("a",{class:"folder-btn",href:"#",target:"_blank",rel:"noopener",text:"📁 "+label});
+    a.addEventListener("click",function(e){
+      var url=getUrl();
+      if(!url){ e.preventDefault(); window.alert("Pick/fill the matching driver or tractor first."); return; }
+      a.href=url;
+    });
+    return a;
   }
 
   function captureContextForm(){
