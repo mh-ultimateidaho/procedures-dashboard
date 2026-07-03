@@ -155,21 +155,27 @@
   .cover-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px}
   .cover-fields .field label{font-size:11px;font-weight:700;color:var(--muted)}
   .cover-fields input{border:1px solid var(--line-strong);border-radius:8px;padding:7px 9px;width:100%}
-  .cover-preview{border:1px solid var(--line);border-radius:12px;background:#fff;padding:8px;margin-bottom:4px}
-  .cover-sheet{max-width:520px;margin:0 auto;padding:40px 30px;text-align:center;font-family:var(--sans);color:#000}
-  .cover-sheet .cs-sm{font-size:14px;font-weight:700;letter-spacing:.02em}
-  .cover-sheet .cs-md{font-size:17px;font-weight:700;margin-top:2px}
-  .cover-sheet .cs-lg{font-size:26px;font-weight:800;margin:4px 0}
-  .cover-sheet .cs-row{font-size:15px;font-weight:700;margin-top:1px}
+  .cover-preview{border:1px solid var(--line);border-radius:12px;background:#fff;padding:8px;margin-bottom:4px;overflow:auto}
+  .cover-preview .cover-sheet{zoom:0.5}
+  .cover-sheet{margin:0 auto;text-align:center;color:#000;font-family:Calibri,"Segoe UI",Aptos,Arial,sans-serif;font-weight:700;line-height:1.15}
+  .cover-sheet .cs-line{font-weight:700}
+  .cover-sheet .cs-48{font-size:48pt}
+  .cover-sheet .cs-40{font-size:40pt}
+  .cover-sheet .cs-24{font-size:24pt}
+  .cover-sheet .cs-20{font-size:20pt}
+  .cover-sheet .cs-gap{font-size:12pt;line-height:1.15}
   #cover-print-area{display:none}
+  .cover-auto{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;margin-bottom:12px}
+  .cover-auto input{width:16px;height:16px}
+  .cover-diag{margin-top:12px;border:1px solid var(--line);border-radius:9px;padding:2px 10px}
+  .cover-diag > summary{cursor:pointer;font-size:12.5px;font-weight:700;color:var(--muted);padding:7px 0;list-style:none}
+  .cover-diag > summary::-webkit-details-marker{display:none}
+  .cover-diag-body{font-size:12.5px;padding:2px 0 8px;word-break:break-word}
   @media print{
     body{visibility:hidden}
     #cover-print-area{display:block;visibility:visible;position:absolute;left:0;top:0;width:100%}
     #cover-print-area *{visibility:visible}
-    #cover-print-area .cover-sheet{max-width:none;padding:120px 40px}
-    #cover-print-area .cs-lg{font-size:34px}
-    #cover-print-area .cs-md{font-size:20px}
-    #cover-print-area .cs-row{font-size:18px}
+    #cover-print-area .cover-sheet{zoom:1;padding-top:1.3in}
   }
   .toggle-bar{display:flex;flex-direction:column;gap:7px;margin-bottom:16px}
   .toggle-bar .tg{display:flex;align-items:center;gap:9px;font-size:13.5px;font-weight:600;background:var(--accent-soft);border:1px solid #d4e0f6;border-radius:9px;padding:8px 11px}
@@ -5834,68 +5840,92 @@
   function loadCoverTables(){
     if(!S365.signedIn || !S365.driveId) return Promise.resolve();
     var m=config.mapping;
-    return Promise.all([
-      readTable(m.trucksSheet||"Trucks","reading Trucks tab").then(function(t){ S365.trucksTbl=t; }, function(){ S365.trucksTbl=null; return Promise.reject("trucks"); }),
-      readTable(m.authoritiesSheet||"Authorities","reading Authorities tab").then(function(t){ S365.authTbl=t; }, function(){ S365.authTbl=null; return Promise.reject("auth"); })
-    ]);
+    var p1=readTable(m.trucksSheet||"Trucks","reading Trucks tab").then(function(t){ S365.trucksTbl=t; }, function(){ S365.trucksTbl=null; });
+    var p2=readTable(m.authoritiesSheet||"Authorities","reading Authorities tab").then(function(t){ S365.authTbl=t; }, function(){ S365.authTbl=null; });
+    return Promise.all([p1,p2]);
   }
+  function toFirstLast(name){ if(!name) return ""; name=String(name).trim(); var i=name.indexOf(", "); if(i>=0) return (name.slice(i+2)+" "+name.slice(0,i)).trim(); return name; }
   function buildCover(driver, authority, unit){
     var tt=S365.trucksTbl, at=S365.authTbl;
     var trow=coverFindRow(tt, ["unit","truck","tractor"], unit);
-    var arow=coverFindRow(at, ["authority","carrier","llc","name","legal"], authority);
-    var year=coverCell(tt,trow,["year"]);
-    var make=coverCell(tt,trow,["make"]);
-    var model=coverCell(tt,trow,["model"]);
-    var type=coverCell(tt,trow,["type","make/model","make & model"]);
+    var arow=coverFindRow(at, ["authority","carrier","llc","legal name","name","legal"], authority);
+    var year=coverCell(tt,trow,["year","yr"]);
+    var make=coverCell(tt,trow,["make","mk"]);
+    var model=coverCell(tt,trow,["model","mdl"]);
+    var type=coverCell(tt,trow,["make/model","make & model","make model","type"]);
     var mm=[make,model].filter(Boolean).join(" ").trim() || type;
     var ymm=[year, mm].filter(Boolean).join(" ").trim();
     return {
-      company: coverCell(at,arow,["legal","llc","company","dba","carrier","name","authority"]) || authority || "",
-      ein: coverCell(at,arow,["ein","fein","tax id","tax-id"]),
-      mc: coverCell(at,arow,["mc#","mc ","mc","docket"]),
-      dot: coverCell(at,arow,["usdot","us dot","dot#","dot"]),
+      company: coverCell(at,arow,["legal name","legal","llc name","llc","company","dba","carrier name","carrier","name","authority"]) || authority || "",
+      ein: coverCell(at,arow,["ein","fein","federal ein","tax id","taxid","tax-id","federal id","employer id"]),
+      mc: coverCell(at,arow,["mc#","mc #","mc no","mc number","mc","docket"]),
+      dot: coverCell(at,arow,["usdot#","usdot","us dot","dot#","dot #","dot number","dot"]),
       unit: unit||"",
       ymm: ymm,
-      plate: coverCell(tt,trow,["plate","license","tag"]),
-      vin: coverCell(tt,trow,["vin"]),
-      color: coverCell(tt,trow,["color","colour"]),
-      driver: driver||""
+      plate: coverCell(tt,trow,["plate","license plate","license","lic","tag"]),
+      vin: coverCell(tt,trow,["vin#","vin","vin number"]),
+      color: coverCell(tt,trow,["color","colour","truck color","tractor color"]),
+      driver: toFirstLast(driver)
     };
   }
+  function coverCompany(name){ var n=String(name||"").trim(); n=n.replace(/[,\s]+LLC\.?$/i,"").trim(); return n; }
   function buildCoverSheet(d){
-    function line(cls,txt,style){ var e=el("div",{class:cls,text:txt}); if(style)e.setAttribute("style",style); return e; }
     var s=el("div",{class:"cover-sheet"});
-    s.appendChild(line("cs-sm","OPERATED BY"));
-    s.appendChild(line("cs-lg",(d.company||"__________")+", LLC"));
-    s.appendChild(line("cs-sm","Carrier Responsible for Safety:","margin-top:16px"));
-    s.appendChild(line("cs-md",(d.company||"__________")+", LLC"));
-    s.appendChild(line("cs-row","EIN: "+(d.ein||"__-_______"),"margin-top:10px"));
-    s.appendChild(line("cs-row","MC#: "+(d.mc||"_______")));
-    s.appendChild(line("cs-row","U.S. DOT#: "+(d.dot||"_______")));
-    s.appendChild(line("cs-lg","UNIT# "+(d.unit||"____"),"margin-top:18px"));
-    s.appendChild(line("cs-md",d.ymm||"Year Make Model"));
-    s.appendChild(line("cs-md",d.plate||"Plate"));
-    s.appendChild(line("cs-md",d.vin||"VIN#"));
-    s.appendChild(line("cs-md",(d.color||"Color")+"; "+(d.driver||"Driver")));
+    function ln(cls,txt){ s.appendChild(el("div",{class:"cs-line "+cls, text:txt})); }
+    function gap(){ s.appendChild(el("div",{class:"cs-gap", text:"\u00a0"})); }
+    var co=coverCompany(d.company)||"__________";
+    ln("cs-48","OPERATED BY");
+    ln("cs-48", co+", LLC");
+    ln("cs-24","Carrier Responsible for Safety:");
+    ln("cs-24", co+", LLC");
+    ln("cs-24","EIN: "+(d.ein||"__-_______"));
+    gap();
+    ln("cs-40","MC#: "+(d.mc||"_______"));
+    ln("cs-40","U.S. DOT#: "+(d.dot||"_______"));
+    gap();
+    ln("cs-48","UNIT# "+(d.unit||"____"));
+    gap();
+    ln("cs-40", d.ymm||"Year Make Model");
+    ln("cs-40", d.plate||"Plate");
+    ln("cs-40", d.vin||"VIN#");
+    ln("cs-20", (d.color||"Color")+"; "+(d.driver||"Driver"));
     return s;
   }
   function syncCoverPrint(){ var pa=document.getElementById("cover-print-area"); if(pa && coverState){ pa.textContent=""; pa.appendChild(buildCoverSheet(coverState.data)); } }
   function updateCoverPreview(){ var p=document.querySelector("#cover-body .cover-preview"); if(p){ p.textContent=""; p.appendChild(buildCoverSheet(coverState.data)); } syncCoverPrint(); }
   function renderCoverStatus(msg){ var e=document.getElementById("cover-status"); if(e) e.textContent=msg||""; }
   function openCoverPage(){
-    coverState={ sel:{driver:"",authority:"",truck:""}, data:blankCover() };
+    coverState={ sel:{driver:"",authority:"",truck:""}, data:blankCover(), autoFill:true };
     document.getElementById("cover-overlay").classList.remove("hidden"); document.body.style.overflow="hidden";
     renderCover();
-    if(S365.signedIn && S365.driveId && !S365.trucksTbl && !S365.authTbl){
-      renderCoverStatus("Loading Trucks & Authorities tabs…");
-      loadCoverTables().then(function(){ renderCoverStatus(""); }, function(){ renderCoverStatus("Couldn’t read those tabs — check the tab names in ⚙ Settings, or just fill the fields below manually."); });
-    }
+    coverReload();
+  }
+  function coverReload(){
+    if(!(S365.signedIn && S365.driveId)) return;
+    S365.trucksTbl=null; S365.authTbl=null;   // always pull fresh (picks up renamed columns)
+    renderCoverStatus("Loading Trucks & Authorities tabs…");
+    loadCoverTables().then(function(){
+      if(!S365.trucksTbl && !S365.authTbl) renderCoverStatus("Couldn’t read the Trucks/Authorities tabs — check the tab names in ⚙ Settings.");
+      else renderCoverStatus("");
+      if(coverState.sel.driver||coverState.sel.authority||coverState.sel.truck) coverFillFromSheet(); else renderCover();
+    });
   }
   function closeCoverPage(){ document.getElementById("cover-overlay").classList.add("hidden"); document.body.style.overflow=""; }
   function coverFillFromSheet(){
-    var r=S365.roster;
-    var driverName = (coverState.sel.driver && r && r.byDriver[coverState.sel.driver]) ? r.byDriver[coverState.sel.driver].name : coverState.sel.driver;
-    coverState.data = buildCover(driverName, coverState.sel.authority, coverState.sel.truck);
+    var r=S365.roster, sel=coverState.sel;
+    var rec=(sel.driver && r && r.byDriver[sel.driver]) ? r.byDriver[sel.driver] : null;
+    var driverName = rec ? rec.name : sel.driver;
+    if(coverState.autoFill){
+      var filled=buildCover(driverName, sel.authority, sel.truck);
+      if(!filled.dot && rec && rec.dot) filled.dot=rec.dot;   // roster DOT as a fallback
+      // apply sheet values, but keep any manual entry where the sheet had nothing
+      ["company","ein","mc","dot","unit","ymm","plate","vin","color","driver"].forEach(function(k){ if(filled[k]) coverState.data[k]=filled[k]; });
+    } else {
+      // manual mode: only grab the identifiers from the selection, leave the rest to type
+      if(driverName) coverState.data.driver=toFirstLast(driverName);
+      if(sel.truck) coverState.data.unit=sel.truck;
+      if(sel.authority && !coverState.data.company) coverState.data.company=sel.authority;
+    }
     renderCover();
   }
   function coverPick(label, opts, cur, onchange){
@@ -5909,6 +5939,11 @@
     var body=document.getElementById("cover-body"); if(!body) return; body.textContent="";
     var r=S365.roster;
     body.appendChild(el("p",{class:"note", id:"cover-status", text:(S365.signedIn ? "" : "Sign in to load drivers/trucks, or fill the fields below manually.")}));
+    var afRow=el("label",{class:"cover-auto"});
+    var afcb=el("input",{type:"checkbox"}); afcb.checked=coverState.autoFill;
+    afcb.addEventListener("change", function(){ coverState.autoFill=afcb.checked; if(afcb.checked) coverFillFromSheet(); });
+    afRow.appendChild(afcb); afRow.appendChild(document.createTextNode(" Auto-fill from Fleet Master Sheet — uncheck to type everything by hand"));
+    body.appendChild(afRow);
     if(r && r.drivers && r.drivers.length){
       var ctrls=el("div",{class:"cover-controls"});
       ctrls.appendChild(coverPick("Driver", r.drivers.map(function(d){return {v:d.key,t:d.label};}), coverState.sel.driver, function(v){
@@ -5931,10 +5966,27 @@
     body.appendChild(grid);
     body.appendChild(el("div",{class:"cover-preview"}, buildCoverSheet(coverState.data)));
     syncCoverPrint();
+
+    var diag=el("details",{class:"cover-diag"});
+    diag.appendChild(el("summary",{text:"Diagnostics — why isn’t something filling?"}));
+    var db=el("div",{class:"cover-diag-body"});
+    db.appendChild(coverDiagLine("Trucks tab", S365.trucksTbl, coverState.sel.truck, ["unit","truck","tractor"]));
+    db.appendChild(coverDiagLine("Authorities tab", S365.authTbl, coverState.sel.authority, ["authority","carrier","llc","legal name","name","legal"]));
+    diag.appendChild(db);
+    body.appendChild(diag);
+
     body.appendChild(el("div",{style:"display:flex;gap:10px;justify-content:flex-end;margin-top:14px"},
       el("button",{class:"btn",text:"Close", onclick:closeCoverPage}),
       el("button",{class:"btn primary",text:"🖨 Print / Save as PDF", onclick:function(){ syncCoverPrint(); window.print(); }})
     ));
+  }
+  function coverDiagLine(label, tbl, keyVal, keyCols){
+    var d=el("div",{style:"margin-bottom:8px"});
+    if(!tbl){ d.appendChild(el("div",{text:label+": not loaded. Check the tab name in ⚙ Settings (or sign in)."})); return d; }
+    var row=coverFindRow(tbl, keyCols, keyVal);
+    d.appendChild(el("div",{}, el("b",{text:label+": "}), document.createTextNode(tbl.rows.length+" rows. Row match for “"+(keyVal||"—")+"”: "+(row?"found ✓":"not found ✗"))));
+    d.appendChild(el("div",{class:"note", style:"margin-top:2px", text:"Columns found: "+tbl.head.map(function(h){return String(h==null?"":h);}).filter(function(x){return x.trim();}).join("  ·  ")}));
+    return d;
   }
 
   function onPickDriver(key, card){
