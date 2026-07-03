@@ -6428,7 +6428,8 @@
     }
     renderCoverPage();
   }
-  function closeCoverPage(){ coverOverlay.classList.add("hidden"); coverOverlay.setAttribute("aria-hidden","true"); document.body.style.overflow=""; }
+  function resetCoverValues(){ coverValues={driverpick:"", authoritypick:"", truckpick:"", driver:"", authority:"", safetyCompany:"", dot:"", ein:"", mc:"", unit:"", year:"", make:"", model:"", plate:"", vin:"", color:""}; }
+  function closeCoverPage(){ coverOverlay.classList.add("hidden"); coverOverlay.setAttribute("aria-hidden","true"); document.body.style.overflow=""; resetCoverValues(); if(coverBody) coverBody.textContent=""; }
 
   function renderCoverPage(){
     coverBody.textContent="";
