@@ -119,11 +119,11 @@
   .cover-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:14px}
   .cover-grid .wide{grid-column:1/-1}
   .cover-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;margin-top:16px}
-  .cover-preview{border:1px solid var(--line);border-radius:12px;background:#fff;padding:16px;margin-top:12px;text-align:center;font-family:"Times New Roman",Times,serif;color:#000}
-  .cover-preview .big{font-weight:700;font-size:34px;line-height:1.05}
+  .cover-preview{border:1px solid var(--line);border-radius:12px;background:#fff;padding:54pt 8pt 36pt;margin-top:12px;text-align:center;font-family:"Times New Roman",Times,serif;color:#000;font-weight:700;line-height:1;min-height:760px}
+  .cover-preview .big{font-size:48pt;line-height:1}
   .cover-preview .fill{color:#000}.cover-preview .under{text-decoration:underline}
-  .cover-preview .mid{font-weight:700;font-size:22px;line-height:1.05}.cover-preview .huge{font-weight:700;font-size:30px;line-height:1.05}
-  .cover-preview .gap{height:18px}.cover-preview .gap-lg{height:32px}
+  .cover-preview .mid{font-size:24pt;line-height:1}.cover-preview .huge{font-size:40pt;line-height:1}.cover-preview .small{font-size:20pt;line-height:1}
+  .cover-preview .gap{height:36pt}.cover-preview .gap-lg{height:62pt}
 
   /* Content */
   .content-block{margin-bottom:18px}
@@ -6355,6 +6355,10 @@
     var out={authoritiesByName:{}, tractorsByUnit:{}, driversByName:{}, authorities:[], tractors:[], drivers:[]};
     function clean(v){ return String(v==null?"":v).trim(); }
     function key(v){ return clean(v).toLowerCase(); }
+    function isActiveCurrent(v){
+      var x=key(v);
+      return x==="yes" || x==="y" || x==="true" || x==="active" || x==="current" || x==="1";
+    }
     function hidx(head, names){
       head=(head||[]).map(function(x){return clean(x).toLowerCase().replace(/[.]/g,"").replace(/[#]/g,"#").replace(/\s+/g," ");});
       for(var n=0;n<names.length;n++){
@@ -6376,7 +6380,8 @@
         for(var r=1;r<authVals.length;r++){
           var row=authVals[r]||[], name=ia>=0?clean(row[ia]):""; if(!name) continue;
           var rec={authority:name, dot:idot>=0?clean(row[idot]):"", mc:imc>=0?clean(row[imc]):"", ein:iein>=0?clean(row[iein]):"", current:icur>=0?clean(row[icur]):""};
-          out.authoritiesByName[key(name)]=rec; out.authorities.push(rec);
+          out.authoritiesByName[key(name)]=rec;
+          if(icur<0 || isActiveCurrent(rec.current)) out.authorities.push(rec);
         }
         out.authorities.sort(function(a,b){ return a.authority.localeCompare(b.authority); });
       }
@@ -6390,12 +6395,22 @@
         out.tractors.sort(function(a,b){ return String(a.unit).localeCompare(String(b.unit), undefined, {numeric:true, sensitivity:"base"}); });
       }
       if(drVals.length){
-        var dh=drVals[0]||[], iname=hidx(dh,["Driver","Driver Name","Name","Full Name"]), ifirst=hidx(dh,["First","First Name"]), ilast=hidx(dh,["Last","Last Name"]), icurD=hidx(dh,["Current?","Current"]);
+        var dh=drVals[0]||[], iid=hidx(dh,["Driver ID","DriverID","ID"]), iname=hidx(dh,["Driver Name","Full Name","Name"]), ifirst=hidx(dh,["First","First Name"]), ilast=hidx(dh,["Last","Last Name"]), icurD=hidx(dh,["Current?","Current"]);
         for(var d=1;d<drVals.length;d++){
-          var dr=drVals[d]||[], first=ifirst>=0?clean(dr[ifirst]):"", last=ilast>=0?clean(dr[ilast]):"";
-          var name=iname>=0?clean(dr[iname]):([first,last].filter(Boolean).join(" "));
+          var dr=drVals[d]||[], id=iid>=0?clean(dr[iid]):"", first=ifirst>=0?clean(dr[ifirst]):"", last=ilast>=0?clean(dr[ilast]):"";
+          // Prefer First + Last for the actual cover-page Driver field.
+          // The Drivers tab has a separate Driver ID column, and that should never become the printed driver name.
+          var full=[first,last].filter(Boolean).join(" ");
+          var fallback=iname>=0?clean(dr[iname]):"";
+          var name=full || fallback || id;
           var label=(last&&first)?(last+", "+first):name;
-          if(name){ var recD={name:name, label:label, first:first, last:last, current:icurD>=0?clean(dr[icurD]):""}; out.driversByName[key(name)]=recD; out.drivers.push(recD); }
+          if(name){
+            var recD={id:id, name:name, label:label, first:first, last:last, current:icurD>=0?clean(dr[icurD]):""};
+            out.driversByName[key(name)]=recD;
+            if(id) out.driversByName[key(id)]=recD;
+            if(label) out.driversByName[key(label)]=recD;
+            if(icurD<0 || isActiveCurrent(recD.current)) out.drivers.push(recD);
+          }
         }
         out.drivers.sort(function(a,b){ return a.label.localeCompare(b.label); });
       }
@@ -6417,13 +6432,13 @@
 
   function renderCoverPage(){
     coverBody.textContent="";
-    coverBody.appendChild(el("p",{class:"note",text:"Pick Driver, Authority, and Truck separately from Fleet Master Sheet, or hand-fill any field. PDF output is black text and kept to one page."}));
+    coverBody.appendChild(el("p",{class:"note",text:"Pick Driver, Authority, and Truck separately from Fleet Master Sheet, or hand-fill any field. Driver and Authority dropdowns show only active/current rows; Truck # shows all trucks. PDF output is black text and kept to one page."}));
     var grid=el("div",{class:"cover-grid"});
     var look=(S365&&S365.coverLookups)||{};
     if(look.drivers && look.drivers.length){
       var dp=el("select",{id:"cover-driverpick"}); dp.appendChild(el("option",{value:"",text:"— pick driver —"}));
-      look.drivers.forEach(function(d){ var val=d.name; var o=el("option",{value:val,text:d.label||d.name}); if(val===coverValues.driverpick || val===coverValues.driver) o.selected=true; dp.appendChild(o); });
-      dp.addEventListener("change",function(){ coverValues.driverpick=dp.value; var d=(look.driversByName||{})[String(dp.value).toLowerCase()]; coverValues.driver=d?(d.name||dp.value):dp.value; renderCoverPage(); });
+      look.drivers.forEach(function(d){ var val=d.id||d.name; var o=el("option",{value:val,text:d.label||d.name}); if(val===coverValues.driverpick || d.name===coverValues.driver) o.selected=true; dp.appendChild(o); });
+      dp.addEventListener("change",function(){ coverValues.driverpick=dp.value; var d=(look.driversByName||{})[String(dp.value).toLowerCase()]; coverValues.driver=d?(d.name||""):dp.value; renderCoverPage(); });
       grid.appendChild(coverField("Driver from Drivers tab", dp));
     }
     if(look.authorities && look.authorities.length){
@@ -6465,7 +6480,8 @@
     else if(coverValues.authority && !coverValues.safetyCompany) coverValues.safetyCompany=coverValues.authority;
     var t=(look.tractorsByUnit||{})[tk];
     if(t){ ["unit","year","make","model","plate","vin","color"].forEach(function(k){ coverValues[k]=coverValues[k]||t[k]||""; }); }
-    var d=(look.driversByName||{})[dk]; if(d){ coverValues.driver=coverValues.driver||d.name; }
+    var d=(look.driversByName||{})[dk] || (look.driversByName||{})[String(coverValues.driverpick||"").trim().toLowerCase()];
+    if(d){ coverValues.driver=d.name||coverValues.driver; }
     if(alertIfMissing && S365.signedIn && ((!a && coverValues.authority) || (!t && coverValues.unit) || (!d && coverValues.driver))){
       window.alert((!a&&coverValues.authority?"I couldn’t find that authority on the Authorities tab.\n":"")+(!t&&coverValues.unit?"I couldn’t find that truck/unit on the Trucks tab.\n":"")+(!d&&coverValues.driver?"I couldn’t find that driver on the Drivers tab.\n":"")+"You can still hand-fill the missing fields.");
     }
@@ -6486,7 +6502,7 @@
       '<div class="huge fill">'+escHtml(ymm)+'</div>'+ 
       '<div class="huge fill">'+escHtml(v.plate||"Plate")+'</div>'+ 
       '<div class="huge fill">'+escHtml(v.vin||"VIN#")+'</div>'+ 
-      '<div class="mid fill">'+escHtml((v.color||"Color")+"; "+(v.driver||"Driver"))+'</div>';
+      '<div class="small fill">'+escHtml((v.color||"Color")+"; "+(v.driver||"Driver"))+'</div>';
     return box;
   }
   function escHtml(s){ return String(s||"").replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c];}); }
@@ -6495,30 +6511,47 @@
 
   function downloadCoverPdf(){
     var v=Object.assign({},coverValues), company=coverCompanyText(v.authority||"Company, LLC"), safety=coverCompanyText(v.safetyCompany||v.authority||"Company, LLC"), ymm=[v.year,v.make,v.model].filter(Boolean).join(" ")||"Year Make Model";
+    // Match the original Word cover sheet: Times New Roman-style bold, centered, black text, one page.
+    // Long authority/company lines shrink just enough to stay on one line.
     var lines=[
-      {t:"OPERATED BY", size:54, y:704},
-      {t:company, size:54, y:650, max:560},
-      {t:"Carrier Responsible for Safety:", size:26, y:592, u:true},
-      {t:safety, size:28, y:560, u:true, max:560},
-      {t:"EIN: "+(v.ein||"##-#######"), size:26, y:518},
-      {t:"MC#: "+(v.mc||"#######"), size:44, y:430, max:560},
-      {t:"U.S. DOT#: "+(v.dot||"#######"), size:44, y:374, max:560},
-      {t:"UNIT#"+(v.unit||"111"), size:54, y:250, max:560},
-      {t:ymm, size:44, y:124, max:560},
-      {t:v.plate||"Plate", size:38, y:82, max:560},
-      {t:v.vin||"VIN#", size:38, y:44, max:560},
-      {t:(v.color||"Color")+"; "+(v.driver||"Driver"), size:24, y:16, max:560}
+      {t:"OPERATED BY", size:48, y:674, max:560},
+      {t:company, size:48, y:619, max:560},
+      {t:"Carrier Responsible for Safety:", size:24, y:588, u:true, max:560},
+      {t:safety, size:24, y:559, u:true, max:560},
+      {t:"EIN: "+(v.ein||"##-#######"), size:24, y:531, max:560},
+      {t:"MC#: "+(v.mc||"#######"), size:40, y:461, max:560},
+      {t:"U.S. DOT#: "+(v.dot||"#######"), size:40, y:415, max:560},
+      {t:"UNIT#"+(v.unit||"111"), size:48, y:315, max:560},
+      {t:ymm, size:40, y:214, max:560},
+      {t:v.plate||"Plate", size:40, y:168, max:560},
+      {t:v.vin||"VIN#", size:40, y:120, max:560},
+      {t:(v.color||"Color")+"; "+(v.driver||"Driver"), size:20, y:95, max:560}
     ];
-    var stream="BT\n/FB 54 Tf\n0 0 0 rg\n";
-    lines.forEach(function(L){ var size=fitPdfSize(L.t,L.size,L.max||540); var font="/FB"; var w=pdfTextWidthApprox(L.t,size); var x=(612-w)/2; stream+=font+" "+size.toFixed(2)+" Tf\n"+x.toFixed(2)+" "+L.y.toFixed(2)+" Td ("+pdfEsc(L.t)+") Tj\n"+(-x).toFixed(2)+" "+(-L.y).toFixed(2)+" Td\n"; if(L.u){ var ux=(612-w)/2, uy=L.y-3; stream+="ET\n1.2 w\n"+ux.toFixed(2)+" "+uy.toFixed(2)+" m "+(ux+w).toFixed(2)+" "+uy.toFixed(2)+" l S\nBT\n"; } });
+    var stream="BT\n/FB 48 Tf\n0 0 0 rg\n";
+    lines.forEach(function(L){
+      var size=fitPdfSize(L.t,L.size,L.max||560);
+      var w=pdfTextWidthApprox(L.t,size);
+      var x=(612-w)/2;
+      stream+="/FB "+size.toFixed(2)+" Tf\n"+x.toFixed(2)+" "+L.y.toFixed(2)+" Td ("+pdfEsc(L.t)+") Tj\n"+(-x).toFixed(2)+" "+(-L.y).toFixed(2)+" Td\n";
+      if(L.u){ var ux=(612-w)/2, uy=L.y-3; stream+="ET\n1.1 w\n"+ux.toFixed(2)+" "+uy.toFixed(2)+" m "+(ux+w).toFixed(2)+" "+uy.toFixed(2)+" l S\nBT\n"; }
+    });
     stream+="ET\n";
     var pdf=buildSimplePdf(stream);
     var blob=new Blob([pdf],{type:"application/pdf"});
     var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="UNIT "+safeFilePart(v.unit||"###")+" COVER PAGE "+safeFilePart(company||"Company")+".pdf"; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },500);
   }
   function pdfEsc(s){ return String(s||"").replace(/[\\()]/g,function(c){ return "\\"+c; }).replace(/[\r\n]+/g," "); }
-  function pdfTextWidthApprox(s,size){ return String(s||"").length*size*0.53; }
-  function fitPdfSize(s,size,max){ max=max||560; var w=pdfTextWidthApprox(s,size); if(w<=max) return size; return Math.max(16, size*(max/w)); }
+  var _coverMeasureCanvas=null;
+  function pdfTextWidthApprox(s,size){
+    try{
+      _coverMeasureCanvas=_coverMeasureCanvas||document.createElement("canvas");
+      var ctx=_coverMeasureCanvas.getContext("2d");
+      ctx.font="bold "+size+"pt 'Times New Roman', Times, serif";
+      // Canvas measures CSS pixels. Convert px back to PDF points.
+      return ctx.measureText(String(s||"")).width*72/96;
+    }catch(e){ return String(s||"").length*size*0.50; }
+  }
+  function fitPdfSize(s,size,max){ max=max||560; var w=pdfTextWidthApprox(s,size); if(w<=max) return size; return Math.max(14, size*(max/w)); }
   function buildSimplePdf(content){
     var objs=[];
     function obj(s){ objs.push(s); return objs.length; }
