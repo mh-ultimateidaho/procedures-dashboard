@@ -6359,6 +6359,35 @@
       var x=key(v);
       return x==="yes" || x==="y" || x==="true" || x==="active" || x==="current" || x==="1";
     }
+    function parseDateish(v){
+      if(v==null || v==="") return null;
+      if(v instanceof Date && !isNaN(v)) return v;
+      if(typeof v==="number" && isFinite(v)){
+        // Excel serial date: days since 1899-12-30.
+        return new Date(Date.UTC(1899,11,30) + Math.round(v)*86400000);
+      }
+      var s=clean(v);
+      if(!s) return null;
+      if(/^\d+(?:\.\d+)?$/.test(s)){
+        var n=Number(s);
+        if(n>20000 && n<90000) return new Date(Date.UTC(1899,11,30) + Math.round(n)*86400000);
+      }
+      var m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+      if(m){
+        var yy=Number(m[3]); if(yy<100) yy+=2000;
+        var d=new Date(yy, Number(m[1])-1, Number(m[2]));
+        return isNaN(d)?null:d;
+      }
+      var parsed=new Date(s);
+      return isNaN(parsed)?null:parsed;
+    }
+    function insuranceNotExpired(v){
+      var d=parseDateish(v);
+      if(!d) return false; // no valid insurance expiration = do not treat as active
+      var today=new Date(); today.setHours(0,0,0,0);
+      d.setHours(0,0,0,0);
+      return d.getTime()>=today.getTime();
+    }
     function hidx(head, names){
       head=(head||[]).map(function(x){return clean(x).toLowerCase().replace(/[.]/g,"").replace(/[#]/g,"#").replace(/\s+/g," ");});
       for(var n=0;n<names.length;n++){
@@ -6376,14 +6405,26 @@
       var authVals=all[0]||[], truckVals=(all[1]&&all[1].length?all[1]:all[2])||[], drVals=all[3]||[];
       if(authVals.length){
         var h=authVals[0]||[], ia=hidx(h,["Authority","Authority / LLC","LLC","Company","Company Name","Name","Legal Name"]),
-          idot=hidx(h,["DOT #","DOT#","U.S. DOT#","USDOT","US DOT","DOT"]), imc=hidx(h,["MC #","MC#","MC","MC Number"]), iein=hidx(h,["EIN","FEIN","Federal ID","Federal ID #","Tax ID"]), icur=hidx(h,["Current?","Current"]);
+          idot=hidx(h,["DOT #","DOT#","U.S. DOT#","USDOT","US DOT","DOT"]), imc=hidx(h,["MC #","MC#","MC","MC Number"]), iein=hidx(h,["EIN","FEIN","Federal ID","Federal ID #","Tax ID"]),
+          icur=hidx(h,["Current?","Current"]), iins=hidx(h,["Insurance Exp","Insurance Expiration","Insurance Exp.","Insurance Exp Date","Insurance Expiration Date","Ins Exp","Ins. Exp","Policy Exp","Policy Expiration"]);
         for(var r=1;r<authVals.length;r++){
           var row=authVals[r]||[], name=ia>=0?clean(row[ia]):""; if(!name) continue;
-          var rec={authority:name, dot:idot>=0?clean(row[idot]):"", mc:imc>=0?clean(row[imc]):"", ein:iein>=0?clean(row[iein]):"", current:icur>=0?clean(row[icur]):""};
+          var rec={authority:name, dot:idot>=0?clean(row[idot]):"", mc:imc>=0?clean(row[imc]):"", ein:iein>=0?clean(row[iein]):"", current:icur>=0?clean(row[icur]):"", insuranceExp:iins>=0?clean(row[iins]):""};
           out.authoritiesByName[key(name)]=rec;
-          if(icur<0 || isActiveCurrent(rec.current)) out.authorities.push(rec);
+          // Authority dropdowns are based on Insurance Exp, not Current?, so authorities without
+          // a current driver can still appear as long as their insurance is not expired.
+          if(insuranceNotExpired(rec.insuranceExp)) out.authorities.push(rec);
         }
         out.authorities.sort(function(a,b){ return a.authority.localeCompare(b.authority); });
+        if(S365 && S365.roster){
+          var activeNames={}, activeDots={};
+          out.authorities.forEach(function(a){
+            if(a.authority) activeNames[a.authority]=1;
+            if(a.authority && a.dot) activeDots[key(a.authority)]=a.dot;
+          });
+          S365.roster.authorities=Object.keys(activeNames).sort(function(a,b){ return a.localeCompare(b, undefined, {sensitivity:"base", numeric:true}); });
+          S365.roster.byAuthorityDot=Object.assign({}, S365.roster.byAuthorityDot||{}, activeDots);
+        }
       }
       if(truckVals.length){
         var th=truckVals[0]||[], iu=hidx(th,["Truck #","Truck#","Unit #","Unit#","Unit","Tractor #","Tractor#"]), iy=hidx(th,["Year"]), ima=hidx(th,["Make","Type"]), imo=hidx(th,["Model"]), ip=hidx(th,["Plate","Plate #","License Plate"]), iv=hidx(th,["VIN","VIN #","VIN#"]), ic=hidx(th,["Color","Colour"]), isvc=hidx(th,["In Service?","In Service"]);
@@ -6433,7 +6474,7 @@
 
   function renderCoverPage(){
     coverBody.textContent="";
-    coverBody.appendChild(el("p",{class:"note",text:"Pick Driver, Authority, and Truck separately from Fleet Master Sheet, or hand-fill any field. Driver and Authority dropdowns show only active/current rows; Truck # shows all trucks. PDF output is black text and kept to one page."}));
+    coverBody.appendChild(el("p",{class:"note",text:"Pick Driver, Authority, and Truck separately from Fleet Master Sheet, or hand-fill any field. Driver dropdown shows current drivers; Authority dropdown shows authorities with a valid Insurance Exp date that is not expired; Truck # shows all trucks. PDF output is black text and kept to one page."}));
     var grid=el("div",{class:"cover-grid"});
     var look=(S365&&S365.coverLookups)||{};
     if(look.drivers && look.drivers.length){
