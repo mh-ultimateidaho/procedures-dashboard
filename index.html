@@ -167,6 +167,11 @@
   .toggle-bar .tg .sp{flex:1}
   .archived-sec > summary{cursor:pointer;list-style:none;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:6px 0;margin-bottom:6px}
   .archived-sec > summary::-webkit-details-marker{display:none}
+  .archived-filter{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0 12px}
+  .archived-filter label{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.02em}
+  .archived-filter select,.archived-filter input[type=date]{border:1px solid var(--line-strong);border-radius:8px;padding:6px 8px;background:#fff;font-size:13px}
+  .archived-filter .spacer{flex:1}
+  .archived-filter .filter-note{font-size:12px;color:var(--muted);font-weight:600}
   .card .edited{font-size:11px;color:var(--muted);margin-top:9px}
   .review-bar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:-4px 0 16px}
   .review-bar .review-label{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
@@ -4216,6 +4221,7 @@
   var state = safeParse(STATE_KEY, null) || {pins:[], recents:[], sessions:[]};
   state.pins = state.pins || []; state.recents = state.recents || []; state.sessions = state.sessions || [];
   state.sessions = pruneDeletedSessions(state.sessions);
+  var archiveFilters = { kind:"all", when:"all", from:"", to:"" };
   // Clean up older shared/local settings after helpers and built-in cards are ready.
   var startupConfigChanged=false;
 
@@ -4890,11 +4896,17 @@
 
     // Archived (collapsible, for future reference)
     if(archivedSessions.length){
+      var filteredArchived = filterArchivedSessions(archivedSessions);
       var arSec=el("details",{class:"home-sec archived-sec"});
-      arSec.appendChild(el("summary",{text:"Archived ("+archivedSessions.length+")"}));
-      var ag=el("div",{class:"grid"});
-      archivedSessions.forEach(function(s){ ag.appendChild(ipTile(s)); });
-      arSec.appendChild(ag);
+      arSec.appendChild(el("summary",{text:"Archived ("+filteredArchived.length+" shown / "+archivedSessions.length+" total)"}));
+      arSec.appendChild(archiveFilterControls(archivedSessions.length, filteredArchived.length));
+      if(filteredArchived.length===0){
+        arSec.appendChild(el("div",{class:"empty",text:"No archived cards match those filters."}));
+      }else{
+        var ag=el("div",{class:"grid"});
+        filteredArchived.forEach(function(s){ ag.appendChild(ipTile(s)); });
+        arSec.appendChild(ag);
+      }
       root.appendChild(arSec);
     }
 
@@ -5885,14 +5897,86 @@
   }
 
   /* ----- saved-session date / archive helpers ----- */
+  function sessionDateStamp(s){ return Number((s && (s.archivedAt || s.updatedAt || s.savedAt)) || 0); }
+  function sessionEventDateStamp(s){
+    var raw=String((s && s.eventDate) || "").trim();
+    if(raw){
+      var d=new Date(raw+"T00:00:00");
+      var t=d.getTime();
+      if(!isNaN(t)) return t;
+    }
+    return sessionDateStamp(s);
+  }
   function sortSessions(list){
     return list.sort(function(a,b){
+      // Archived cards sort by the card/event date (“when this happens”), newest first.
+      if((a&&a.archived) || (b&&b.archived)){
+        var ea=sessionEventDateStamp(a), eb=sessionEventDateStamp(b);
+        if(ea!==eb) return eb-ea;
+        return sessionDateStamp(b)-sessionDateStamp(a);
+      }
       var da=a.eventDate||"", db=b.eventDate||"";
       if(da && db){ return da<db?-1:(da>db?1:(b.savedAt-a.savedAt)); }
       if(da && !db) return -1;
       if(!da && db) return 1;
       return b.savedAt-a.savedAt;
     });
+  }
+  function sessionCardTitle(s){ var c=getEffectiveCard(s.cardId); return String((c&&c.title)||s.label||""); }
+  function archiveKindForSession(s){
+    var title=sessionCardTitle(s).toLowerCase();
+    var id=String((s&&s.cardId)||"").toLowerCase();
+    if(title.indexOf("driver quit")>=0 || id.indexOf("driver-quits")>=0) return "quit";
+    if(title.indexOf("new driver")>=0 || id.indexOf("new-driver")>=0 || title.indexOf("new authority")>=0 || id.indexOf("new-authority")>=0) return "new";
+    return "other";
+  }
+  function dateOnlyFromStamp(stamp){
+    var d=new Date(Number(stamp)||Date.now()); d.setHours(0,0,0,0); return d;
+  }
+  function monthBounds(offset){
+    var now=new Date();
+    var start=new Date(now.getFullYear(), now.getMonth()+offset, 1);
+    var end=new Date(now.getFullYear(), now.getMonth()+offset+1, 1);
+    return {start:start, end:end};
+  }
+  function filterArchivedSessions(list){
+    return (Array.isArray(list)?list:[]).filter(function(s){
+      if(archiveFilters.kind!=="all" && archiveKindForSession(s)!==archiveFilters.kind) return false;
+      var d=dateOnlyFromStamp(sessionEventDateStamp(s));
+      if(archiveFilters.when==="thisMonth"){ var m=monthBounds(0); if(!(d>=m.start && d<m.end)) return false; }
+      if(archiveFilters.when==="lastMonth"){ var lm=monthBounds(-1); if(!(d>=lm.start && d<lm.end)) return false; }
+      if(archiveFilters.when==="custom"){
+        if(archiveFilters.from){ var f=new Date(archiveFilters.from+"T00:00:00"); if(d<f) return false; }
+        if(archiveFilters.to){ var t=new Date(archiveFilters.to+"T23:59:59"); if(d>t) return false; }
+      }
+      return true;
+    });
+  }
+  function archiveFilterControls(total, shown){
+    var kind=el("select",{onchange:function(){ archiveFilters.kind=this.value; renderHome(); }},
+      el("option",{value:"all",text:"All archived cards"}),
+      el("option",{value:"new",text:"New driver / new authority"}),
+      el("option",{value:"quit",text:"Quit driver"}),
+      el("option",{value:"other",text:"Other cards"})
+    );
+    kind.value=archiveFilters.kind||"all";
+    var when=el("select",{onchange:function(){ archiveFilters.when=this.value; renderHome(); }},
+      el("option",{value:"all",text:"Any time"}),
+      el("option",{value:"thisMonth",text:"This month"}),
+      el("option",{value:"lastMonth",text:"Last month"}),
+      el("option",{value:"custom",text:"Custom dates"})
+    );
+    when.value=archiveFilters.when||"all";
+    var from=el("input",{type:"date",value:archiveFilters.from||"", onchange:function(){ archiveFilters.from=this.value; archiveFilters.when="custom"; renderHome(); }});
+    var to=el("input",{type:"date",value:archiveFilters.to||"", onchange:function(){ archiveFilters.to=this.value; archiveFilters.when="custom"; renderHome(); }});
+    if(archiveFilters.when!=="custom"){ from.classList.add("hidden"); to.classList.add("hidden"); }
+    return el("div",{class:"archived-filter"},
+      el("label",{text:"Show"}), kind,
+      el("label",{text:"Done"}), when,
+      from, to,
+      el("span",{class:"spacer"}),
+      el("span",{class:"filter-note",text:shown+" of "+total+" shown · sorted by card date"})
+    );
   }
   function formatEventDate(d){
     if(!d) return "";
@@ -5907,8 +5991,8 @@
     var p=String(d).split("-"); if(p.length!==3) return false;
     return new Date(Number(p[0]), Number(p[1])-1, Number(p[2])) < today;
   }
-  function archiveSession(id){ var s=state.sessions.filter(function(x){return x.id===id;})[0]; if(s){ s.archived=true; s.updatedAt=Date.now(); saveSharedSessions(); renderHome(); } }
-  function unarchiveSession(id){ var s=state.sessions.filter(function(x){return x.id===id;})[0]; if(s){ s.archived=false; s.updatedAt=Date.now(); saveSharedSessions(); renderHome(); } }
+  function archiveSession(id){ var s=state.sessions.filter(function(x){return x.id===id;})[0]; if(s){ var now=Date.now(); s.archived=true; s.archivedAt=s.archivedAt||now; s.updatedAt=now; saveSharedSessions(); renderHome(); } }
+  function unarchiveSession(id){ var s=state.sessions.filter(function(x){return x.id===id;})[0]; if(s){ s.archived=false; delete s.archivedAt; s.updatedAt=Date.now(); saveSharedSessions(); renderHome(); } }
 
   /* ====================================================================
      NEW CARD BUILDER
@@ -6381,12 +6465,21 @@
       var parsed=new Date(s);
       return isNaN(parsed)?null:parsed;
     }
-    function insuranceNotExpired(v){
+    function dateNotExpired(v){
       var d=parseDateish(v);
-      if(!d) return false; // no valid insurance expiration = do not treat as active
+      if(!d) return false;
       var today=new Date(); today.setHours(0,0,0,0);
       d.setHours(0,0,0,0);
       return d.getTime()>=today.getTime();
+    }
+    function includeByDateOrCurrent(dateVal, currentVal, hasDateCol, hasCurrentCol){
+      // Primary rule: include if the relevant expiration date is valid and not expired.
+      // Catch-all rule: also include rows marked Current? = Yes, even if the date is missing/expired.
+      // If neither column exists, do not accidentally hide everything.
+      if(hasDateCol && dateNotExpired(dateVal)) return true;
+      if(hasCurrentCol && isActiveCurrent(currentVal)) return true;
+      if(!hasDateCol && !hasCurrentCol) return true;
+      return false;
     }
     function hidx(head, names){
       head=(head||[]).map(function(x){return clean(x).toLowerCase().replace(/[.]/g,"").replace(/[#]/g,"#").replace(/\s+/g," ");});
@@ -6411,9 +6504,9 @@
           var row=authVals[r]||[], name=ia>=0?clean(row[ia]):""; if(!name) continue;
           var rec={authority:name, dot:idot>=0?clean(row[idot]):"", mc:imc>=0?clean(row[imc]):"", ein:iein>=0?clean(row[iein]):"", current:icur>=0?clean(row[icur]):"", insuranceExp:iins>=0?clean(row[iins]):""};
           out.authoritiesByName[key(name)]=rec;
-          // Authority dropdowns are based on Insurance Exp, not Current?, so authorities without
-          // a current driver can still appear as long as their insurance is not expired.
-          if(insuranceNotExpired(rec.insuranceExp)) out.authorities.push(rec);
+          // Authority dropdowns use Insurance Exp as the main active signal, plus Current? = Yes as a catch-all.
+          // This keeps insured authorities available even when they don't currently have a driver assigned.
+          if(includeByDateOrCurrent(rec.insuranceExp, rec.current, iins>=0, icur>=0)) out.authorities.push(rec);
         }
         out.authorities.sort(function(a,b){ return a.authority.localeCompare(b.authority); });
         if(S365 && S365.roster){
@@ -6436,7 +6529,7 @@
         out.tractors.sort(function(a,b){ return String(a.unit).localeCompare(String(b.unit), undefined, {numeric:true, sensitivity:"base"}); });
       }
       if(drVals.length){
-        var dh=drVals[0]||[], iid=hidx(dh,["Driver ID","DriverID","ID"]), iname=hidx(dh,["Driver Name","Full Name","Name"]), ifirst=hidx(dh,["First","First Name"]), ilast=hidx(dh,["Last","Last Name"]), icurD=hidx(dh,["Current?","Current"]);
+        var dh=drVals[0]||[], iid=hidx(dh,["Driver ID","DriverID","ID"]), iname=hidx(dh,["Driver Name","Full Name","Name"]), ifirst=hidx(dh,["First","First Name"]), ilast=hidx(dh,["Last","Last Name"]), icurD=hidx(dh,["Current?","Current"]), imed=hidx(dh,["Medical Exp","Medical Expiration","Medical Exp.","Medical Exp Date","Medical Expiration Date","Med Exp","Med. Exp"]);
         for(var d=1;d<drVals.length;d++){
           var dr=drVals[d]||[], id=iid>=0?clean(dr[iid]):"", first=ifirst>=0?clean(dr[ifirst]):"", last=ilast>=0?clean(dr[ilast]):"";
           // Prefer First + Last for the actual cover-page Driver field.
@@ -6446,14 +6539,27 @@
           var name=full || fallback || id;
           var label=(last&&first)?(last+", "+first):name;
           if(name){
-            var recD={id:id, name:name, label:label, first:first, last:last, current:icurD>=0?clean(dr[icurD]):""};
+            var recD={id:id, name:name, label:label, first:first, last:last, current:icurD>=0?clean(dr[icurD]):"", medicalExp:imed>=0?clean(dr[imed]):""};
             out.driversByName[key(name)]=recD;
             if(id) out.driversByName[key(id)]=recD;
             if(label) out.driversByName[key(label)]=recD;
-            if(icurD<0 || isActiveCurrent(recD.current)) out.drivers.push(recD);
+            if(includeByDateOrCurrent(recD.medicalExp, recD.current, imed>=0, icurD>=0)) out.drivers.push(recD);
           }
         }
         out.drivers.sort(function(a,b){ return a.label.localeCompare(b.label); });
+        // Use the same Medical Exp / Current? filtered Drivers-tab list in driver cards, too.
+        // Merge it with Current Roster assignment details when available, so assigned drivers still auto-fill authority/truck.
+        if(S365 && S365.roster){
+          var mergedByDriver=Object.assign({}, S365.roster.byDriver||{});
+          S365.roster.drivers=out.drivers.map(function(d){
+            var existing=mergedByDriver[d.label] || mergedByDriver[d.name] || mergedByDriver[(d.name||"")+(d.id?(" #"+d.id):"")];
+            var keyVal=d.label || d.name;
+            mergedByDriver[keyVal]=Object.assign({name:d.name, truck:"", authority:"", dot:""}, existing||{});
+            mergedByDriver[keyVal].name=d.name || (existing&&existing.name) || "";
+            return {key:keyVal, label:d.label||d.name};
+          });
+          S365.roster.byDriver=mergedByDriver;
+        }
       }
       S365.coverLookups=out;
     }).catch(function(){ S365.coverLookups=out; });
@@ -6474,7 +6580,7 @@
 
   function renderCoverPage(){
     coverBody.textContent="";
-    coverBody.appendChild(el("p",{class:"note",text:"Pick Driver, Authority, and Truck separately from Fleet Master Sheet, or hand-fill any field. Driver dropdown shows current drivers; Authority dropdown shows authorities with a valid Insurance Exp date that is not expired; Truck # shows all trucks. PDF output is black text and kept to one page."}));
+    coverBody.appendChild(el("p",{class:"note",text:"Pick Driver, Authority, and Truck separately from Fleet Master Sheet, or hand-fill any field. Driver dropdown shows drivers with a valid Medical Exp date that is not expired, plus any marked Current? = Yes; Authority dropdown shows authorities with a valid Insurance Exp date that is not expired, plus any marked Current? = Yes; Truck # shows all trucks. PDF output is black text and kept to one page."}));
     var grid=el("div",{class:"cover-grid"});
     var look=(S365&&S365.coverLookups)||{};
     if(look.drivers && look.drivers.length){
