@@ -6146,7 +6146,7 @@
     clientId: "2688e58a-1841-4c5b-8630-f92ff88238cc",
     tenantId: "2c6b3d13-b98c-4605-8fcc-d8eed3579136",
     scopes: ["https://graph.microsoft.com/Sites.ReadWrite.All", "https://graph.microsoft.com/Files.ReadWrite.All"],
-    fleetUrl: "https://ultimatecorp.sharepoint.com/:x:/r/sites/UltimateLogisticsLLC/_layouts/15/Doc.aspx?sourcedoc=%7B36A2C772-3F8C-42ED-A901-797013BCFBC0%7D&file=Fleet%20Master%20Sheet.xlsx&action=default&mobileredirect=true",
+    fleetUrl: "https://ultimatecorp.sharepoint.com/:x:/r/sites/UltimateLogisticsLLC/_layouts/15/Doc.aspx?sourcedoc=%7B1373254C-C2DF-465C-ADE6-24914AA40C2F%7D&file=Fleet%20Master%20Sheet.xlsx&action=default&mobileredirect=true",
     // Shared edits are intentionally locked to one SharePoint JSON file.
     // Do not let per-browser settings point users at old/personal JSON files.
     configStorage: "sharepoint",
@@ -6164,7 +6164,7 @@
   config.remoteConfigStorage = SP.configStorage;
   config.remoteConfigPath = SP.configFile;
   config.remoteConfigSharePointUrl = SP.configSharePointUrl;
-  config.fleetUrl = config.fleetUrl || SP.fleetUrl;
+  config.fleetUrl = SP.fleetUrl;
   config._sharedStorageMigrated = true;
   try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){}
 
@@ -6363,7 +6363,7 @@
       if(remote.deletedSessions) mergeDeletedSessions(remote.deletedSessions);
       if(remote.sessions) mergeSharedSessions(remote.sessions);
       if(remote.mapping) config.mapping=remote.mapping;
-      if(remote.fleetUrl) config.fleetUrl=String(remote.fleetUrl).trim() || SP.fleetUrl;
+      config.fleetUrl=SP.fleetUrl;
       loadPinsForCurrentUser();
       // Never allow the remote JSON (or stale browser data) to change where sync saves.
       config.remoteConfigStorage=SP.configStorage;
