@@ -245,6 +245,11 @@
   .settings-row select,.settings-row input{border:1px solid var(--line-strong);border-radius:8px;padding:8px 9px;background:#fff}
   .settings-status{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:11px 13px;margin-bottom:16px;font-size:13px}
   .settings-status b{color:var(--ink)}
+  .settings-panel{border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin-bottom:14px;background:#fff}
+  .settings-panel h3{margin:0 0 8px;font-size:13px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+  .settings-panel .status-line{display:flex;gap:7px;flex-wrap:wrap;margin:4px 0}
+  .settings-panel .status-line b{color:var(--ink)}
+  .settings-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:10px}
   .note{font-size:12.5px;color:var(--muted)}
   .ctx-pick{grid-column:1/-1}
 </style>
@@ -4941,6 +4946,25 @@
     root.appendChild(recSec);
   }
 
+  function sessionDriverDisplay(s){
+    var fv=(s&&s.formValues)||{};
+    var ctx=(s&&s.context)||{};
+    var picked=stripTruckSuffixFromDriverLabel(fv.driverpick||"");
+    if(picked && picked.indexOf(",")>=0) return picked;
+    var name=String(ctx.DRIVER || fv.driver || "").trim();
+    if(!name) return "(no driver)";
+    if(name.indexOf(",")>=0) return stripTruckSuffixFromDriverLabel(name);
+    // Saved cards created after the cover-page fix may store Driver as First Last;
+    // card tiles use Last, First so active/archive cards look consistent.
+    var parts=name.split(/\s+/).filter(Boolean);
+    if(parts.length>=2){
+      var first=parts.shift();
+      var last=parts.join(" ");
+      return last+", "+first;
+    }
+    return name;
+  }
+
   function ipTile(s){
     var card0=getEffectiveCard(s.cardId);
     var title=(card0&&card0.title)||(s.label||"Checklist");
@@ -4950,7 +4974,7 @@
     var tnum = (s.context && (s.context.NEW||s.context.OLD)) ? ("#"+(s.context.NEW||s.context.OLD)) : "";
     if(tnum) truckLine.push(tnum);
     var tile=el("div",{class:"ip-card"+(s.archived?" archived":"")},
-      el("div",{class:"top"}, mkBadge(s.section), el("span",{class:"who",text:(s.context&&s.context.DRIVER)||"(no driver)"})),
+      el("div",{class:"top"}, mkBadge(s.section), el("span",{class:"who",text:sessionDriverDisplay(s)})),
       el("div",{class:"meta",text:title}),
       (s.eventDate ? el("div",{class:"when"+(isPastDate(s.eventDate)?" past":""), text:"📅 "+formatEventDate(s.eventDate)}) : el("div",{class:"meta",text:"No date set"})),
       el("div",{class:"meta",text:truckLine.join("  ·  ")||"—"}),
@@ -5288,6 +5312,39 @@
     if(!name) return "";
     return spSharedFolderUrl("/sites/UltimateLogisticsLLC/Shared Documents/Driver Documents/"+name);
   }
+  function stripTruckSuffixFromDriverLabel(label){
+    return String(label||"").replace(/\s+#\s*[^#]+$/, "").trim();
+  }
+  function driverFolderNameFromContext(){
+    var v=(modalState && modalState.formValues) ? modalState.formValues : {};
+    var pick=String(v.driverpick||"").trim();
+    var fromRoster=null;
+    if(pick && S365 && S365.roster && S365.roster.byDriver){
+      fromRoster=S365.roster.byDriver[pick] || null;
+    }
+    // The actual SharePoint folder names are Last, First. The visible Driver name field is often
+    // First Last for cover pages/documents, so don't use it for folder links unless we have to.
+    if(pick){
+      var pickedFolderName=stripTruckSuffixFromDriverLabel(pick);
+      if(pickedFolderName && pickedFolderName.indexOf(",")>=0) return pickedFolderName;
+    }
+    if(fromRoster && fromRoster.name && String(fromRoster.name).indexOf(",")>=0){
+      return stripTruckSuffixFromDriverLabel(fromRoster.name);
+    }
+    var driver=String(v.driver||"").trim();
+    if(driver.indexOf(",")>=0) return stripTruckSuffixFromDriverLabel(driver);
+    if(S365 && S365.coverLookups && S365.coverLookups.driversByName){
+      var rec=S365.coverLookups.driversByName[String(driver).toLowerCase()];
+      if(rec && rec.label) return rec.label;
+    }
+    var parts=driver.split(/\s+/).filter(Boolean);
+    if(parts.length>=2){
+      var first=parts.shift();
+      var last=parts.join(" ");
+      return last+", "+first;
+    }
+    return driver;
+  }
   function tractorFolderUrl(truckNo){
     var n=String(truckNo||"").trim();
     if(!n) return "";
@@ -5297,7 +5354,7 @@
     var row=el("div",{class:"folder-link-row"});
     var driverBtn=folderBtn("Driver folder", function(){
       captureContextForm();
-      return driverFolderUrl(modalState.formValues.driver);
+      return driverFolderUrl(driverFolderNameFromContext());
     });
     var oldBtn=folderBtn("Current tractor folder", function(){
       captureContextForm();
@@ -6157,8 +6214,10 @@
   var S365 = { msal:null, account:null, signedIn:false, item:null, driveId:null,
                roster:null, worksheets:[], coverLookups:null, remote:{eTag:null, by:null, at:null, present:false} };
 
-  config.mapping = config.mapping || { worksheet:"Current Roster", nameMode:"firstlast",
+  var FIXED_MAPPING = { worksheet:"Current Roster", nameMode:"firstlast",
       colName:"Driver", colFirst:"First", colLast:"Last", colTruck:"Truck #", colAuthority:"Authority", colDot:"DOT #" };
+  function fixedMapping(){ return Object.assign({}, FIXED_MAPPING); }
+  config.mapping = fixedMapping();
   // Force all browsers/users onto the same shared JSON file, even if localStorage
   // still contains an old OneDrive/SharePoint path from a previous version.
   config.remoteConfigStorage = SP.configStorage;
@@ -6362,7 +6421,8 @@
       if(remote.userPins && typeof remote.userPins==="object") config.userPins=remote.userPins;
       if(remote.deletedSessions) mergeDeletedSessions(remote.deletedSessions);
       if(remote.sessions) mergeSharedSessions(remote.sessions);
-      if(remote.mapping) config.mapping=remote.mapping;
+      // Fleet workbook/tab/columns are locked in code so old JSON/browser settings cannot break the dashboard.
+      config.mapping=fixedMapping();
       config.fleetUrl=SP.fleetUrl;
       loadPinsForCurrentUser();
       // Never allow the remote JSON (or stale browser data) to change where sync saves.
@@ -6421,7 +6481,7 @@
     if(!S365.signedIn) return;        // local-only until signed in
     setSync("saving","Syncing changes…");
     var payload={ version:1, savedAt:new Date().toISOString(), remoteConfigStorage:activeConfigStorage(), remoteConfigPath:activeConfigFile(), remoteConfigSharePointUrl:activeConfigSharePointUrl(),
-      cardOverrides:config.cardOverrides, customCards:config.customCards, hiddenCards:config.hiddenCards, userPins:config.userPins||{}, mapping:config.mapping, fleetUrl:activeFleetUrl(),
+      cardOverrides:config.cardOverrides, customCards:config.customCards, hiddenCards:config.hiddenCards, userPins:config.userPins||{}, mapping:fixedMapping(), fleetUrl:activeFleetUrl(),
       sessions:pruneDeletedSessions(state.sessions), deletedSessions:config.deletedSessions||{} };
     configPath(null, null, true).then(function(contentUrl){ return graph(contentUrl, { method:"PUT", body:JSON.stringify(payload,null,2), headers:{"Content-Type":"application/json"} }, "saving JSON"); })
       .then(function(){ S365.remote.present=true; S365.remote.storage=activeConfigStorage(); S365.remote.path=activeConfigFile(); setSync("ok","Synced ✓"); })
@@ -6721,57 +6781,54 @@
   function openSettings(){ document.getElementById("settings-overlay").classList.remove("hidden"); document.body.style.overflow="hidden"; renderSettings(); }
   function closeSettings(){ document.getElementById("settings-overlay").classList.add("hidden"); document.body.style.overflow=""; }
   function renderSettings(){
-    var body=document.getElementById("settings-body"); body.textContent=""; var m=config.mapping;
+    var body=document.getElementById("settings-body"); body.textContent="";
+    config.mapping=fixedMapping();
+    try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){}
+
     var st=el("div",{class:"settings-status"});
     if(S365.signedIn){
       st.appendChild(el("div",{}, el("b",{text:"Signed in: "}), (S365.account.username||S365.account.name||"")));
-      st.appendChild(el("div",{}, el("b",{text:"Fleet sheet: "}), S365.item?"connected":"not found"));
-      st.appendChild(el("div",{}, el("b",{text:"Fleet link: "}), activeFleetUrl()));
-      st.appendChild(el("div",{}, el("b",{text:"Saved JSON: "}), S365.remote.present?("syncing to the fixed shared SharePoint JSON"+(S365.remote.by?(" · last edit by "+S365.remote.by):"")):"not created yet (saves on first edit)"));
-      st.appendChild(el("div",{}, el("b",{text:"JSON location: "}), activeConfigSharePointUrl()));
+      st.appendChild(el("div",{}, el("b",{text:"Fleet Master: "}), S365.item?"connected":"not found"));
+      st.appendChild(el("div",{}, el("b",{text:"Shared edits: "}), S365.remote.present?("synced"+(S365.remote.by?(" · last edit by "+S365.remote.by):"")):"not created yet (saves on first edit)"));
       st.appendChild(el("div",{}, el("b",{text:"Your pins: "}), String((state.pins||[]).length)+" saved for "+(S365.account.username||S365.account.name||"this sign-in")));
     } else {
-      st.appendChild(el("div",{text:"Not signed in. Use Sign in (top right) to load drivers and sync edits across the office."}));
+      st.appendChild(el("div",{text:"Not signed in. Use Sign in (top right) to load Fleet Master data and sync shared dashboard edits."}));
     }
     body.appendChild(st);
     if(!S365.signedIn) return;
 
-    body.appendChild(el("p",{class:"note",text:"Shared card edits are locked to the fixed SharePoint JSON above so every office user syncs to the same file. This location cannot be changed from individual browsers."}));
-    body.appendChild(colRow("Fleet Master Sheet sharing link","set-fleet-url",activeFleetUrl()));
+    var dataPanel=el("div",{class:"settings-panel"});
+    dataPanel.appendChild(el("h3",{text:"Data connections"}));
+    dataPanel.appendChild(el("div",{class:"status-line"}, el("b",{text:"Fleet Master Sheet: "}), "Locked to the office workbook"));
+    dataPanel.appendChild(el("div",{class:"status-line"}, el("b",{text:"Worksheet: "}), FIXED_MAPPING.worksheet));
+    dataPanel.appendChild(el("div",{class:"status-line"}, el("b",{text:"Driver/authority filters: "}), "Drivers use Medical Exp + Current?; authorities use Insurance Exp + Current?"));
+    dataPanel.appendChild(el("div",{class:"status-line"}, el("b",{text:"Shared JSON: "}), "Locked to the shared office file"));
+    dataPanel.appendChild(el("p",{class:"note",text:"The workbook link, JSON location, worksheet, and column mapping are fixed so one person’s browser settings can’t accidentally break everyone’s dashboard."}));
+    body.appendChild(dataPanel);
 
-    var wsRow=el("div",{class:"settings-row"}); wsRow.appendChild(el("label",{text:"Worksheet (tab) to read"}));
-    var wsSel=el("select",{id:"set-ws"}); (S365.worksheets.length?S365.worksheets:[m.worksheet]).forEach(function(n){ var o=el("option",{value:n,text:n}); if(n===m.worksheet)o.selected=true; wsSel.appendChild(o); });
-    wsRow.appendChild(wsSel); body.appendChild(wsRow);
+    var actionPanel=el("div",{class:"settings-panel"});
+    actionPanel.appendChild(el("h3",{text:"Useful actions"}));
+    actionPanel.appendChild(el("p",{class:"note",text:"Use these when data looks stale, someone edited shared cards, or your personal pins need a reset."}));
+    var actions=el("div",{class:"settings-actions"});
+    actions.appendChild(el("button",{class:"btn",text:"Refresh Fleet Master data", onclick:function(){ setSync("saving","Refreshing…"); reconnectM365().then(function(){ setSync("ok","Synced ✓"); rerenderAll(); renderSettings(); }).catch(function(e){ setSync("err", chipErr(e), String(e)); renderSettings(); }); }}));
+    actions.appendChild(el("button",{class:"btn",text:"Reload shared edits", onclick:function(){ setSync("saving","Reloading shared edits…"); reconnectM365().then(function(){ setSync("ok","Synced ✓"); rerenderAll(); renderSettings(); }).catch(function(e){ setSync("err", chipErr(e), String(e)); renderSettings(); }); }}));
+    actions.appendChild(el("button",{class:"btn",text:"Sync my changes now", onclick:function(){ setSync("saving","Syncing changes…"); pushRemoteConfig(); setTimeout(renderSettings, 700); }}));
+    actions.appendChild(el("button",{class:"btn danger",text:"Clear my pins", onclick:function(){ if(!confirm("Clear only your pinned cards? This will not affect anyone else.")) return; state.pins=[]; savePinsForCurrentUser(); rerenderAll(); renderSettings(); }}));
+    actionPanel.appendChild(actions);
+    body.appendChild(actionPanel);
 
-    var nmRow=el("div",{class:"settings-row"}); nmRow.appendChild(el("label",{text:"Driver name comes from"}));
-    var nmSel=el("select",{id:"set-namemode"}); [["firstlast","Two columns (First + Last)"],["full","One column (full name)"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===m.nameMode)o.selected=true; nmSel.appendChild(o); });
-    nmRow.appendChild(nmSel); body.appendChild(nmRow);
-
-    body.appendChild(colRow("First-name column","set-first",m.colFirst));
-    body.appendChild(colRow("Last-name column","set-last",m.colLast));
-    body.appendChild(colRow("Full-name column","set-name",m.colName));
-    body.appendChild(colRow("Truck # column","set-truck",m.colTruck));
-    body.appendChild(colRow("Authority column","set-auth",m.colAuthority));
-    body.appendChild(colRow("DOT # column","set-dot",m.colDot));
-    body.appendChild(el("p",{class:"note",text:"Type the exact column header text from your sheet. Matching is case-insensitive and allows partial matches."}));
-
-    body.appendChild(el("div",{style:"display:flex;gap:10px;justify-content:flex-end;margin-top:6px"},
-      el("button",{class:"btn",text:"Reload data", onclick:function(){ saveMapping(false); setSync("saving","Reloading…"); reconnectM365().then(function(){ setSync("ok","Synced ✓"); rerenderAll(); renderSettings(); }).catch(function(){ setSync("err","Couldn’t read that data"); renderSettings(); }); }}),
-      el("button",{class:"btn primary",text:"Save settings", onclick:function(){ saveMapping(true); setSync("saving","Syncing changes…"); reconnectM365().then(function(){ setSync("ok","Synced ✓"); rerenderAll(); closeSettings(); }).catch(function(){ setSync("err","Saved locally — couldn’t reconnect"); closeSettings(); }); }})
-    ));
-
-    function colRow(lbl,id,val){ var r=el("div",{class:"settings-row"}); r.appendChild(el("label",{text:lbl})); var i=el("input",{type:"text",id:id}); i.value=val||""; r.appendChild(i); return r; }
+    var helpPanel=el("div",{class:"settings-panel"});
+    helpPanel.appendChild(el("h3",{text:"What to do if something looks wrong"}));
+    helpPanel.appendChild(el("p",{class:"note",text:"Try Refresh Fleet Master data first. If card edits or saved cards look stale, try Reload shared edits. If sign-in looks stuck, sign out and back in from the top bar."}));
+    body.appendChild(helpPanel);
   }
   function saveMapping(persist){
-    function gv(id){ var e=document.getElementById(id); return e?e.value:""; }
     config.remoteConfigStorage=SP.configStorage;
     config.remoteConfigPath=SP.configFile;
     config.remoteConfigSharePointUrl=SP.configSharePointUrl;
-    config.fleetUrl=String(gv("set-fleet-url") || config.fleetUrl || SP.fleetUrl).trim() || SP.fleetUrl;
+    config.fleetUrl=SP.fleetUrl;
+    config.mapping=fixedMapping();
     try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){}
-    config.mapping={ worksheet:gv("set-ws")||config.mapping.worksheet, nameMode:gv("set-namemode")||"firstlast",
-      colName:gv("set-name"), colFirst:gv("set-first"), colLast:gv("set-last"),
-      colTruck:gv("set-truck"), colAuthority:gv("set-auth"), colDot:gv("set-dot") };
     if(persist) scheduleSave();
   }
 
