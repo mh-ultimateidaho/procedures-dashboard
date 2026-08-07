@@ -128,10 +128,10 @@
   /* Lease termination generator */
   .lease-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:14px}
   .lease-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;margin-top:16px}
-  .lease-preview{border:1px solid var(--line);border-radius:12px;background:#fff;padding:72pt 54pt 42pt;margin-top:12px;font-family:"Times New Roman",Times,serif;color:#000;line-height:1.28;min-height:760px;font-size:16pt}
-  .lease-preview .lease-title{font-weight:700;text-decoration:underline;font-size:18pt;margin-bottom:52pt}
-  .lease-preview .lease-p{margin:0 0 18pt}
-  .lease-preview .lease-sig{margin-top:86pt}
+  .lease-preview{border:1px solid var(--line);border-radius:12px;background:#fff;padding:72pt 54pt 42pt;margin-top:12px;font-family:Aptos,"Aptos Body",Arial,sans-serif;color:#000;line-height:1.32;min-height:760px;font-size:14pt}
+  .lease-preview .lease-title{font-weight:700;text-decoration:underline;font-size:14pt;margin-bottom:48pt}
+  .lease-preview .lease-p{margin:0 0 14pt}
+  .lease-preview .lease-sig{margin-top:54pt}
   .lease-preview .lease-line{border-top:1px solid #000;width:310pt;height:12pt}
   .lease-preview .lease-sign-row{display:flex;gap:170pt;margin-bottom:24pt}
 
@@ -6892,37 +6892,37 @@
   function downloadLeasePdf(){
     var p=leaseTextParts(), left=72, max=468, stream="BT\n0 0 0 rg\n";
     function drawText(text,x,y,size,bold){ var font=bold?"/FB":"/FR"; stream+=font+" "+size.toFixed(2)+" Tf\n1 0 0 1 "+x.toFixed(2)+" "+y.toFixed(2)+" Tm ("+pdfEsc(text)+") Tj\n"; }
-    function drawUnderline(x,y,w){ stream+="ET\n1 w\n"+x.toFixed(2)+" "+(y-3).toFixed(2)+" m "+(x+w).toFixed(2)+" "+(y-3).toFixed(2)+" l S\nBT\n"; }
-    drawText("To Whom It May Concern:", left, 684, 18, true); drawUnderline(left,684,pdfTextWidthApproxFont("To Whom It May Concern:",18,true));
-    var y=615, size=16, gap=22;
+    function drawUnderline(x,y,w){ stream+="ET\n1 w\n"+x.toFixed(2)+" "+(y-2.5).toFixed(2)+" m "+(x+w).toFixed(2)+" "+(y-2.5).toFixed(2)+" l S\nBT\n"; }
+    drawText("To Whom It May Concern:", left, 684, 14, true); drawUnderline(left,684,pdfTextWidthApproxFont("To Whom It May Concern:",14,true));
+    var y=615, size=14, gap=19;
     wrapPdfLines(p.p1,size,max,false).forEach(function(line){ drawText(line,left,y,size,false); y-=gap; });
-    y-=12;
+    y-=10;
     wrapPdfLines(p.p2,size,max,false).forEach(function(line){ drawText(line,left,y,size,false); y-=gap; });
-    y=Math.min(y-72,260);
+    y=Math.min(y-54,318);
     stream+="ET\n1 w\n"+left+" "+y.toFixed(2)+" m 365 "+y.toFixed(2)+" l S\nBT\n";
-    drawText("Majkaela Holt", left, y-23, 16, false); drawText("Date", 322, y-23, 16, false);
-    var fy=y-70; ["Administrative Fleet Coordinator","Ultimate Logistics LLC","4663 S Enterprise St","Boise, ID 83705","208-344-1717"].forEach(function(line){ drawText(line,left,fy,16,false); fy-=19; });
+    drawText("Majkaela Holt", left, y-18, 14, false); drawText("Date", 322, y-18, 14, false);
+    var fy=y-54; ["Administrative Fleet Coordinator","Ultimate Logistics LLC","4663 S Enterprise St","Boise, ID 83705","208-344-1717"].forEach(function(line){ drawText(line,left,fy,14,false); fy-=16.5; });
     stream+="ET\n";
-    var pdf=buildPdfWithTimes(stream);
+    var pdf=buildPdfWithAptosStyle(stream);
     var blob=new Blob([pdf],{type:"application/pdf"});
     var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="LEASE TERMINATION UNIT "+safeFilePart(leaseValues.oldUnit||"###")+" "+safeFilePart(leaseValues.oldCompany||"Company")+".pdf"; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },500);
   }
   function pdfTextWidthApproxFont(s,size,bold){
-    try{ _coverMeasureCanvas=_coverMeasureCanvas||document.createElement("canvas"); var ctx=_coverMeasureCanvas.getContext("2d"); ctx.font=(bold?"bold ":"")+size+"pt 'Times New Roman', Times, serif"; return ctx.measureText(String(s||"")).width*72/96; }
-    catch(e){ return String(s||"").length*size*0.48; }
+    try{ _coverMeasureCanvas=_coverMeasureCanvas||document.createElement("canvas"); var ctx=_coverMeasureCanvas.getContext("2d"); ctx.font=(bold?"700 ":"")+size+"pt Aptos, 'Aptos Body', Arial, sans-serif"; return ctx.measureText(String(s||"")).width*72/96; }
+    catch(e){ return String(s||"").length*size*0.5; }
   }
   function wrapPdfLines(text,size,max,bold){
     var words=String(text||"").split(/\s+/), lines=[], cur="";
     words.forEach(function(w){ var test=cur?cur+" "+w:w; if(pdfTextWidthApproxFont(test,size,bold)<=max || !cur){ cur=test; } else { lines.push(cur); cur=w; } });
     if(cur) lines.push(cur); return lines;
   }
-  function buildPdfWithTimes(content){
+  function buildPdfWithAptosStyle(content){
     var objs=[]; function obj(s){ objs.push(s); return objs.length; }
     obj("<< /Type /Catalog /Pages 2 0 R >>");
     obj("<< /Type /Pages /Kids [3 0 R] /Count 1 >>");
     obj("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /FR 4 0 R /FB 5 0 R >> >> /Contents 6 0 R >>");
-    obj("<< /Type /Font /Subtype /Type1 /BaseFont /Times-Roman >>");
-    obj("<< /Type /Font /Subtype /Type1 /BaseFont /Times-Bold >>");
+    obj("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+    obj("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>");
     obj("<< /Length "+content.length+" >>\nstream\n"+content+"endstream");
     var out="%PDF-1.4\n%\xE2\xE3\xCF\xD3\n", offsets=[0];
     for(var i=0;i<objs.length;i++){ offsets.push(out.length); out+=(i+1)+" 0 obj\n"+objs[i]+"\nendobj\n"; }
@@ -6931,6 +6931,7 @@
     out+="trailer\n<< /Size "+(objs.length+1)+" /Root 1 0 R >>\nstartxref\n"+xref+"\n%%EOF";
     return out;
   }
+
 
 
   /* ----- settings modal ----- */
