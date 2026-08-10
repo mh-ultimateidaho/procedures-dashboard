@@ -7479,14 +7479,29 @@
   var leaseValues={oldAuthorityPick:"", oldTruckPick:"", newAuthorityPick:"", newTruckPick:"", oldCompany:"", oldUnit:"", oldYear:"", oldMake:"", oldModel:"", oldVin:"", oldLeaseStart:"", oldLeaseEnd:"", newCompany:"", newUnit:"", newYear:"", newMake:"", newModel:"", newVin:""};
 
   function resetLeaseValues(){ leaseValues={oldAuthorityPick:"", oldTruckPick:"", newAuthorityPick:"", newTruckPick:"", oldCompany:"", oldUnit:"", oldYear:"", oldMake:"", oldModel:"", oldVin:"", oldLeaseStart:"", oldLeaseEnd:"", newCompany:"", newUnit:"", newYear:"", newMake:"", newModel:"", newVin:""}; }
+  function leaseDateFromEventDate(d){
+    if(!d) return "";
+    var raw=String(d).trim();
+    var p=raw.split("-");
+    if(p.length===3 && /^\d{4}$/.test(p[0])){
+      var y=Number(p[0]), m=Number(p[1]), day=Number(p[2]);
+      if(y && m && day) return m+"/"+day+"/"+y;
+    }
+    return raw;
+  }
   function openLeaseTermination(){
     leaseOverlay.classList.remove("hidden"); leaseOverlay.setAttribute("aria-hidden","false"); document.body.style.overflow="hidden";
     if(modalState && modalState.formValues){
       var f=modalState.formValues;
-      leaseValues.oldCompany=f.auth||f.oldauth||f.newauth||"";
-      leaseValues.newCompany=leaseValues.oldCompany;
+      var company=f.auth||f.oldauth||f.newauth||"";
+      leaseValues.oldAuthorityPick=company;
+      leaseValues.oldCompany=company;
+      leaseValues.newCompany=company;
+      leaseValues.oldTruckPick=f.old||"";
+      leaseValues.newTruckPick=f.new||"";
       leaseValues.oldUnit=f.old||"";
       leaseValues.newUnit=f.new||"";
+      leaseValues.oldLeaseEnd=leaseDateFromEventDate(f.eventdate||"");
       autofillLeaseDetails(false);
     }
     renderLeaseTermination();
