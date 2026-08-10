@@ -320,6 +320,8 @@
   .gen-menu{position:relative}
   .gen-menu summary{list-style:none;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);border-radius:10px;padding:5px 10px;font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap}
   .gen-menu summary::-webkit-details-marker{display:none}
+  .card-gen-menu{display:inline-block}
+  .card-gen-menu .gen-panel{right:0;left:auto}
   .gen-menu[open] summary,.gen-menu summary:hover{border-color:var(--accent);color:var(--accent)}
   .gen-panel{position:absolute;right:0;top:calc(100% + 6px);z-index:70;min-width:220px;background:#fff;border:1px solid var(--line-strong);border-radius:12px;box-shadow:0 16px 45px rgba(15,23,42,.18);padding:6px}
   .gen-panel button{display:block;width:100%;border:0;background:transparent;text-align:left;color:var(--ink);border-radius:9px;padding:9px 10px;font-weight:650;white-space:nowrap}
@@ -5308,6 +5310,14 @@
   }
   overlay.addEventListener("click", function(e){ if(e.target===overlay) closeCard(); });
 
+  function openGenerateFromCard(kind){
+    captureContextForm();
+    var menus=mActions.querySelectorAll("details.card-gen-menu");
+    menus.forEach(function(m){ m.open=false; });
+    if(kind==="cover") openCoverPage();
+    else if(kind==="lease") openLeaseTermination();
+  }
+
   function renderModal(){
     var card=(modalState && modalState.editMode && modalState.editDraft) ? modalState.editDraft : getEffectiveCard(modalState.cardId);
     var sec=SEC_BY_ID[card.section]||{name:"—",color:"#999"};
@@ -5320,6 +5330,13 @@
       mActions.appendChild(el("button",{class:"icon-btn",text:"💾 Save progress", onclick:saveSession}));
       if(modalState.sessionId){
         mActions.appendChild(el("button",{class:"icon-btn", style:"border-color:#e6b5ae;color:var(--bad)", text:"🗑 Delete saved copy", onclick:function(){ deleteSession(modalState.sessionId); closeCard(); }}));
+        var genDetails=el("details",{class:"gen-menu card-gen-menu"});
+        genDetails.appendChild(el("summary",{text:"📄 Generate ▾",title:"Generate using this saved card's info"}));
+        genDetails.appendChild(el("div",{class:"gen-panel",role:"menu","aria-label":"Generate from saved card"},
+          el("button",{type:"button",role:"menuitem",text:"📄 Cover page",onclick:function(){ openGenerateFromCard("cover"); }}),
+          el("button",{type:"button",role:"menuitem",text:"📝 Lease termination",onclick:function(){ openGenerateFromCard("lease"); }})
+        ));
+        mActions.appendChild(genDetails);
       }
     }
     if(isEditable(card)){
@@ -6452,7 +6469,10 @@
     document.getElementById("exp-close").addEventListener("click", closeExpirations);
     document.getElementById("exp-overlay").addEventListener("click", function(e){ if(e.target.id==="exp-overlay") closeExpirations(); });
     function closeGenerateMenu(){ var gm=document.getElementById("generate-menu"); if(gm) gm.open=false; }
-    document.addEventListener("click", function(e){ var gm=document.getElementById("generate-menu"); if(gm && gm.open && !gm.contains(e.target)) gm.open=false; });
+    document.addEventListener("click", function(e){
+      var gm=document.getElementById("generate-menu"); if(gm && gm.open && !gm.contains(e.target)) gm.open=false;
+      document.querySelectorAll("details.card-gen-menu[open]").forEach(function(menu){ if(!menu.contains(e.target)) menu.open=false; });
+    });
     document.getElementById("cover-btn").addEventListener("click", function(){ closeGenerateMenu(); openCoverPage(); });
     document.getElementById("cover-close").addEventListener("click", closeCoverPage);
     document.getElementById("cover-overlay").addEventListener("click", function(e){ if(e.target.id==="cover-overlay") closeCoverPage(); });
