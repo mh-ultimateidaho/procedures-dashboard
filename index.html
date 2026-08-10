@@ -135,6 +135,21 @@
   .lease-preview .lease-line{border-top:1px solid #000;width:310pt;height:12pt}
   .lease-preview .lease-sign-row{display:flex;gap:170pt;margin-bottom:24pt}
 
+
+  /* Fleet lookup + health check */
+  .lookup-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .lookup-tabs .btn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .lookup-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:14px}
+  .lookup-card{border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff;margin-bottom:10px}
+  .lookup-card h3{margin:0 0 6px;font-size:15px}
+  .lookup-meta{font-size:12.5px;color:var(--muted);margin-bottom:9px}
+  .lookup-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .health-results{border:1px solid var(--line);border-radius:10px;background:var(--bg);padding:10px 12px;margin-top:10px}
+  .health-group{margin:8px 0 12px}
+  .health-group h4{margin:0 0 5px;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+  .health-group ul{margin:0;padding-left:18px}.health-group li{margin:2px 0;font-size:13px}
+  .warn-note{border:1px solid #f0d28a;background:#fff9e8;color:#6b4b00;border-radius:10px;padding:9px 11px;margin:10px 0;font-size:13px}
+
   /* Content */
   .content-block{margin-bottom:18px}
   .owner-label{font-size:12px;font-weight:700;letter-spacing:.02em;color:#fff;padding:4px 11px;border-radius:8px 8px 0 0;display:inline-block}
@@ -243,11 +258,13 @@
 
   /* --- M365 / data integration --- */
   .auth-wrap{display:flex;align-items:center;gap:8px}
-  .sync-chip{font-size:11px;font-weight:700;border-radius:999px;padding:4px 10px;border:1px solid var(--line);white-space:nowrap}
-  .sync-chip.local{color:var(--muted);background:var(--bg)}
-  .sync-chip.ok{color:var(--good);background:#eaf7ef;border-color:#bfe3cc}
-  .sync-chip.saving{color:var(--warn);background:#fff5e0;border-color:#f0d28a}
-  .sync-chip.err{color:var(--bad);background:#fdf1ef;border-color:#e6b5ae}
+  .top-status{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  .sync-chip,.data-chip{font-size:11px;font-weight:700;border-radius:999px;padding:4px 10px;border:1px solid var(--line);white-space:nowrap}
+  .sync-chip.local,.data-chip.local{color:var(--muted);background:var(--bg)}
+  .sync-chip.ok,.data-chip.ok{color:var(--good);background:#eaf7ef;border-color:#bfe3cc}
+  .sync-chip.saving,.data-chip.saving{color:var(--warn);background:#fff5e0;border-color:#f0d28a}
+  .sync-chip.err,.data-chip.err{color:var(--bad);background:#fdf1ef;border-color:#e6b5ae}
+  .data-chip.cached{color:var(--accent);background:var(--accent-soft);border-color:#c7d7f2}
   .gear{border:1px solid var(--line-strong);background:var(--surface);border-radius:9px;padding:7px 10px;font-size:14px;line-height:1}
   .gear:hover{border-color:var(--accent);color:var(--accent)}
   .settings-row{display:flex;flex-direction:column;gap:5px;margin-bottom:13px}
@@ -4115,7 +4132,11 @@
       <button id="view-browse" role="tab">All Procedures</button>
     </div>
     <div class="auth-wrap">
-      <span id="sync-status" class="sync-chip local" title="Where your edits are saved">Local only</span>
+      <div class="top-status" aria-label="Data and sync status">
+        <span id="data-status" class="data-chip local" title="Fleet Master data available for generators">No Fleet data yet</span>
+        <span id="sync-status" class="sync-chip local" title="Shared dashboard sync status">Not checking yet</span>
+      </div>
+      <button id="lookup-btn" class="btn small" title="Driver / authority lookup">🔎 Fleet lookup</button>
       <button id="cover-btn" class="btn small" title="Generate truck cover page">📄 Cover page</button>
       <button id="lease-btn" class="btn small" title="Generate lease termination page">📝 Lease termination</button>
       <button id="m365-btn" class="btn small">Sign in</button>
@@ -4156,6 +4177,20 @@
   </div>
 </div>
 
+
+
+<!-- Fleet lookup modal -->
+<div id="lookup-overlay" class="overlay hidden" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" style="max-width:820px">
+    <div class="m-head">
+      <div class="t"><h2 style="margin-top:0">Fleet lookup</h2></div>
+      <div class="m-actions">
+        <button class="icon-btn x" id="lookup-close" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div class="m-body" id="lookup-body"></div>
+  </div>
+</div>
 
 <!-- Cover page generator modal -->
 <div id="cover-overlay" class="overlay hidden" aria-hidden="true">
@@ -6256,10 +6291,31 @@
     return !!(S365.fleetCacheAt && (Date.now()-Number(S365.fleetCacheAt) > FLEET_CACHE_WARN_DAYS*86400000));
   }
   function fleetDataStatus(){
-    if(S365.refreshingFleet && hasFleetLookupData()) return "Using remembered data while refreshing";
+    if(S365.refreshingFleet && hasFleetLookupData()) return "Using remembered data while checking for updates";
     if(S365.fleetLiveAt) return "Live data updated " + fleetStampLabel(S365.fleetLiveAt);
     if(S365.fleetCacheAt) return (fleetCacheIsOld()?"Using older remembered data from ":"Using remembered data from ") + fleetStampLabel(S365.fleetCacheAt);
     return "No Fleet Master data loaded yet";
+  }
+  function fleetDataChipText(){
+    if(S365.fleetLiveAt) return "Using data from " + fleetStampLabel(S365.fleetLiveAt);
+    if(S365.fleetCacheAt) return "Using data from " + fleetStampLabel(S365.fleetCacheAt);
+    if(hasFleetLookupData()) return "Using remembered Fleet data";
+    return S365.refreshingFleet ? "Loading Fleet data…" : "No Fleet data yet";
+  }
+  function fleetDataChipKind(){
+    if(!hasFleetLookupData()) return S365.refreshingFleet ? "saving" : "local";
+    if(fleetCacheIsOld() && !S365.fleetLiveAt) return "saving";
+    return S365.fleetLiveAt ? "ok" : "cached";
+  }
+  function refreshDataStatus(){
+    var c=document.getElementById("data-status");
+    if(!c) return;
+    var kind=fleetDataChipKind();
+    c.className="data-chip "+kind;
+    c.textContent=fleetDataChipText();
+    var detail=fleetDataStatus();
+    if(S365.refreshingFleet) detail += ". You can keep working while the dashboard looks for changes.";
+    c.title=detail;
   }
   function loadFleetCache(){
     try{
@@ -6296,13 +6352,20 @@
   config._sharedStorageMigrated = true;
   try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); }catch(e){}
 
-  function setSync(kind, text, detail){ var c=document.getElementById("sync-status"); if(c){ c.className="sync-chip "+kind; c.textContent=text; c.title=detail||text; } }
+  function setSync(kind, text, detail){
+    var c=document.getElementById("sync-status");
+    if(c){ c.className="sync-chip "+kind; c.textContent=text; c.title=detail||text; }
+    refreshDataStatus();
+  }
   function chipErr(e){ var s=String(e); var head=s.split(":")[0].trim(); if(head.length>46) head=head.slice(0,46); return head||"Error"; }
   function rerenderAll(){ if(currentView==="home") renderHome(); else renderBrowse(); }
 
   function m365Init(){
     var btn=document.getElementById("m365-btn");
     document.getElementById("settings-btn").addEventListener("click", openSettings);
+    document.getElementById("lookup-btn").addEventListener("click", openFleetLookup);
+    document.getElementById("lookup-close").addEventListener("click", closeFleetLookup);
+    document.getElementById("lookup-overlay").addEventListener("click", function(e){ if(e.target.id==="lookup-overlay") closeFleetLookup(); });
     document.getElementById("cover-btn").addEventListener("click", openCoverPage);
     document.getElementById("cover-close").addEventListener("click", closeCoverPage);
     document.getElementById("cover-overlay").addEventListener("click", function(e){ if(e.target.id==="cover-overlay") closeCoverPage(); });
@@ -6325,7 +6388,7 @@
       if(res && res.account) S365.msal.setActiveAccount(res.account);
       var acct = S365.msal.getActiveAccount() || (S365.msal.getAllAccounts()[0]);
       if(acct){ S365.account=acct; S365.signedIn=true; onSignedIn(); }
-      else setSync("local", hasFleetLookupData()?"Using saved Fleet data":"Local only", fleetDataStatus());
+      else setSync("saving", hasFleetLookupData()?"Looking for changes…":"Connecting to Fleet…", hasFleetLookupData()?"You can keep using remembered Fleet data while this checks for updates.":"Connecting to load Fleet Master data.");
     }).catch(function(e){ console.warn("MSAL redirect error", e); setSync("err","Sign-in error"); });
   }
 
@@ -6335,9 +6398,9 @@
   function onSignedIn(){
     var btn=document.getElementById("m365-btn");
     btn.textContent="Sign out ("+(S365.account.name||S365.account.username||"")+")";
-    setSync("saving","Connecting…");
+    setSync("saving", hasFleetLookupData()?"Looking for changes…":"Connecting to Fleet…", hasFleetLookupData()?"You can keep using remembered Fleet data while this checks for updates.":"Connecting to load Fleet Master data.");
     reconnectM365()
-      .then(function(){ setSync("ok","Synced ✓"); rerenderAll(); })
+      .then(function(){ setSync("ok","Up to date ✓","Shared edits and Fleet data check finished."); rerenderAll(); })
       .catch(function(e){
         console.warn("M365 connect error", e);
         setSync("err", chipErr(e), String(e));
@@ -6384,11 +6447,14 @@
     // This lets cover pages / lease terminations / driver cards stay usable immediately,
     // and it avoids disrupting an open generator while the background refresh finishes.
     S365.item=null; S365.driveId=null; S365.worksheets=[]; S365.refreshingFleet=true;
+    refreshDataStatus();
     return resolveItem().then(listWorksheets).then(loadRemoteConfig).then(resolveItem).then(listWorksheets).then(loadRoster).then(function(){
       saveFleetCache();
       S365.refreshingFleet=false;
+      refreshDataStatus();
     }).catch(function(e){
       S365.refreshingFleet=false;
+      refreshDataStatus();
       throw e;
     });
   }
@@ -6565,11 +6631,136 @@
       cardOverrides:config.cardOverrides, customCards:config.customCards, hiddenCards:config.hiddenCards, userPins:config.userPins||{}, mapping:fixedMapping(), fleetUrl:activeFleetUrl(),
       sessions:pruneDeletedSessions(state.sessions), deletedSessions:config.deletedSessions||{} };
     configPath(null, null, true).then(function(contentUrl){ return graph(contentUrl, { method:"PUT", body:JSON.stringify(payload,null,2), headers:{"Content-Type":"application/json"} }, "saving JSON"); })
-      .then(function(){ S365.remote.present=true; S365.remote.storage=activeConfigStorage(); S365.remote.path=activeConfigFile(); setSync("ok","Synced ✓"); })
+      .then(function(){ S365.remote.present=true; S365.remote.storage=activeConfigStorage(); S365.remote.path=activeConfigFile(); setSync("ok","Up to date ✓","Shared edits and Fleet data check finished."); })
       .catch(function(e){ setSync("err", chipErr(e), String(e)); });
   }
 
 
+
+  /* ----- fleet lookup / quick actions ----- */
+  var lookupOverlay=document.getElementById("lookup-overlay");
+  var lookupBody=document.getElementById("lookup-body");
+  var lookupState={mode:"driver", driverKey:"", authority:""};
+  var healthCheckResults=null;
+
+  function openFleetLookup(){ lookupOverlay.classList.remove("hidden"); lookupOverlay.setAttribute("aria-hidden","false"); document.body.style.overflow="hidden"; renderFleetLookup(); }
+  function closeFleetLookup(){ lookupOverlay.classList.add("hidden"); lookupOverlay.setAttribute("aria-hidden","true"); document.body.style.overflow=""; }
+  function currentDriverRecords(){
+    var roster=(S365&&S365.roster)||null, out=[];
+    if(!roster || !roster.byDriver) return out;
+    Object.keys(roster.byDriver).forEach(function(key){ var rec=roster.byDriver[key]||{}; out.push({key:key,label:key,name:rec.name||stripTruckSuffixFromDriverLabel(key),truck:rec.truck||"",authority:rec.authority||"",dot:rec.dot||""}); });
+    return out.sort(function(a,b){ return String(a.label).localeCompare(String(b.label),undefined,{numeric:true,sensitivity:"base"}); });
+  }
+  function firstLastFromLastFirst(name){
+    name=stripTruckSuffixFromDriverLabel(name||"");
+    if(name.indexOf(",")>=0){ var p=name.split(","); return (String(p[1]||"").trim()+" "+String(p[0]||"").trim()).trim(); }
+    return name;
+  }
+  function lookupDriverByKey(key){ return currentDriverRecords().filter(function(r){return r.key===key;})[0] || null; }
+  function truckDetailsByUnit(unit){ var look=(S365&&S365.coverLookups)||{}, tr=look.tractorsByUnit||{}; return tr[String(unit||"").trim().toLowerCase()] || null; }
+  function authorityDetailsByName(auth){ var look=(S365&&S365.coverLookups)||{}, au=look.authoritiesByName||{}; return au[String(auth||"").trim().toLowerCase()] || null; }
+  function fillCoverFromDriver(rec){
+    if(!rec) return;
+    var a=authorityDetailsByName(rec.authority)||{}, t=truckDetailsByUnit(rec.truck)||{};
+    coverValues={driverpick:rec.key||"", authoritypick:rec.authority||"", truckpick:rec.truck||"", driver:firstLastFromLastFirst(rec.name||rec.key), authority:rec.authority||"", safetyCompany:rec.authority||"", dot:rec.dot||a.dot||"", ein:a.ein||"", mc:a.mc||"", unit:rec.truck||"", year:t.year||"", make:t.make||"", model:t.model||"", plate:t.plate||"", vin:t.vin||"", color:t.color||""};
+    autofillCoverDetails(false);
+    closeFleetLookup(); openCoverPage();
+  }
+  function fillLeaseFromDriver(rec){
+    if(!rec) return;
+    resetLeaseValues();
+    var t=truckDetailsByUnit(rec.truck)||{};
+    leaseValues.oldAuthorityPick=rec.authority||""; leaseValues.oldTruckPick=rec.truck||"";
+    leaseValues.oldCompany=rec.authority||""; leaseValues.oldUnit=rec.truck||"";
+    leaseValues.oldYear=t.year||""; leaseValues.oldMake=t.make||""; leaseValues.oldModel=t.model||""; leaseValues.oldVin=t.vin||"";
+    closeFleetLookup(); openLeaseTermination();
+  }
+  function openFolderUrl(url, label){ if(!url){ window.alert("Missing "+(label||"folder")+" info."); return; } window.open(url,"_blank","noopener"); }
+  function renderLookupDriverCard(rec){
+    var truck=rec.truck||"", auth=rec.authority||"";
+    var card=el("div",{class:"lookup-card"});
+    card.appendChild(el("h3",{text:stripTruckSuffixFromDriverLabel(rec.name||rec.key||"Driver")}));
+    card.appendChild(el("div",{class:"lookup-meta",text:[auth, truck?("#"+truck):"", rec.dot?("DOT "+rec.dot):""].filter(Boolean).join(" · ")||"No current assignment details"}));
+    var actions=el("div",{class:"lookup-actions"});
+    actions.appendChild(el("button",{class:"btn small",text:"📁 Driver folder",onclick:function(){ openFolderUrl(driverFolderUrl(stripTruckSuffixFromDriverLabel(rec.key||rec.name)),"driver folder"); }}));
+    actions.appendChild(el("button",{class:"btn small",text:"📁 Truck folder",onclick:function(){ openFolderUrl(tractorFolderUrl(truck),"truck folder"); }}));
+    actions.appendChild(el("button",{class:"btn small",text:"📄 Cover page",onclick:function(){ fillCoverFromDriver(rec); }}));
+    actions.appendChild(el("button",{class:"btn small",text:"📝 Lease termination",onclick:function(){ fillLeaseFromDriver(rec); }}));
+    card.appendChild(actions);
+    return card;
+  }
+  function renderFleetLookup(){
+    lookupBody.textContent="";
+    var drivers=currentDriverRecords(), look=(S365&&S365.coverLookups)||{};
+    if(!hasFleetLookupData()) lookupBody.appendChild(el("div",{class:"warn-note",text:"No Fleet Master data is loaded yet. Sign in or wait for remembered data to load."}));
+    else lookupBody.appendChild(el("p",{class:"note",text:"Use remembered Fleet data immediately; the dashboard still checks for updates in the background."}));
+    var tabs=el("div",{class:"lookup-tabs"});
+    tabs.appendChild(el("button",{class:"btn small"+(lookupState.mode==="driver"?" on":""),text:"Driver lookup",onclick:function(){ lookupState.mode="driver"; renderFleetLookup(); }}));
+    tabs.appendChild(el("button",{class:"btn small"+(lookupState.mode==="authority"?" on":""),text:"Authority lookup",onclick:function(){ lookupState.mode="authority"; renderFleetLookup(); }}));
+    lookupBody.appendChild(tabs);
+    var grid=el("div",{class:"lookup-grid"});
+    if(lookupState.mode==="driver"){
+      var sel=el("select"); sel.appendChild(el("option",{value:"",text:"— choose driver —"}));
+      drivers.forEach(function(d){ var o=el("option",{value:d.key,text:d.label}); if(d.key===lookupState.driverKey)o.selected=true; sel.appendChild(o); });
+      sel.addEventListener("change",function(){ lookupState.driverKey=sel.value; renderFleetLookup(); });
+      grid.appendChild(coverField("Driver", sel));
+      lookupBody.appendChild(grid);
+      var rec=lookupDriverByKey(lookupState.driverKey);
+      if(rec) lookupBody.appendChild(renderLookupDriverCard(rec));
+    }else{
+      var auths=(look.authorities&&look.authorities.length?look.authorities.map(function(a){return a.authority;}):(S365&&S365.roster&&S365.roster.authorities)||[]).filter(Boolean);
+      auths=auths.filter(function(v,i,a){return a.indexOf(v)===i;}).sort(function(a,b){return String(a).localeCompare(String(b),undefined,{sensitivity:"base",numeric:true});});
+      var as=el("select"); as.appendChild(el("option",{value:"",text:"— choose authority —"}));
+      auths.forEach(function(a){ var o=el("option",{value:a,text:a}); if(a===lookupState.authority)o.selected=true; as.appendChild(o); });
+      as.addEventListener("change",function(){ lookupState.authority=as.value; renderFleetLookup(); });
+      grid.appendChild(coverField("Authority", as));
+      lookupBody.appendChild(grid);
+      if(lookupState.authority){
+        var matches=drivers.filter(function(d){return String(d.authority||"").trim().toLowerCase()===String(lookupState.authority).trim().toLowerCase();});
+        lookupBody.appendChild(el("p",{class:"note",text:matches.length ? (matches.length+" current driver(s) found for this authority.") : "No current drivers found for this authority."}));
+        matches.forEach(function(rec){ lookupBody.appendChild(renderLookupDriverCard(rec)); });
+      }
+    }
+  }
+
+  function fieldMissing(v){ return String(v==null?"":v).trim()===""; }
+  function confirmMissingFields(docName, pairs){
+    var missing=pairs.filter(function(p){return fieldMissing(p[1]);}).map(function(p){return p[0];});
+    if(!missing.length) return true;
+    return window.confirm("This "+docName+" is missing: "+missing.join(", ")+".\n\nGenerate anyway?");
+  }
+  function coverRequiredFields(){ return [["Company / LLC",coverValues.authority],["Carrier responsible for safety",coverValues.safetyCompany||coverValues.authority],["EIN",coverValues.ein],["MC #",coverValues.mc],["U.S. DOT #",coverValues.dot],["Unit #",coverValues.unit],["Year",coverValues.year],["Make / Type",coverValues.make],["Plate",coverValues.plate],["VIN #",coverValues.vin],["Color",coverValues.color],["Driver",coverValues.driver]]; }
+  function leaseRequiredFields(){ return [["Terminated company",leaseValues.oldCompany],["Terminated unit #",leaseValues.oldUnit],["Terminated year",leaseValues.oldYear],["Terminated make / type",leaseValues.oldMake],["Terminated VIN #",leaseValues.oldVin],["Added company",leaseValues.newCompany],["Added unit #",leaseValues.newUnit],["Added year",leaseValues.newYear],["Added make / type",leaseValues.newMake],["Added VIN #",leaseValues.newVin]]; }
+
+  function runDashboardHealthCheck(){
+    var res=[];
+    function add(group,msg){ var g=res.filter(function(x){return x.group===group;})[0]; if(!g){g={group:group,items:[]}; res.push(g);} g.items.push(msg); }
+    var hidden=(config.hiddenCards||[]).length; if(hidden) add("Templates", hidden+" default card(s) are hidden.");
+    var titles={}; (config.customCards||[]).forEach(function(c){ var t=String(c.title||"").trim().toLowerCase(); if(t) titles[t]=(titles[t]||0)+1; });
+    var dupCustom=Object.keys(titles).filter(function(t){return titles[t]>1;}).length; if(dupCustom) add("Templates", dupCustom+" duplicate custom card title(s). ");
+    var oldToken=0; BUILTIN.concat(config.customCards||[]).forEach(function(card){ if(card && card.type==="driver-event"){ (card.steps||[]).forEach(function(it){ if(it && DRIVER_EVENT_TOKEN_TEXT[it.id] && !hasContextToken(it.text)) oldToken++; }); (card.blocks||[]).forEach(function(b){ (b.items||[]).forEach(function(it){ if(it && DRIVER_EVENT_TOKEN_TEXT[it.id] && !hasContextToken(it.text)) oldToken++; }); }); } });
+    if(oldToken) add("Templates", oldToken+" driver-event checklist line(s) still use old auto-fill text.");
+    var missingDate=(state.sessions||[]).filter(function(s){return !s.eventDate;}).length; if(missingDate) add("Saved cards", missingDate+" saved card(s) are missing a card date.");
+    var badCard=(state.sessions||[]).filter(function(s){return !getEffectiveCard(s.cardId) || isHidden(s.cardId);}).length; if(badCard) add("Saved cards", badCard+" saved card(s) are tied to hidden/missing templates.");
+    var seenSess={}, dupSess=0; (state.sessions||[]).forEach(function(s){ var k=[s.cardId,s.eventDate,(s.context&&s.context.DRIVER)||"",(s.context&&(s.context.NEW||s.context.OLD))||""].join("|").toLowerCase(); if(seenSess[k]) dupSess++; else seenSess[k]=1; });
+    if(dupSess) add("Saved cards", dupSess+" possible duplicate saved card(s).");
+    var look=(S365&&S365.coverLookups)||{};
+    if(!hasFleetLookupData()) add("Fleet data", "No Fleet Master data is currently loaded.");
+    var authMissing=(look.authorities||[]).filter(function(a){return fieldMissing(a.dot)||fieldMissing(a.mc)||fieldMissing(a.ein);}).length; if(authMissing) add("Fleet data", authMissing+" active authority row(s) are missing DOT, MC, or EIN.");
+    var truckMissing=(look.tractors||[]).filter(function(t){return fieldMissing(t.vin)||fieldMissing(t.plate)||fieldMissing(t.color);}).length; if(truckMissing) add("Fleet data", truckMissing+" truck row(s) are missing VIN, plate, or color.");
+    var rosterMissing=currentDriverRecords().filter(function(d){return fieldMissing(d.truck)||fieldMissing(d.authority);}).length; if(rosterMissing) add("Fleet data", rosterMissing+" current roster driver(s) are missing truck or authority.");
+    if(!S365.signedIn) add("Sync/cache", "Not signed in, so live Fleet refresh and shared JSON sync are unavailable.");
+    if(!S365.remote.present) add("Sync/cache", "Shared JSON has not been confirmed this session yet.");
+    if(S365.fleetCacheAt){ var age=Date.now()-Number(S365.fleetCacheAt); if(age>7*86400000) add("Sync/cache", "Remembered Fleet data is older than 7 days."); }
+    if(!res.length) res.push({group:"All clear",items:["No obvious issues found."]});
+    healthCheckResults=res;
+  }
+  function renderHealthResults(){
+    if(!healthCheckResults) return el("p",{class:"note",text:"Run one scan to check templates, saved cards, Fleet data, and sync/cache status."});
+    var box=el("div",{class:"health-results"});
+    healthCheckResults.forEach(function(g){ var wrap=el("div",{class:"health-group"}); wrap.appendChild(el("h4",{text:g.group})); var ul=el("ul"); g.items.forEach(function(item){ ul.appendChild(el("li",{text:item})); }); wrap.appendChild(ul); box.appendChild(wrap); });
+    return box;
+  }
 
   /* ----- cover page generator ----- */
   var coverOverlay=document.getElementById("cover-overlay");
@@ -6799,6 +6990,7 @@
   function coverCompanyText(s){ s=String(s||"").trim(); return s || "Company, LLC"; }
 
   function downloadCoverPdf(){
+    if(!confirmMissingFields("cover page", coverRequiredFields())) return;
     var v=Object.assign({},coverValues), company=coverCompanyText(v.authority||"Company, LLC"), safety=coverCompanyText(v.safetyCompany||v.authority||"Company, LLC"), ymm=[v.year,v.make,v.model].filter(Boolean).join(" ")||"Year Make Model";
     // Match the original Word cover sheet: Times New Roman-style bold, centered, black text, one page.
     // Long authority/company lines shrink just enough to stay on one line.
@@ -6944,6 +7136,7 @@
     return box;
   }
   function downloadLeasePdf(){
+    if(!confirmMissingFields("lease termination", leaseRequiredFields())) return;
     var p=leaseTextParts(), left=72, max=468, stream="BT\n0 0 0 rg\n";
     function drawText(text,x,y,size,bold){ var font=bold?"/FB":"/FR"; stream+=font+" "+size.toFixed(2)+" Tf\n1 0 0 1 "+x.toFixed(2)+" "+y.toFixed(2)+" Tm ("+pdfEsc(text)+") Tj\n"; }
     function drawUnderline(x,y,w){ stream+="ET\n1 w\n"+x.toFixed(2)+" "+(y-2.5).toFixed(2)+" m "+(x+w).toFixed(2)+" "+(y-2.5).toFixed(2)+" l S\nBT\n"; }
@@ -7023,12 +7216,19 @@
     actionPanel.appendChild(el("h3",{text:"Useful actions"}));
     actionPanel.appendChild(el("p",{class:"note",text:"Use these when data looks stale, someone edited shared cards, or your personal pins need a reset. Refreshing Fleet Master updates the saved fast-start data too."}));
     var actions=el("div",{class:"settings-actions"});
-    actions.appendChild(el("button",{class:"btn",text:"Refresh Fleet Master data", onclick:function(){ setSync("saving","Refreshing…"); reconnectM365().then(function(){ setSync("ok","Synced ✓"); rerenderAll(); renderSettings(); }).catch(function(e){ setSync("err", chipErr(e), String(e)); renderSettings(); }); }}));
-    actions.appendChild(el("button",{class:"btn",text:"Reload shared edits", onclick:function(){ setSync("saving","Reloading shared edits…"); reconnectM365().then(function(){ setSync("ok","Synced ✓"); rerenderAll(); renderSettings(); }).catch(function(e){ setSync("err", chipErr(e), String(e)); renderSettings(); }); }}));
+    actions.appendChild(el("button",{class:"btn",text:"Refresh Fleet Master data", onclick:function(){ setSync("saving","Looking for changes…","Refreshing Fleet Master data in the background."); reconnectM365().then(function(){ setSync("ok","Up to date ✓","Shared edits and Fleet data check finished."); rerenderAll(); renderSettings(); }).catch(function(e){ setSync("err", chipErr(e), String(e)); renderSettings(); }); }}));
+    actions.appendChild(el("button",{class:"btn",text:"Reload shared edits", onclick:function(){ setSync("saving","Looking for changes…","Reloading shared edits and refreshing Fleet data."); reconnectM365().then(function(){ setSync("ok","Up to date ✓","Shared edits and Fleet data check finished."); rerenderAll(); renderSettings(); }).catch(function(e){ setSync("err", chipErr(e), String(e)); renderSettings(); }); }}));
     actions.appendChild(el("button",{class:"btn",text:"Sync my changes now", onclick:function(){ setSync("saving","Syncing changes…"); pushRemoteConfig(); setTimeout(renderSettings, 700); }}));
     actions.appendChild(el("button",{class:"btn danger",text:"Clear my pins", onclick:function(){ if(!confirm("Clear only your pinned cards? This will not affect anyone else.")) return; state.pins=[]; savePinsForCurrentUser(); rerenderAll(); renderSettings(); }}));
     actionPanel.appendChild(actions);
     body.appendChild(actionPanel);
+
+    var healthPanel=el("div",{class:"settings-panel"});
+    healthPanel.appendChild(el("h3",{text:"Dashboard health check"}));
+    healthPanel.appendChild(el("p",{class:"note",text:"One scan checks templates, saved cards, Fleet data, and sync/cache status. It only reports issues; it does not auto-fix anything."}));
+    healthPanel.appendChild(el("div",{class:"settings-actions"}, el("button",{class:"btn",text:"Run health check",onclick:function(){ runDashboardHealthCheck(); renderSettings(); }})));
+    healthPanel.appendChild(renderHealthResults());
+    body.appendChild(healthPanel);
 
     var helpPanel=el("div",{class:"settings-panel"});
     helpPanel.appendChild(el("h3",{text:"What to do if something looks wrong"}));
@@ -7047,6 +7247,7 @@
 
   /* ---------- boot ---------- */
   loadFleetCache();
+  refreshDataStatus();
   renderHome();
   m365Init();
 })();
