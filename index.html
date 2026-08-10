@@ -144,6 +144,21 @@
   .lookup-card h3{margin:0 0 6px;font-size:15px}
   .lookup-meta{font-size:12.5px;color:var(--muted);margin-bottom:9px}
   .lookup-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .lookup-search{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:10px 0 14px}
+  .lookup-card.primary{border-color:#c7d7f2;background:#fbfdff}
+  .lookup-section-title{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:14px 0 7px}
+  .info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-top:10px}
+  .info-kv{border:1px solid var(--line);border-radius:9px;background:#fff;padding:8px 9px;min-width:0}
+  .info-kv .k{font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
+  .info-kv .v{font-size:13.5px;font-weight:700;color:var(--ink);overflow-wrap:anywhere}
+  .info-kv .v.muted{font-weight:600;color:var(--muted)}
+  .info-table{border:1px solid var(--line);border-radius:11px;overflow:hidden;background:#fff;margin-top:10px}
+  .info-tr{display:grid;grid-template-columns:minmax(150px,1.1fr) 76px 105px 105px minmax(160px,1.25fr);gap:9px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);font-size:13px}
+  .info-tr:last-child{border-bottom:0}.info-tr.head{background:#f8fafc;color:var(--muted);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+  .info-actions{display:flex;gap:5px;flex-wrap:wrap}.info-actions .btn.small{padding:4px 8px;font-size:12px}
+  .secondary-links{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}.secondary-links a{font-size:12px;font-weight:700;text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:3px 8px;background:#fff}
+  .missing-inline{border:1px solid #f0d28a;background:#fff9e8;color:#6b4b00;border-radius:9px;padding:7px 9px;font-size:12.5px;font-weight:700;margin-top:9px}
+  .privacy-reveal{display:inline-flex;gap:6px;align-items:center}
   .health-results{border:1px solid var(--line);border-radius:10px;background:var(--bg);padding:10px 12px;margin-top:10px}
   .health-group{margin:8px 0 12px}
   .health-group h4{margin:0 0 5px;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
@@ -159,12 +174,12 @@
   .exp-row{border-bottom:1px solid var(--line);background:#fff}
   .exp-row:last-child{border-bottom:0}
   .exp-row-main{padding:8px 10px;border-left:4px solid var(--line-strong);min-height:52px}
-  .exp-row.expired .exp-row-main{border-left-color:var(--bad)} .exp-row.due .exp-row-main{border-left-color:var(--warn)} .exp-row.review .exp-row-main{border-left-color:#7c3aed} .exp-row.missing .exp-row-main{border-left-color:#64748b}
+  .exp-row.expired .exp-row-main{border-left-color:var(--bad)} .exp-row.expiring .exp-row-main{border-left-color:#dc2626} .exp-row.due .exp-row-main{border-left-color:var(--warn)} .exp-row.review .exp-row-main{border-left-color:#7c3aed} .exp-row.missing .exp-row-main{border-left-color:#64748b}
   .exp-title{font-weight:750;line-height:1.25}.exp-sub{font-size:12px;color:var(--muted);margin-top:1px}
   .exp-cell{min-width:0}.exp-muted{font-size:12.5px;color:var(--muted)}
   .exp-date{text-align:left;min-width:0;font-size:12.5px;color:var(--muted)}
   .exp-status{display:inline-block;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:800;border:1px solid var(--line);white-space:nowrap}
-  .exp-status.expired{color:var(--bad);background:#fdf1ef;border-color:#e6b5ae}.exp-status.due{color:var(--warn);background:#fff5e0;border-color:#f0d28a}
+  .exp-status.expired{color:var(--bad);background:#fdf1ef;border-color:#e6b5ae}.exp-status.expiring{color:#991b1b;background:#fee2e2;border-color:#fecaca}.exp-status.due{color:var(--warn);background:#fff5e0;border-color:#f0d28a}
   .exp-status.ok{color:var(--good);background:#eaf7ef;border-color:#bfe3cc}.exp-status.upcoming{color:var(--accent);background:var(--accent-soft);border-color:#c7d7f2}
   .exp-status.missing{color:#475569;background:#f1f5f9;border-color:#cbd5e1}.exp-status.review{color:#5b21b6;background:#f3e8ff;border-color:#ddd6fe}
   .exp-note-inline{font-size:12.5px;line-height:1.35;color:var(--ink);display:flex;gap:6px;align-items:flex-start}
@@ -4177,7 +4192,7 @@
         <span id="data-status" class="data-chip local" title="Fleet Master data available for generators">No Fleet data yet</span>
         <span id="sync-status" class="sync-chip local" title="Shared dashboard sync status">Not checking yet</span>
       </div>
-      <button id="lookup-btn" class="btn small" title="Driver / authority lookup">🔎 Fleet</button>
+      <button id="lookup-btn" class="btn small" title="Fleet Master info snapshot">🚚 Fleet Info</button>
       <button id="exp-btn" class="btn small" title="Expiration tracker">⏰ Expirations</button>
       <details id="generate-menu" class="gen-menu">
         <summary title="Generate documents">📄 Generate ▾</summary>
@@ -4228,9 +4243,9 @@
 
 <!-- Fleet lookup modal -->
 <div id="lookup-overlay" class="overlay hidden" aria-hidden="true">
-  <div class="modal" role="dialog" aria-modal="true" style="max-width:820px">
+  <div class="modal" role="dialog" aria-modal="true" style="max-width:980px">
     <div class="m-head">
-      <div class="t"><h2 style="margin-top:0">Fleet lookup</h2></div>
+      <div class="t"><h2 style="margin-top:0">Fleet Info</h2></div>
       <div class="m-actions">
         <button class="icon-btn x" id="lookup-close" aria-label="Close">✕</button>
       </div>
@@ -6707,89 +6722,188 @@
 
 
 
-  /* ----- fleet lookup / quick actions ----- */
+  /* ----- fleet info / quick actions ----- */
   var lookupOverlay=document.getElementById("lookup-overlay");
   var lookupBody=document.getElementById("lookup-body");
-  var lookupState={mode:"driver", driverKey:"", authority:""};
+  var lookupState={mode:"driver", driverKey:"", truckUnit:"", authority:"", revealed:{}};
   var healthCheckResults=null;
 
   function openFleetLookup(){ lookupOverlay.classList.remove("hidden"); lookupOverlay.setAttribute("aria-hidden","false"); document.body.style.overflow="hidden"; renderFleetLookup(); }
   function closeFleetLookup(){ lookupOverlay.classList.add("hidden"); lookupOverlay.setAttribute("aria-hidden","true"); document.body.style.overflow=""; }
-  function currentDriverRecords(){
-    var roster=(S365&&S365.roster)||null, out=[];
-    if(!roster || !roster.byDriver) return out;
-    Object.keys(roster.byDriver).forEach(function(key){ var rec=roster.byDriver[key]||{}; out.push({key:key,label:key,name:rec.name||stripTruckSuffixFromDriverLabel(key),truck:rec.truck||"",authority:rec.authority||"",dot:rec.dot||""}); });
-    return out.sort(function(a,b){ return String(a.label).localeCompare(String(b.label),undefined,{numeric:true,sensitivity:"base"}); });
-  }
   function firstLastFromLastFirst(name){
     name=stripTruckSuffixFromDriverLabel(name||"");
     if(name.indexOf(",")>=0){ var p=name.split(","); return (String(p[1]||"").trim()+" "+String(p[0]||"").trim()).trim(); }
     return name;
   }
+  function lookupNorm(v){ return String(v==null?"":v).trim().toLowerCase(); }
+  function lookupDate(v){ var iso=expDateISO(v); return iso?expPrettyDate(iso):""; }
+  function lookupDays(v){ var iso=expDateISO(v); if(!iso) return ""; var d=expDaysUntil(iso); if(d===null) return ""; if(d<0) return Math.abs(d)+" days ago"; if(d===0) return "today"; return d+" days"; }
+  function lookupValue(v){ return String(v==null?"":v).trim() || "—"; }
+  function hasFleetLookupData(){
+    var look=(S365&&S365.coverLookups)||{};
+    var roster=(S365&&S365.roster)||{};
+    return !!((look.drivers&&look.drivers.length) || (look.authorities&&look.authorities.length) || (look.tractors&&look.tractors.length) || (S365.expirationItems&&S365.expirationItems.length) || (roster.drivers&&roster.drivers.length) || (roster.authorities&&roster.authorities.length) || (roster.fleetTrucks&&roster.fleetTrucks.length));
+  }
+  function driverDetailsByText(v){
+    var look=(S365&&S365.coverLookups)||{}, nm=look.driversByName||{}, id=look.driversById||{};
+    var tests=[];
+    if(v && typeof v==="object") tests=[v.id,v.driverId,v.name,v.label,v.key,stripTruckSuffixFromDriverLabel(v.key||""),firstLastFromLastFirst(v.key||v.label||"")];
+    else tests=[v, stripTruckSuffixFromDriverLabel(v||""), firstLastFromLastFirst(v||"")];
+    for(var i=0;i<tests.length;i++){ var k=lookupNorm(tests[i]); if(k && (id[k]||nm[k])) return id[k]||nm[k]; }
+    return null;
+  }
+  function assignmentForDriverDetail(d){
+    var by=(S365&&S365.roster&&S365.roster.byDriver)||{}, best=null;
+    var keys=Object.keys(by), targets=[lookupNorm(d&&d.label), lookupNorm(d&&d.name), lookupNorm(d&&d.id), lookupNorm(d&&d.driverId)].filter(Boolean);
+    for(var i=0;i<keys.length;i++){
+      var k=keys[i], rec=by[k]||{}, base=stripTruckSuffixFromDriverLabel(k), name=lookupNorm(rec.name||base), label=lookupNorm(base);
+      var hit=false;
+      for(var t=0;t<targets.length;t++){ if(targets[t] && (label===targets[t] || name===targets[t] || lookupNorm(rec.driverId)===targets[t])) hit=true; }
+      if(hit){ var cand=Object.assign({key:k,label:base},rec); if(!best || (!best.truck && cand.truck)) best=cand; }
+    }
+    return best;
+  }
+  function currentDriverRecords(){
+    var look=(S365&&S365.coverLookups)||{}, by=(S365&&S365.roster&&S365.roster.byDriver)||{}, seen={}, out=[];
+    function put(key, baseLabel, assign, detail){
+      assign=assign||{}; detail=detail||driverDetailsByText(baseLabel)||{};
+      var id=detail.id||detail.driverId||assign.driverId||"", name=detail.name||assign.name||firstLastFromLastFirst(baseLabel||key||""), label=detail.label||baseLabel||name||key;
+      var dedupe=lookupNorm(id||label||name||key); if(!dedupe) return;
+      var row={key:key||label, label:label, name:name, display:label+(assign.truck?" #"+assign.truck:""), truck:assign.truck||"", authority:assign.authority||"", dot:assign.dot||"", driverId:id, driverDetail:detail};
+      if(!seen[dedupe] || (!seen[dedupe].truck && row.truck)) seen[dedupe]=row;
+    }
+    Object.keys(by).forEach(function(k){ var rec=by[k]||{}, base=stripTruckSuffixFromDriverLabel(k||rec.name||""); put(k,base,rec,driverDetailsByText(rec)||driverDetailsByText(base)); });
+    (look.drivers||[]).forEach(function(d){ var a=assignmentForDriverDetail(d); put((a&&a.key)||d.label||d.name,d.label||d.name,a,d); });
+    Object.keys(seen).forEach(function(k){ out.push(seen[k]); });
+    return out.sort(function(a,b){ return String(a.label||a.name).localeCompare(String(b.label||b.name),undefined,{numeric:true,sensitivity:"base"}); });
+  }
   function lookupDriverByKey(key){ return currentDriverRecords().filter(function(r){return r.key===key;})[0] || null; }
-  function truckDetailsByUnit(unit){ var look=(S365&&S365.coverLookups)||{}, tr=look.tractorsByUnit||{}; return tr[String(unit||"").trim().toLowerCase()] || null; }
-  function authorityDetailsByName(auth){ var look=(S365&&S365.coverLookups)||{}, au=look.authoritiesByName||{}; return au[String(auth||"").trim().toLowerCase()] || null; }
+  function truckDetailsByUnit(unit){ var look=(S365&&S365.coverLookups)||{}, tr=look.tractorsByUnit||{}; return tr[lookupNorm(unit)] || null; }
+  function authorityDetailsByName(auth){ var look=(S365&&S365.coverLookups)||{}, au=look.authoritiesByName||{}; return au[lookupNorm(auth)] || null; }
+  function currentDriverForTruck(unit){ unit=lookupNorm(unit); return currentDriverRecords().filter(function(r){return lookupNorm(r.truck)===unit;})[0] || null; }
+  function currentDriversForAuthority(auth){ auth=lookupNorm(auth); return currentDriverRecords().filter(function(r){return lookupNorm(r.authority)===auth;}); }
+  function kv(label,value,muted){ return el("div",{class:"info-kv"}, el("div",{class:"k",text:label}), el("div",{class:"v"+(muted?" muted":""),text:lookupValue(value)})); }
+  function dateKv(label,value){ var pretty=lookupDate(value), days=lookupDays(value); return kv(label, pretty ? (pretty+(days?" · "+days:"")) : "—", !pretty); }
+  function missingBox(pairs){
+    var miss=pairs.filter(function(p){return fieldMissing(p[1]);}).map(function(p){return p[0];});
+    return miss.length?el("div",{class:"missing-inline",text:"Missing: "+miss.join(", ")}):null;
+  }
+  function copyText(txt,label){
+    if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(function(){ setSync("ok","Copied ✓",label||"Copied"); }).catch(function(){ window.prompt("Copy this:", txt); }); }
+    else window.prompt("Copy this:", txt);
+  }
+  function insuranceTextFor(rec){
+    rec=rec||{}; var d=rec.driverDetail||driverDetailsByText(rec)||{}, t=truckDetailsByUnit(rec.truck)||{}, a=authorityDetailsByName(rec.authority)||{};
+    return [
+      "Driver: "+lookupValue(d.name||rec.name||firstLastFromLastFirst(rec.label||rec.key)),
+      "Driver ID: "+lookupValue(d.id||rec.driverId),
+      "CDL: "+lookupValue(d.cdl)+(d.cdlState?" ("+d.cdlState+")":""),
+      "CDL Exp: "+lookupValue(lookupDate(d.cdlExp)),
+      "Medical Exp: "+lookupValue(lookupDate(d.medicalExp)),
+      "Authority: "+lookupValue(rec.authority),
+      "DOT #: "+lookupValue(a.dot||rec.dot),
+      "MC #: "+lookupValue(a.mc),
+      "EIN: "+lookupValue(a.ein),
+      "Insurance Exp: "+lookupValue(lookupDate(a.insuranceExp)),
+      "Unit #: "+lookupValue(rec.truck),
+      "Truck: "+lookupValue([t.year,t.make,t.model].filter(Boolean).join(" ")),
+      "VIN: "+lookupValue(t.vin),
+      "Plate: "+lookupValue(t.plate),
+      "Color: "+lookupValue(t.color),
+      "Annual Inspection: "+lookupValue(lookupDate(t.annualInspection))
+    ].join("\n");
+  }
+  function truckInfoText(unit){ var t=truckDetailsByUnit(unit)||{}, rec=currentDriverForTruck(unit)||{}, a=authorityDetailsByName(rec.authority)||{}; return ["Unit #: "+lookupValue(t.unit||unit),"Truck: "+lookupValue([t.year,t.make,t.model].filter(Boolean).join(" ")),"VIN: "+lookupValue(t.vin),"Plate: "+lookupValue(t.plate),"Color: "+lookupValue(t.color),"Annual Inspection: "+lookupValue(lookupDate(t.annualInspection)),"Current driver: "+lookupValue(rec.name||rec.label),"Current authority: "+lookupValue(rec.authority),"DOT #: "+lookupValue(a.dot||rec.dot),"MC #: "+lookupValue(a.mc)].join("\n"); }
+  function authorityInfoText(auth){ var a=authorityDetailsByName(auth)||{}, rows=currentDriversForAuthority(auth); return ["Authority: "+lookupValue(a.authority||auth),"DOT #: "+lookupValue(a.dot),"MC #: "+lookupValue(a.mc),"EIN: "+lookupValue(a.ein),"Insurance Exp: "+lookupValue(lookupDate(a.insuranceExp)),"Insurer/Agent: "+lookupValue(a.insurerAgent),"Policy Type: "+lookupValue(a.policyType),"Current drivers: "+rows.length].join("\n"); }
   function fillCoverFromDriver(rec){
     if(!rec) return;
-    var a=authorityDetailsByName(rec.authority)||{}, t=truckDetailsByUnit(rec.truck)||{};
-    coverValues={driverpick:rec.key||"", authoritypick:rec.authority||"", truckpick:rec.truck||"", driver:firstLastFromLastFirst(rec.name||rec.key), authority:rec.authority||"", safetyCompany:rec.authority||"", dot:rec.dot||a.dot||"", ein:a.ein||"", mc:a.mc||"", unit:rec.truck||"", year:t.year||"", make:t.make||"", model:t.model||"", plate:t.plate||"", vin:t.vin||"", color:t.color||""};
-    autofillCoverDetails(false);
-    closeFleetLookup(); openCoverPage();
+    var d=rec.driverDetail||driverDetailsByText(rec)||{}, a=authorityDetailsByName(rec.authority)||{}, t=truckDetailsByUnit(rec.truck)||{};
+    coverValues={driverpick:rec.key||"", authoritypick:rec.authority||"", truckpick:rec.truck||"", driver:d.name||firstLastFromLastFirst(rec.name||rec.label||rec.key), authority:rec.authority||"", safetyCompany:rec.authority||"", dot:rec.dot||a.dot||"", ein:a.ein||"", mc:a.mc||"", unit:rec.truck||"", year:t.year||"", make:t.make||"", model:t.model||"", plate:t.plate||"", vin:t.vin||"", color:t.color||""};
+    autofillCoverDetails(false); closeFleetLookup(); openCoverPage();
   }
+  function fillCoverFromTruck(unit){ var rec=currentDriverForTruck(unit), t=truckDetailsByUnit(unit)||{}; if(rec) return fillCoverFromDriver(rec); coverValues={driverpick:"", authoritypick:"", truckpick:unit||"", driver:"", authority:"", safetyCompany:"", dot:"", ein:"", mc:"", unit:unit||"", year:t.year||"", make:t.make||"", model:t.model||"", plate:t.plate||"", vin:t.vin||"", color:t.color||""}; closeFleetLookup(); openCoverPage(); }
   function fillLeaseFromDriver(rec){
-    if(!rec) return;
-    resetLeaseValues();
+    if(!rec) return; resetLeaseValues();
     var t=truckDetailsByUnit(rec.truck)||{};
     leaseValues.oldAuthorityPick=rec.authority||""; leaseValues.oldTruckPick=rec.truck||"";
     leaseValues.oldCompany=rec.authority||""; leaseValues.oldUnit=rec.truck||"";
     leaseValues.oldYear=t.year||""; leaseValues.oldMake=t.make||""; leaseValues.oldModel=t.model||""; leaseValues.oldVin=t.vin||"";
     closeFleetLookup(); openLeaseTermination();
   }
-  function openFolderUrl(url, label){ if(!url){ window.alert("Missing "+(label||"folder")+" info."); return; } window.open(url,"_blank","noopener"); }
-  function renderLookupDriverCard(rec){
-    var truck=rec.truck||"", auth=rec.authority||"";
-    var card=el("div",{class:"lookup-card"});
-    card.appendChild(el("h3",{text:stripTruckSuffixFromDriverLabel(rec.name||rec.key||"Driver")}));
-    card.appendChild(el("div",{class:"lookup-meta",text:[auth, truck?("#"+truck):"", rec.dot?("DOT "+rec.dot):""].filter(Boolean).join(" · ")||"No current assignment details"}));
-    var actions=el("div",{class:"lookup-actions"});
-    actions.appendChild(el("button",{class:"btn small",text:"📁 Driver folder",onclick:function(){ openFolderUrl(driverFolderUrl(stripTruckSuffixFromDriverLabel(rec.key||rec.name)),"driver folder"); }}));
-    actions.appendChild(el("button",{class:"btn small",text:"📁 Truck folder",onclick:function(){ openFolderUrl(tractorFolderUrl(truck),"truck folder"); }}));
-    actions.appendChild(el("button",{class:"btn small",text:"📄 Cover page",onclick:function(){ fillCoverFromDriver(rec); }}));
-    actions.appendChild(el("button",{class:"btn small",text:"📝 Lease termination",onclick:function(){ fillLeaseFromDriver(rec); }}));
-    card.appendChild(actions);
+  function fillLeaseFromTruck(unit){ var rec=currentDriverForTruck(unit), t=truckDetailsByUnit(unit)||{}; resetLeaseValues(); leaseValues.oldAuthorityPick=(rec&&rec.authority)||""; leaseValues.oldTruckPick=unit||""; leaseValues.oldCompany=(rec&&rec.authority)||""; leaseValues.oldUnit=unit||""; leaseValues.oldYear=t.year||""; leaseValues.oldMake=t.make||""; leaseValues.oldModel=t.model||""; leaseValues.oldVin=t.vin||""; closeFleetLookup(); openLeaseTermination(); }
+  function secondaryFolderLinks(rec){
+    var links=el("div",{class:"secondary-links"}), label=stripTruckSuffixFromDriverLabel((rec&&rec.key)||(rec&&rec.label)||(rec&&rec.name)||"");
+    if(label) links.appendChild(el("a",{href:driverFolderUrl(label),target:"_blank",rel:"noopener",text:"Driver folder ↗"}));
+    if(rec && rec.truck) links.appendChild(el("a",{href:tractorFolderUrl(rec.truck),target:"_blank",rel:"noopener",text:"Truck folder ↗"}));
+    return links.childNodes.length?links:null;
+  }
+  function renderDriverProfile(rec){
+    if(!rec) return el("div",{class:"empty",text:"Choose a driver to see Fleet Master details."});
+    var d=rec.driverDetail||driverDetailsByText(rec)||{}, t=truckDetailsByUnit(rec.truck)||{}, a=authorityDetailsByName(rec.authority)||{}, card=el("div",{class:"lookup-card primary"});
+    card.appendChild(el("h3",{text:d.name||firstLastFromLastFirst(rec.label||rec.key||"Driver")}));
+    card.appendChild(el("div",{class:"lookup-meta",text:[rec.authority, rec.truck?("Unit #"+rec.truck):"", (a.dot||rec.dot)?("DOT "+(a.dot||rec.dot)):""].filter(Boolean).join(" · ")||"No current assignment details"}));
+    var ssnText=(d.ssnLast4 && lookupState.revealed[rec.key]) ? d.ssnLast4 : (d.ssnLast4?"••••":"—");
+    var ssnBox=kv("SSN last 4", ssnText, !d.ssnLast4);
+    if(d.ssnLast4){ ssnBox.querySelector(".v").appendChild(document.createTextNode(" ")); ssnBox.querySelector(".v").appendChild(el("button",{class:"mini",text:lookupState.revealed[rec.key]?"Hide":"Reveal",onclick:function(ev){ ev.stopPropagation(); lookupState.revealed[rec.key]=!lookupState.revealed[rec.key]; renderFleetLookup(); }})); }
+    card.appendChild(el("div",{class:"info-grid"},
+      kv("Driver ID",d.id||rec.driverId), kv("CDL #",d.cdl), kv("CDL State",d.cdlState), dateKv("CDL Exp",d.cdlExp), dateKv("Medical Exp",d.medicalExp), ssnBox,
+      kv("Current truck",rec.truck), kv("Current authority",rec.authority), kv("DOT #",a.dot||rec.dot)
+    ));
+    var miss=missingBox([["CDL #",d.cdl],["CDL Exp",d.cdlExp],["Medical Exp",d.medicalExp],["Current truck",rec.truck],["Current authority",rec.authority],["SSN last 4",d.ssnLast4]]); if(miss) card.appendChild(miss);
+    card.appendChild(el("div",{class:"lookup-section-title",text:"Current truck"}));
+    card.appendChild(el("div",{class:"info-grid"}, kv("Unit #",rec.truck), kv("Truck",[t.year,t.make,t.model].filter(Boolean).join(" ")), kv("VIN",t.vin), kv("Plate",t.plate), kv("Color",t.color), dateKv("Annual inspection",t.annualInspection)));
+    card.appendChild(el("div",{class:"lookup-section-title",text:"Authority"}));
+    card.appendChild(el("div",{class:"info-grid"}, kv("Company",a.authority||rec.authority), kv("DOT #",a.dot||rec.dot), kv("MC #",a.mc), kv("EIN",a.ein), dateKv("Insurance Exp",a.insuranceExp), kv("Insurer/Agent",a.insurerAgent), kv("Policy type",a.policyType)));
+    var actions=el("div",{class:"lookup-actions"}, el("button",{class:"btn small",text:"📄 Cover page",onclick:function(){ fillCoverFromDriver(rec); }}), el("button",{class:"btn small",text:"📝 Lease termination",onclick:function(){ fillLeaseFromDriver(rec); }}), el("button",{class:"btn small",text:"Copy insurance info",onclick:function(){ copyText(insuranceTextFor(rec),"Insurance info copied"); }}));
+    card.appendChild(actions); var links=secondaryFolderLinks(rec); if(links) card.appendChild(links); return card;
+  }
+  function renderTruckProfile(unit){
+    if(!unit) return el("div",{class:"empty",text:"Choose a truck/unit to see Fleet Master details."});
+    var t=truckDetailsByUnit(unit)||{unit:unit}, rec=currentDriverForTruck(unit), a=authorityDetailsByName(rec&&rec.authority)||{}, card=el("div",{class:"lookup-card primary"});
+    card.appendChild(el("h3",{text:"Unit #"+(t.unit||unit)}));
+    card.appendChild(el("div",{class:"lookup-meta",text:[rec&&rec.name, rec&&rec.authority].filter(Boolean).join(" · ")||"No current driver found"}));
+    card.appendChild(el("div",{class:"info-grid"}, kv("Truck",[t.year,t.make,t.model].filter(Boolean).join(" ")), kv("VIN",t.vin), kv("Plate",t.plate), kv("Color",t.color), dateKv("Annual inspection",t.annualInspection), kv("In service",t.inService), kv("Current driver",rec&&(rec.driverDetail&&rec.driverDetail.name||rec.name||rec.label)), kv("Current authority",rec&&rec.authority), kv("DOT #",a.dot||(rec&&rec.dot))));
+    var miss=missingBox([["VIN",t.vin],["Plate",t.plate],["Color",t.color],["Annual inspection",t.annualInspection]]); if(miss) card.appendChild(miss);
+    card.appendChild(el("div",{class:"lookup-actions"}, el("button",{class:"btn small",text:"📄 Cover page",onclick:function(){ fillCoverFromTruck(unit); }}), el("button",{class:"btn small",text:"📝 Lease termination",onclick:function(){ fillLeaseFromTruck(unit); }}), el("button",{class:"btn small",text:"Copy truck info",onclick:function(){ copyText(truckInfoText(unit),"Truck info copied"); }})));
+    if(rec){ var links=secondaryFolderLinks(rec); if(links) card.appendChild(links); }
     return card;
+  }
+  function renderAuthorityProfile(auth){
+    if(!auth) return el("div",{class:"empty",text:"Choose an authority to see company details and current drivers."});
+    var a=authorityDetailsByName(auth)||{authority:auth}, matches=currentDriversForAuthority(auth), card=el("div",{class:"lookup-card primary"});
+    card.appendChild(el("h3",{text:a.authority||auth}));
+    card.appendChild(el("div",{class:"lookup-meta",text:matches.length+" current driver(s) under this authority"}));
+    card.appendChild(el("div",{class:"info-grid"}, kv("DOT #",a.dot), kv("MC #",a.mc), kv("EIN",a.ein), dateKv("Insurance Exp",a.insuranceExp), kv("Insurer/Agent",a.insurerAgent), kv("Policy type",a.policyType), dateKv("Policy date",a.policyDate)));
+    var miss=missingBox([["DOT #",a.dot],["MC #",a.mc],["EIN",a.ein],["Insurance Exp",a.insuranceExp]]); if(miss) card.appendChild(miss);
+    card.appendChild(el("div",{class:"lookup-actions"}, el("button",{class:"btn small",text:"Copy authority info",onclick:function(){ copyText(authorityInfoText(auth),"Authority info copied"); }})));
+    card.appendChild(el("div",{class:"lookup-section-title",text:"Current drivers"}));
+    var table=el("div",{class:"info-table"}, el("div",{class:"info-tr head"}, el("div",{text:"Driver"}), el("div",{text:"Truck"}), el("div",{text:"CDL Exp"}), el("div",{text:"Medical"}), el("div",{text:"Actions"})));
+    if(!matches.length) table.appendChild(el("div",{class:"exp-empty",text:"No current drivers found for this authority."}));
+    matches.forEach(function(rec){ var d=rec.driverDetail||driverDetailsByText(rec)||{}; table.appendChild(el("div",{class:"info-tr"}, el("div",{text:d.name||rec.name||rec.label}), el("div",{text:rec.truck||"—"}), el("div",{text:lookupDate(d.cdlExp)||"—"}), el("div",{text:lookupDate(d.medicalExp)||"—"}), el("div",{class:"info-actions"}, el("button",{class:"btn small",text:"Cover",onclick:function(){ fillCoverFromDriver(rec); }}), el("button",{class:"btn small",text:"Lease",onclick:function(){ fillLeaseFromDriver(rec); }}), el("button",{class:"btn small",text:"Copy",onclick:function(){ copyText(insuranceTextFor(rec),"Driver info copied"); }})))); });
+    card.appendChild(table); return card;
   }
   function renderFleetLookup(){
     lookupBody.textContent="";
     var drivers=currentDriverRecords(), look=(S365&&S365.coverLookups)||{};
     if(!hasFleetLookupData()) lookupBody.appendChild(el("div",{class:"warn-note",text:"No Fleet Master data is loaded yet. Sign in or wait for remembered data to load."}));
-    else lookupBody.appendChild(el("p",{class:"note",text:"Use remembered Fleet data immediately; the dashboard still checks for updates in the background."}));
+    else lookupBody.appendChild(el("p",{class:"note",text:"Fleet Info uses Fleet Master details for insurance/document work. Folder links are secondary because Office Doc Lookup already handles document searching."}));
     var tabs=el("div",{class:"lookup-tabs"});
-    tabs.appendChild(el("button",{class:"btn small"+(lookupState.mode==="driver"?" on":""),text:"Driver lookup",onclick:function(){ lookupState.mode="driver"; renderFleetLookup(); }}));
-    tabs.appendChild(el("button",{class:"btn small"+(lookupState.mode==="authority"?" on":""),text:"Authority lookup",onclick:function(){ lookupState.mode="authority"; renderFleetLookup(); }}));
+    [["driver","Driver"],["truck","Truck"],["authority","Authority"]].forEach(function(p){ tabs.appendChild(el("button",{class:"btn small"+(lookupState.mode===p[0]?" on":""),text:p[1],onclick:function(){ lookupState.mode=p[0]; renderFleetLookup(); }})); });
     lookupBody.appendChild(tabs);
-    var grid=el("div",{class:"lookup-grid"});
+    var grid=el("div",{class:"lookup-search"});
     if(lookupState.mode==="driver"){
       var sel=el("select"); sel.appendChild(el("option",{value:"",text:"— choose driver —"}));
-      drivers.forEach(function(d){ var o=el("option",{value:d.key,text:d.label}); if(d.key===lookupState.driverKey)o.selected=true; sel.appendChild(o); });
-      sel.addEventListener("change",function(){ lookupState.driverKey=sel.value; renderFleetLookup(); });
-      grid.appendChild(coverField("Driver", sel));
-      lookupBody.appendChild(grid);
-      var rec=lookupDriverByKey(lookupState.driverKey);
-      if(rec) lookupBody.appendChild(renderLookupDriverCard(rec));
+      drivers.forEach(function(d){ var o=el("option",{value:d.key,text:d.display||d.label}); if(d.key===lookupState.driverKey)o.selected=true; sel.appendChild(o); });
+      sel.addEventListener("change",function(){ lookupState.driverKey=sel.value; renderFleetLookup(); }); grid.appendChild(coverField("Driver", sel)); lookupBody.appendChild(grid); lookupBody.appendChild(renderDriverProfile(lookupDriverByKey(lookupState.driverKey)));
+    }else if(lookupState.mode==="truck"){
+      var tractors=(look.tractors||[]).slice().sort(function(a,b){return String(a.unit).localeCompare(String(b.unit),undefined,{numeric:true,sensitivity:"base"});});
+      var ts=el("select"); ts.appendChild(el("option",{value:"",text:"— choose truck —"})); tractors.forEach(function(t){ var o=el("option",{value:t.unit,text:"Unit #"+t.unit+([t.year,t.make,t.model].filter(Boolean).length?" — "+[t.year,t.make,t.model].filter(Boolean).join(" "):"")}); if(String(t.unit)===String(lookupState.truckUnit))o.selected=true; ts.appendChild(o); });
+      ts.addEventListener("change",function(){ lookupState.truckUnit=ts.value; renderFleetLookup(); }); grid.appendChild(coverField("Truck / unit", ts)); lookupBody.appendChild(grid); lookupBody.appendChild(renderTruckProfile(lookupState.truckUnit));
     }else{
       var auths=(look.authorities&&look.authorities.length?look.authorities.map(function(a){return a.authority;}):(S365&&S365.roster&&S365.roster.authorities)||[]).filter(Boolean);
       auths=auths.filter(function(v,i,a){return a.indexOf(v)===i;}).sort(function(a,b){return String(a).localeCompare(String(b),undefined,{sensitivity:"base",numeric:true});});
-      var as=el("select"); as.appendChild(el("option",{value:"",text:"— choose authority —"}));
-      auths.forEach(function(a){ var o=el("option",{value:a,text:a}); if(a===lookupState.authority)o.selected=true; as.appendChild(o); });
-      as.addEventListener("change",function(){ lookupState.authority=as.value; renderFleetLookup(); });
-      grid.appendChild(coverField("Authority", as));
-      lookupBody.appendChild(grid);
-      if(lookupState.authority){
-        var matches=drivers.filter(function(d){return String(d.authority||"").trim().toLowerCase()===String(lookupState.authority).trim().toLowerCase();});
-        lookupBody.appendChild(el("p",{class:"note",text:matches.length ? (matches.length+" current driver(s) found for this authority.") : "No current drivers found for this authority."}));
-        matches.forEach(function(rec){ lookupBody.appendChild(renderLookupDriverCard(rec)); });
-      }
+      var as=el("select"); as.appendChild(el("option",{value:"",text:"— choose authority —"})); auths.forEach(function(a){ var o=el("option",{value:a,text:a}); if(a===lookupState.authority)o.selected=true; as.appendChild(o); });
+      as.addEventListener("change",function(){ lookupState.authority=as.value; renderFleetLookup(); }); grid.appendChild(coverField("Authority", as)); lookupBody.appendChild(grid); lookupBody.appendChild(renderAuthorityProfile(lookupState.authority));
     }
   }
 
@@ -6860,7 +6974,7 @@
   function expDateISO(v){ var d=expParseDate(v); return d?d.toISOString().slice(0,10):""; }
   function expPrettyDate(iso){ if(!iso) return "No date"; var p=String(iso).split("-"); var d=new Date(Number(p[0]),Number(p[1])-1,Number(p[2])); return d.toLocaleDateString([], {month:"short", day:"numeric", year:"numeric"}); }
   function expDaysUntil(iso){ if(!iso) return null; var p=String(iso).split("-"); var d=new Date(Number(p[0]),Number(p[1])-1,Number(p[2])); d.setHours(0,0,0,0); var today=new Date(); today.setHours(0,0,0,0); return Math.round((d.getTime()-today.getTime())/86400000); }
-  function expStatusFor(iso){ var days=expDaysUntil(iso); if(days===null) return {id:"missing", label:"No date", days:null}; if(days<0) return {id:"expired", label:"Expired", days:days}; if(days<=30) return {id:"due", label:"Due soon", days:days}; if(days<=90) return {id:"upcoming", label:"Upcoming", days:days}; return {id:"ok", label:"OK", days:days}; }
+  function expStatusFor(iso){ var days=expDaysUntil(iso); if(days===null) return {id:"missing", label:"No date", days:null}; if(days<0) return {id:"expired", label:"Expired", days:days}; if(days<=3) return {id:"expiring", label:"Expiring", days:days}; if(days<=15) return {id:"due", label:"Due soon", days:days}; if(days<=30) return {id:"upcoming", label:"Upcoming", days:days}; return {id:"ok", label:"OK", days:days}; }
   function expHeaderIndex(head,names){
     head=(head||[]).map(function(x){return expNorm(String(x).replace(/[.]/g,""));});
     for(var n=0;n<names.length;n++){ var want=expNorm(String(names[n]).replace(/[.]/g,"")); for(var i=0;i<head.length;i++){ if(head[i]===want) return i; } }
@@ -6870,7 +6984,7 @@
   function expSort(a,b){
     var na=expActiveNote(a), nb=expActiveNote(b), ra=na&&expNoteNeedsReview(na,a), rb=nb&&expNoteNeedsReview(nb,b);
     if(ra!==rb) return ra?-1:1;
-    var sa=expStatusFor(a.dateISO), sb=expStatusFor(b.dateISO), rank={expired:0,due:1,missing:2,upcoming:3,ok:4};
+    var sa=expStatusFor(a.dateISO), sb=expStatusFor(b.dateISO), rank={expired:0,expiring:1,due:2,missing:3,upcoming:4,ok:5};
     if(rank[sa.id]!==rank[sb.id]) return rank[sa.id]-rank[sb.id];
     var da=sa.days===null?999999:sa.days, db=sb.days===null?999999:sb.days;
     if(da!==db) return da-db;
@@ -6919,7 +7033,7 @@
   function expSaveNote(item,text,type){
     text=expClean(text); if(!text){ window.alert("Type a note first, or use Delete to remove the note."); return; }
     var b=expBucket(item.key), prev=b.active||{}, now=new Date().toISOString();
-    b.active={id:prev.id||uid("expnote"), type:type||prev.type||"Info", text:text, createdAt:prev.createdAt||now, updatedAt:now, updatedBy:expAccountName(), dateISO:item.dateISO||"", dateLabel:expPrettyDate(item.dateISO)};
+    b.active={id:prev.id||uid("expnote"), type:type||expInferType(text)||prev.type||"Info", text:text, createdAt:prev.createdAt||now, updatedAt:now, updatedBy:expAccountName(), dateISO:item.dateISO||"", dateLabel:expPrettyDate(item.dateISO)};
     expirationEditingKey=""; flushConfig(); renderExpirations();
   }
   function expDeleteActive(item){ var b=expBucket(item.key); b.active=null; flushConfig(); renderExpirations(); }
@@ -6929,14 +7043,15 @@
   function expRestoreArchived(item,idx){ var b=expBucket(item.key), n=b.archived[idx]; if(!n) return; if(b.active && !window.confirm("Replace the active note with this archived note?")) return; b.archived.splice(idx,1); n.archivedAt=""; n.archivedBy=""; n.updatedAt=new Date().toISOString(); n.updatedBy=expAccountName(); b.active=n; flushConfig(); renderExpirations(); }
   function expInferType(text){ var s=expNorm(text); if(s.indexOf("temp")>=0) return "Temp / exception"; if(s.indexOf("email")>=0 || s.indexOf("emailed")>=0) return "Emailed"; if(s.indexOf("waiting")>=0) return "Waiting"; if(s.indexOf("follow")>=0) return "Follow-up"; return "Info"; }
   function expSummaryCounts(items){
-    var c={expired:0,due:0,missing:0,review:0,notes:0,temp:0};
+    var c={expired:0,expiring:0,due:0,upcoming:0,missing:0,review:0,notes:0,temp:0};
     items.forEach(function(it){ var st=expStatusFor(it.dateISO); if(c[st.id]!=null) c[st.id]++; var n=expActiveNote(it); if(n){ c.notes++; if(expNoteNeedsReview(n,it)) c.review++; if(n.type==="Temp / exception") c.temp++; } }); return c;
   }
   function expMatchesView(it,view){
     var st=expStatusFor(it.dateISO), n=expActiveNote(it), rev=n&&expNoteNeedsReview(n,it), archived=expArchivedNotes(it).length;
     if(view==="all") return true;
-    if(view==="attention") return rev || st.id==="expired" || st.id==="due" || st.id==="missing";
+    if(view==="attention") return rev || st.id==="expired" || st.id==="expiring" || st.id==="due" || st.id==="missing";
     if(view==="expired") return st.id==="expired";
+    if(view==="expiring") return st.id==="expiring";
     if(view==="due") return st.id==="due";
     if(view==="upcoming") return st.id==="upcoming";
     if(view==="notes") return !!n;
@@ -6956,9 +7071,9 @@
   }
   function expTypeSelect(value){ var sel=el("select"); EXP_NOTE_TYPES.forEach(function(t){ var o=el("option",{value:t,text:t}); if(t===(value||"Info")) o.selected=true; sel.appendChild(o); }); return sel; }
   function renderExpNoteEditor(item, note){
-    var wrap=el("div",{class:"exp-note-edit"}), sel=expTypeSelect(note&&note.type), ta=el("textarea",{placeholder:"Example: Emailed 8/10 — waiting on updated med card"}); ta.value=(note&&note.text)||"";
-    wrap.appendChild(sel); wrap.appendChild(ta);
-    wrap.appendChild(el("div",{class:"exp-note-actions"}, el("button",{class:"btn primary small",text:"Save note",onclick:function(){ expSaveNote(item,ta.value,sel.value); }}), el("button",{class:"btn small",text:"Cancel",onclick:function(){ expirationEditingKey=""; renderExpirations(); }})));
+    var wrap=el("div",{class:"exp-note-edit"}), ta=el("textarea",{placeholder:"Example: Emailed 8/10 — waiting on updated med card, or temp CDL"}); ta.value=(note&&note.text)||"";
+    wrap.appendChild(ta);
+    wrap.appendChild(el("div",{class:"exp-note-actions"}, el("button",{class:"btn primary small",text:"Save note",onclick:function(){ expSaveNote(item,ta.value,expInferType(ta.value)); }}), el("button",{class:"btn small",text:"Cancel",onclick:function(){ expirationEditingKey=""; renderExpirations(); }})));
     return wrap;
   }
   function renderExpTableHead(){
@@ -6969,7 +7084,7 @@
   }
   function renderExpNotePreview(note){
     if(!note) return el("div",{class:"exp-muted",text:"—"});
-    return el("div",{class:"exp-note-inline"}, el("span",{class:"exp-note-type",text:note.type||"Info"}), el("span",{class:"txt",text:note.text||""}));
+    return el("div",{class:"exp-note-inline"}, el("span",{class:"txt",text:note.text||""}));
   }
   function renderExpCard(item){
     var st=expStatusFor(item.dateISO), note=expActiveNote(item), rev=note&&expNoteNeedsReview(note,item), cls="exp-row "+(rev?"review":st.id);
@@ -6997,7 +7112,7 @@
     if(expirationState.view==="archived"){
       expArchivedNotes(item).forEach(function(n,idx){
         var archived=el("div",{class:"exp-archived-note"},
-          el("div",{class:"exp-note-top"}, el("span",{class:"exp-note-type",text:n.type||"Info"}), el("span",{class:"exp-note-meta",text:"Archived "+fleetStampLabel(Date.parse(n.archivedAt||n.updatedAt||Date.now()))})),
+          el("div",{class:"exp-note-top"}, el("span",{class:"exp-note-meta",text:"Archived "+fleetStampLabel(Date.parse(n.archivedAt||n.updatedAt||Date.now()))})),
           el("div",{class:"exp-note-text",text:n.text||""}),
           el("div",{class:"exp-note-actions"}, el("button",{class:"btn small",text:"Restore",onclick:function(){ expRestoreArchived(item,idx); }}), el("button",{class:"btn danger small",text:"Delete archived",onclick:function(){ if(window.confirm("Delete this archived note?")) expDeleteArchived(item,idx); }}))
         );
@@ -7009,16 +7124,16 @@
   function renderExpirations(){
     expBody.textContent="";
     if(!hasFleetLookupData()) expBody.appendChild(el("div",{class:"warn-note",text:"Fleet Master data is not loaded yet. Sign in or wait for remembered data/live refresh."}));
-    else expBody.appendChild(el("p",{class:"note",text:"This pulls dates from Drivers, Authorities, Trucks, and Trailers — not from the old Expirations tab. Notes are shared so everyone sees the follow-up status."}));
+    else expBody.appendChild(el("p",{class:"note",text:"This pulls dates from Drivers, Authorities, Trucks, and Trailers — not from the old Expirations tab. Notes are shared, and dates are grouped as Expiring ≤3 days, Due soon ≤15 days, Upcoming ≤30 days."}));
     var toolbar=el("div",{class:"exp-toolbar"});
     var cat=el("select"); [["all","All categories"],["Driver","Drivers"],["Authority","Authorities"],["Truck","Trucks"],["Trailer","Trailers"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===expirationState.category)o.selected=true; cat.appendChild(o); }); cat.addEventListener("change",function(){ expirationState.category=cat.value; renderExpirations(); });
-    var view=el("select"); [["attention","Needs attention"],["all","All current items"],["expired","Expired"],["due","Due soon"],["upcoming","Upcoming"],["notes","Has active notes"],["review","Needs review"],["temp","Temp / exception"],["archived","Archived notes"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===expirationState.view)o.selected=true; view.appendChild(o); }); view.addEventListener("change",function(){ expirationState.view=view.value; renderExpirations(); });
+    var view=el("select"); [["attention","Needs attention"],["all","All current items"],["expired","Expired"],["expiring","Expiring — 3 days"],["due","Due soon — 15 days"],["upcoming","Upcoming — 30 days"],["notes","Has active notes"],["review","Needs review"],["temp","Temp / exception"],["archived","Archived notes"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===expirationState.view)o.selected=true; view.appendChild(o); }); view.addEventListener("change",function(){ expirationState.view=view.value; renderExpirations(); });
     var search=el("input",{type:"search",placeholder:"Search driver, truck, note…"}); search.value=expirationState.search||""; search.addEventListener("input",function(){ expirationState.search=search.value; renderExpirations(); });
     toolbar.appendChild(coverField("Category",cat)); toolbar.appendChild(coverField("View",view)); toolbar.appendChild(coverField("Search",search)); expBody.appendChild(toolbar);
     var actions=el("div",{class:"settings-actions"}, el("button",{class:"btn small",text:expirationImportBusy?"Importing…":"Import old Excel notes",onclick:function(){ importExcelExpirationNotes(); }}), el("button",{class:"btn small",text:"Refresh Fleet data",onclick:function(){ if(!S365.signedIn){ window.alert("Sign in first so the dashboard can refresh Fleet Master."); return; } setSync("saving","Looking for changes…"); reconnectM365().then(function(){ setSync("ok","Up to date ✓"); renderExpirations(); }).catch(function(e){ setSync("err",chipErr(e),String(e)); }); }}));
     expBody.appendChild(actions);
     var all=(S365.expirationItems||[]), counts=expSummaryCounts(all), filtered=expFilteredItems();
-    expBody.appendChild(el("div",{class:"exp-summary"}, el("span",{class:"exp-pill",text:filtered.length+" shown"}), el("span",{class:"exp-pill",text:counts.expired+" expired"}), el("span",{class:"exp-pill",text:counts.due+" due soon"}), el("span",{class:"exp-pill",text:counts.missing+" missing date"}), el("span",{class:"exp-pill",text:counts.review+" needs review"}), el("span",{class:"exp-pill",text:counts.notes+" with notes"})));
+    expBody.appendChild(el("div",{class:"exp-summary"}, el("span",{class:"exp-pill",text:filtered.length+" shown"}), el("span",{class:"exp-pill",text:counts.expired+" expired"}), el("span",{class:"exp-pill",text:counts.expiring+" expiring"}), el("span",{class:"exp-pill",text:counts.due+" due soon"}), el("span",{class:"exp-pill",text:counts.upcoming+" upcoming"}), el("span",{class:"exp-pill",text:counts.missing+" missing date"}), el("span",{class:"exp-pill",text:counts.review+" needs review"}), el("span",{class:"exp-pill",text:counts.notes+" with notes"})));
     var list=el("div",{class:"exp-list"}); if(!filtered.length) list.appendChild(el("div",{class:"exp-empty",text:"No expiration items match this view."})); else { list.appendChild(renderExpTableHead()); filtered.forEach(function(it){ list.appendChild(renderExpCard(it)); }); } expBody.appendChild(list);
   }
   function expLooseDetail(detail){ var d=expNorm(detail); if(d.indexOf("cdl")===0) return "cdl"; if(d.indexOf("medical")>=0) return "medical"; if(d.indexOf("annual")>=0 || d.indexOf("inspection")>=0) return "annual inspection"; if(d.indexOf("insurance")>=0) return "insurance"; return d; }
@@ -7044,7 +7159,7 @@
   var coverValues={driverpick:"", authoritypick:"", truckpick:"", driver:"", authority:"", safetyCompany:"", dot:"", ein:"", mc:"", unit:"", year:"", make:"", model:"", plate:"", vin:"", color:""};
 
   function loadCoverLookups(){
-    var out={authoritiesByName:{}, tractorsByUnit:{}, driversByName:{}, authorities:[], tractors:[], drivers:[]};
+    var out={authoritiesByName:{}, tractorsByUnit:{}, driversByName:{}, driversById:{}, authorities:[], tractors:[], drivers:[]};
     function clean(v){ return String(v==null?"":v).trim(); }
     function key(v){ return clean(v).toLowerCase(); }
     function isActiveCurrent(v){
@@ -7107,10 +7222,11 @@
       if(authVals.length){
         var h=authVals[0]||[], ia=hidx(h,["Authority","Authority / LLC","LLC","Company","Company Name","Name","Legal Name"]),
           idot=hidx(h,["DOT #","DOT#","U.S. DOT#","USDOT","US DOT","DOT"]), imc=hidx(h,["MC #","MC#","MC","MC Number"]), iein=hidx(h,["EIN","FEIN","Federal ID","Federal ID #","Tax ID"]),
+          iagent=hidx(h,["Insurer/Agent","Insurer","Agent","Insurance Agent"]), ipolicy=hidx(h,["Policy Type","Coverage","Coverage Type"]), ipolicyDate=hidx(h,["Policy Date","Effective Date","Policy Effective"]),
           icur=hidx(h,["Current?","Current"]), iins=hidx(h,["Insurance Exp","Insurance Expiration","Insurance Exp.","Insurance Exp Date","Insurance Expiration Date","Ins Exp","Ins. Exp","Policy Exp","Policy Expiration"]);
         for(var r=1;r<authVals.length;r++){
           var row=authVals[r]||[], name=ia>=0?clean(row[ia]):""; if(!name) continue;
-          var rec={authority:name, dot:idot>=0?clean(row[idot]):"", mc:imc>=0?clean(row[imc]):"", ein:iein>=0?clean(row[iein]):"", current:icur>=0?clean(row[icur]):"", insuranceExp:iins>=0?clean(row[iins]):""};
+          var rec={authority:name, dot:idot>=0?clean(row[idot]):"", mc:imc>=0?clean(row[imc]):"", ein:iein>=0?clean(row[iein]):"", insurerAgent:iagent>=0?clean(row[iagent]):"", policyType:ipolicy>=0?clean(row[ipolicy]):"", policyDate:ipolicyDate>=0?clean(row[ipolicyDate]):"", current:icur>=0?clean(row[icur]):"", insuranceExp:iins>=0?clean(row[iins]):""};
           out.authoritiesByName[key(name)]=rec;
           // Authority dropdowns use Insurance Exp as the main active signal, plus Current? = Yes as a catch-all.
           // This keeps insured authorities available even when they don't currently have a driver assigned.
@@ -7128,16 +7244,17 @@
         }
       }
       if(truckVals.length){
-        var th=truckVals[0]||[], iu=hidx(th,["Truck #","Truck#","Unit #","Unit#","Unit","Tractor #","Tractor#"]), iy=hidx(th,["Year"]), ima=hidx(th,["Make","Type"]), imo=hidx(th,["Model"]), ip=hidx(th,["Plate","Plate #","License Plate"]), iv=hidx(th,["VIN","VIN #","VIN#"]), ic=hidx(th,["Color","Colour"]), isvc=hidx(th,["In Service?","In Service"]);
+        var th=truckVals[0]||[], iu=hidx(th,["Truck #","Truck#","Unit #","Unit#","Unit","Tractor #","Tractor#"]), iy=hidx(th,["Year"]), ima=hidx(th,["Make","Type"]), imo=hidx(th,["Model"]), ip=hidx(th,["Plate","Plate #","License Plate"]), iv=hidx(th,["VIN","VIN #","VIN#"]), ic=hidx(th,["Color","Colour"]), iannual=hidx(th,["Annual Inspection","Annual Inspection Exp","Inspection Exp","Annual Insp"]), isvc=hidx(th,["In Service?","In Service"]);
         for(var t=1;t<truckVals.length;t++){
           var tr=truckVals[t]||[], unit=iu>=0?clean(tr[iu]):""; if(!unit) continue;
-          var recT={unit:unit, year:iy>=0?clean(tr[iy]):"", make:ima>=0?clean(tr[ima]):"", model:imo>=0?clean(tr[imo]):"", plate:ip>=0?clean(tr[ip]):"", vin:iv>=0?clean(tr[iv]):"", color:ic>=0?clean(tr[ic]):"", inService:isvc>=0?clean(tr[isvc]):""};
+          var recT={unit:unit, year:iy>=0?clean(tr[iy]):"", make:ima>=0?clean(tr[ima]):"", model:imo>=0?clean(tr[imo]):"", plate:ip>=0?clean(tr[ip]):"", vin:iv>=0?clean(tr[iv]):"", color:ic>=0?clean(tr[ic]):"", annualInspection:iannual>=0?clean(tr[iannual]):"", inService:isvc>=0?clean(tr[isvc]):""};
           out.tractorsByUnit[key(unit)]=recT; out.tractors.push(recT);
         }
         out.tractors.sort(function(a,b){ return String(a.unit).localeCompare(String(b.unit), undefined, {numeric:true, sensitivity:"base"}); });
       }
       if(drVals.length){
-        var dh=drVals[0]||[], iid=hidx(dh,["Driver ID","DriverID","ID"]), iname=hidx(dh,["Driver Name","Full Name","Name"]), ifirst=hidx(dh,["First","First Name"]), ilast=hidx(dh,["Last","Last Name"]), icurD=hidx(dh,["Current?","Current"]), imed=hidx(dh,["Medical Exp","Medical Expiration","Medical Exp.","Medical Exp Date","Medical Expiration Date","Med Exp","Med. Exp"]);
+        var dh=drVals[0]||[], iid=hidx(dh,["Driver ID","DriverID","ID"]), iname=hidx(dh,["Driver Name","Full Name","Name"]), ifirst=hidx(dh,["First","First Name"]), ilast=hidx(dh,["Last","Last Name"]), icurD=hidx(dh,["Current?","Current"]),
+          icdl=hidx(dh,["CDL #","CDL#","CDL Number","License #"]), icdlState=hidx(dh,["CDL State","State"]), icdlExp=hidx(dh,["CDL Exp","CDL Expiration","CDL Exp.","CDL Exp Date","CDL Expiration Date"]), imed=hidx(dh,["Medical Exp","Medical Expiration","Medical Exp.","Medical Exp Date","Medical Expiration Date","Med Exp","Med. Exp"]), issn=hidx(dh,["SSN Last 4","SSN Last4","Last 4","SSN"]);
         for(var d=1;d<drVals.length;d++){
           var dr=drVals[d]||[], id=iid>=0?clean(dr[iid]):"", first=ifirst>=0?clean(dr[ifirst]):"", last=ilast>=0?clean(dr[ilast]):"";
           // Prefer First + Last for the actual cover-page Driver field.
@@ -7147,9 +7264,9 @@
           var name=full || fallback || id;
           var label=(last&&first)?(last+", "+first):name;
           if(name){
-            var recD={id:id, name:name, label:label, first:first, last:last, current:icurD>=0?clean(dr[icurD]):"", medicalExp:imed>=0?clean(dr[imed]):""};
+            var recD={id:id, driverId:id, name:name, label:label, first:first, last:last, current:icurD>=0?clean(dr[icurD]):"", cdl:icdl>=0?clean(dr[icdl]):"", cdlState:icdlState>=0?clean(dr[icdlState]):"", cdlExp:icdlExp>=0?clean(dr[icdlExp]):"", medicalExp:imed>=0?clean(dr[imed]):"", ssnLast4:issn>=0?clean(dr[issn]):""};
             out.driversByName[key(name)]=recD;
-            if(id) out.driversByName[key(id)]=recD;
+            if(id){ out.driversByName[key(id)]=recD; out.driversById[key(id)]=recD; }
             if(label) out.driversByName[key(label)]=recD;
             if(includeByDateOrCurrent(recD.medicalExp, recD.current, imed>=0, icurD>=0)) out.drivers.push(recD);
           }
