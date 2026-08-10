@@ -6236,7 +6236,52 @@
     legacyConfigFiles: []
   };
   var S365 = { msal:null, account:null, signedIn:false, item:null, driveId:null,
-               roster:null, worksheets:[], coverLookups:null, remote:{eTag:null, by:null, at:null, present:false} };
+               roster:null, worksheets:[], coverLookups:null,
+               fleetCacheAt:0, fleetLiveAt:0, fleetSource:"none", refreshingFleet:false,
+               remote:{eTag:null, by:null, at:null, present:false} };
+
+  var FLEET_CACHE_KEY = "ultimateProceduresFleetMasterCacheV1";
+  var FLEET_CACHE_WARN_DAYS = 7;
+  function hasFleetLookupData(){
+    var look=(S365&&S365.coverLookups)||{};
+    var roster=(S365&&S365.roster)||{};
+    return !!((look.drivers&&look.drivers.length) || (look.authorities&&look.authorities.length) || (look.tractors&&look.tractors.length) || (roster.drivers&&roster.drivers.length) || (roster.authorities&&roster.authorities.length) || (roster.fleetTrucks&&roster.fleetTrucks.length));
+  }
+  function fleetStampLabel(ts){
+    if(!ts) return "never";
+    try{ return new Date(Number(ts)).toLocaleString([], {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"}); }
+    catch(e){ return "saved earlier"; }
+  }
+  function fleetCacheIsOld(){
+    return !!(S365.fleetCacheAt && (Date.now()-Number(S365.fleetCacheAt) > FLEET_CACHE_WARN_DAYS*86400000));
+  }
+  function fleetDataStatus(){
+    if(S365.refreshingFleet && hasFleetLookupData()) return "Using remembered data while refreshing";
+    if(S365.fleetLiveAt) return "Live data updated " + fleetStampLabel(S365.fleetLiveAt);
+    if(S365.fleetCacheAt) return (fleetCacheIsOld()?"Using older remembered data from ":"Using remembered data from ") + fleetStampLabel(S365.fleetCacheAt);
+    return "No Fleet Master data loaded yet";
+  }
+  function loadFleetCache(){
+    try{
+      var raw=localStorage.getItem(FLEET_CACHE_KEY);
+      if(!raw) return false;
+      var data=JSON.parse(raw);
+      if(!data || !data.roster || !data.coverLookups) return false;
+      S365.roster=data.roster;
+      S365.coverLookups=data.coverLookups;
+      S365.fleetCacheAt=Number(data.at)||0;
+      S365.fleetSource="cache";
+      return hasFleetLookupData();
+    }catch(e){ return false; }
+  }
+  function saveFleetCache(){
+    if(!hasFleetLookupData()) return;
+    var payload={version:1, at:Date.now(), roster:S365.roster, coverLookups:S365.coverLookups};
+    try{ localStorage.setItem(FLEET_CACHE_KEY, JSON.stringify(payload)); }catch(e){ console.warn("Could not save Fleet Master cache", e); }
+    S365.fleetCacheAt=payload.at;
+    S365.fleetLiveAt=payload.at;
+    S365.fleetSource="live";
+  }
 
   var FIXED_MAPPING = { worksheet:"Current Roster", nameMode:"firstlast",
       colName:"Driver", colFirst:"First", colLast:"Last", colTruck:"Truck #", colAuthority:"Authority", colDot:"DOT #" };
@@ -6280,7 +6325,7 @@
       if(res && res.account) S365.msal.setActiveAccount(res.account);
       var acct = S365.msal.getActiveAccount() || (S365.msal.getAllAccounts()[0]);
       if(acct){ S365.account=acct; S365.signedIn=true; onSignedIn(); }
-      else setSync("local","Local only");
+      else setSync("local", hasFleetLookupData()?"Using saved Fleet data":"Local only", fleetDataStatus());
     }).catch(function(e){ console.warn("MSAL redirect error", e); setSync("err","Sign-in error"); });
   }
 
@@ -6335,8 +6380,17 @@
       .catch(function(){ /* non-fatal */ });
   }
   function reconnectM365(){
-    S365.item=null; S365.driveId=null; S365.worksheets=[]; S365.roster=null; S365.coverLookups=null;
-    return resolveItem().then(listWorksheets).then(loadRemoteConfig).then(resolveItem).then(listWorksheets).then(loadRoster);
+    // Keep the last remembered Fleet data available while the live workbook refreshes.
+    // This lets cover pages / lease terminations / driver cards stay usable immediately,
+    // and it avoids disrupting an open generator while the background refresh finishes.
+    S365.item=null; S365.driveId=null; S365.worksheets=[]; S365.refreshingFleet=true;
+    return resolveItem().then(listWorksheets).then(loadRemoteConfig).then(resolveItem).then(listWorksheets).then(loadRoster).then(function(){
+      saveFleetCache();
+      S365.refreshingFleet=false;
+    }).catch(function(e){
+      S365.refreshingFleet=false;
+      throw e;
+    });
   }
   function readSheet(name){
     var p="/drives/"+S365.driveId+"/items/"+S365.item+"/workbook/worksheets('"+encodeURIComponent(name)+"')/usedRange(valuesOnly=true)?$select=values";
@@ -6720,7 +6774,7 @@
     if(alertIfMissing && S365.signedIn && ((!a && coverValues.authority) || (!t && coverValues.unit) || (!d && coverValues.driver))){
       window.alert((!a&&coverValues.authority?"I couldn’t find that authority on the Authorities tab.\n":"")+(!t&&coverValues.unit?"I couldn’t find that truck/unit on the Trucks tab.\n":"")+(!d&&coverValues.driver?"I couldn’t find that driver on the Drivers tab.\n":"")+"You can still hand-fill the missing fields.");
     }
-    if(alertIfMissing && !S365.signedIn){ window.alert("Sign in to auto-fill from Fleet Master Sheet, or hand-fill the fields."); }
+    if(alertIfMissing && !hasFleetLookupData()){ window.alert("Fleet Master data is not loaded yet. Sign in, or wait for the remembered data/live refresh to load, then try again. You can still hand-fill the fields."); }
   }
   function updateCoverPreview(){ var old=coverBody.querySelector(".cover-preview"); if(old) old.replaceWith(coverPreview()); }
   function coverPreview(){
@@ -6871,7 +6925,7 @@
     if(alertIfMissing && S365.signedIn && ((!oldT && leaseValues.oldUnit) || (!newT && leaseValues.newUnit))){
       window.alert((!oldT&&leaseValues.oldUnit?"I couldn’t find the terminated truck on the Trucks tab.\n":"")+(!newT&&leaseValues.newUnit?"I couldn’t find the added truck on the Trucks tab.\n":"")+"You can still hand-fill the missing fields.");
     }
-    if(alertIfMissing && !S365.signedIn){ window.alert("Sign in to auto-fill from Fleet Master Sheet, or hand-fill the fields."); }
+    if(alertIfMissing && !hasFleetLookupData()){ window.alert("Fleet Master data is not loaded yet. Sign in, or wait for the remembered data/live refresh to load, then try again. You can still hand-fill the fields."); }
   }
   function leaseVehicle(prefix){ var y=leaseValues[prefix+"Year"]||"", m=leaseValues[prefix+"Make"]||"", mo=leaseValues[prefix+"Model"]||""; return [y,m,mo].filter(Boolean).join(" ") || "Year Make Model"; }
   function leaseTextParts(){
@@ -6945,11 +6999,12 @@
     var st=el("div",{class:"settings-status"});
     if(S365.signedIn){
       st.appendChild(el("div",{}, el("b",{text:"Signed in: "}), (S365.account.username||S365.account.name||"")));
-      st.appendChild(el("div",{}, el("b",{text:"Fleet Master: "}), S365.item?"connected":"not found"));
+      st.appendChild(el("div",{}, el("b",{text:"Fleet Master: "}), S365.item?"connected":(hasFleetLookupData()?"refreshing / using remembered data":"not found")));
+      st.appendChild(el("div",{}, el("b",{text:"Fleet data: "}), fleetDataStatus()));
       st.appendChild(el("div",{}, el("b",{text:"Shared edits: "}), S365.remote.present?("synced"+(S365.remote.by?(" · last edit by "+S365.remote.by):"")):"not created yet (saves on first edit)"));
       st.appendChild(el("div",{}, el("b",{text:"Your pins: "}), String((state.pins||[]).length)+" saved for "+(S365.account.username||S365.account.name||"this sign-in")));
     } else {
-      st.appendChild(el("div",{text:"Not signed in. Use Sign in (top right) to load Fleet Master data and sync shared dashboard edits."}));
+      st.appendChild(el("div",{text:hasFleetLookupData()?"Not signed in. " + fleetDataStatus() + ". Sign in to refresh Fleet Master data and sync shared dashboard edits.":"Not signed in. Use Sign in (top right) to load Fleet Master data and sync shared dashboard edits."}));
     }
     body.appendChild(st);
     if(!S365.signedIn) return;
@@ -6959,13 +7014,14 @@
     dataPanel.appendChild(el("div",{class:"status-line"}, el("b",{text:"Fleet Master Sheet: "}), "Locked to the office workbook"));
     dataPanel.appendChild(el("div",{class:"status-line"}, el("b",{text:"Worksheet: "}), FIXED_MAPPING.worksheet));
     dataPanel.appendChild(el("div",{class:"status-line"}, el("b",{text:"Driver/authority filters: "}), "Drivers use Medical Exp + Current?; authorities use Insurance Exp + Current?"));
+    dataPanel.appendChild(el("div",{class:"status-line"}, el("b",{text:"Fast start cache: "}), hasFleetLookupData()?fleetDataStatus():"No remembered Fleet data yet"));
     dataPanel.appendChild(el("div",{class:"status-line"}, el("b",{text:"Shared JSON: "}), "Locked to the shared office file"));
-    dataPanel.appendChild(el("p",{class:"note",text:"The workbook link, JSON location, worksheet, and column mapping are fixed so one person’s browser settings can’t accidentally break everyone’s dashboard."}));
+    dataPanel.appendChild(el("p",{class:"note",text:"The dashboard loads remembered Fleet data immediately, then refreshes from the live workbook after sign-in. If a generator is open while the refresh finishes, your current form is left alone."}));
     body.appendChild(dataPanel);
 
     var actionPanel=el("div",{class:"settings-panel"});
     actionPanel.appendChild(el("h3",{text:"Useful actions"}));
-    actionPanel.appendChild(el("p",{class:"note",text:"Use these when data looks stale, someone edited shared cards, or your personal pins need a reset."}));
+    actionPanel.appendChild(el("p",{class:"note",text:"Use these when data looks stale, someone edited shared cards, or your personal pins need a reset. Refreshing Fleet Master updates the saved fast-start data too."}));
     var actions=el("div",{class:"settings-actions"});
     actions.appendChild(el("button",{class:"btn",text:"Refresh Fleet Master data", onclick:function(){ setSync("saving","Refreshing…"); reconnectM365().then(function(){ setSync("ok","Synced ✓"); rerenderAll(); renderSettings(); }).catch(function(e){ setSync("err", chipErr(e), String(e)); renderSettings(); }); }}));
     actions.appendChild(el("button",{class:"btn",text:"Reload shared edits", onclick:function(){ setSync("saving","Reloading shared edits…"); reconnectM365().then(function(){ setSync("ok","Synced ✓"); rerenderAll(); renderSettings(); }).catch(function(e){ setSync("err", chipErr(e), String(e)); renderSettings(); }); }}));
@@ -6990,6 +7046,7 @@
   }
 
   /* ---------- boot ---------- */
+  loadFleetCache();
   renderHome();
   m365Init();
 })();
