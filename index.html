@@ -6912,11 +6912,17 @@ UEsDBBQAAAAIAAAAIQCZVX4F+AAAAOECAAALAAAAX3JlbHMvLnJlbHOtkk1LAzEQhu+C/yHMvTvbKiLS
     var d=rec.driverDetail||driverDetailsByText(rec)||{}, t=truckDetailsByUnit(rec.truck)||{}, a=authorityDetailsByName(rec.authority)||{}, card=el("div",{class:"lookup-card primary"});
     card.appendChild(el("h3",{text:d.name||firstLastFromLastFirst(rec.label||rec.key||"Driver")}));
     card.appendChild(el("div",{class:"lookup-meta",text:[rec.authority, rec.truck?("Unit #"+rec.truck):"", (a.dot||rec.dot)?("DOT "+(a.dot||rec.dot)):""].filter(Boolean).join(" · ")||"No current assignment details"}));
-    var ssnText=(d.ssnLast4 && lookupState.revealed[rec.key]) ? d.ssnLast4 : (d.ssnLast4?"••••":"—");
+    var revealKey=rec.key||d.id||d.name||"driver";
+    var ssnText=(d.ssnLast4 && lookupState.revealed[revealKey+":ssn"]) ? d.ssnLast4 : (d.ssnLast4?"••••":"—");
     var ssnBox=kv("SSN last 4", ssnText, !d.ssnLast4);
-    if(d.ssnLast4){ ssnBox.querySelector(".v").appendChild(document.createTextNode(" ")); ssnBox.querySelector(".v").appendChild(el("button",{class:"mini",text:lookupState.revealed[rec.key]?"Hide":"Reveal",onclick:function(ev){ ev.stopPropagation(); lookupState.revealed[rec.key]=!lookupState.revealed[rec.key]; renderFleetLookup(); }})); }
+    if(d.ssnLast4){ ssnBox.querySelector(".v").appendChild(document.createTextNode(" ")); ssnBox.querySelector(".v").appendChild(el("button",{class:"mini",text:lookupState.revealed[revealKey+":ssn"]?"Hide":"Reveal",onclick:function(ev){ ev.stopPropagation(); lookupState.revealed[revealKey+":ssn"]=!lookupState.revealed[revealKey+":ssn"]; renderFleetLookup(); }})); }
+    var dobText=(d.dob && lookupState.revealed[revealKey+":dob"]) ? (lookupDate(d.dob)||d.dob) : (d.dob?"••••":"—");
+    var dobBox=kv("DOB", dobText, !d.dob);
+    if(d.dob){ dobBox.querySelector(".v").appendChild(document.createTextNode(" ")); dobBox.querySelector(".v").appendChild(el("button",{class:"mini",text:lookupState.revealed[revealKey+":dob"]?"Hide":"Reveal",onclick:function(ev){ ev.stopPropagation(); lookupState.revealed[revealKey+":dob"]=!lookupState.revealed[revealKey+":dob"]; renderFleetLookup(); }})); }
+    var fullAddr=[d.address,[d.city,d.state,d.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
     card.appendChild(el("div",{class:"info-grid"},
-      kv("Driver ID",d.id||rec.driverId), kv("CDL #",d.cdl), kv("CDL State",d.cdlState), dateKv("CDL Exp",d.cdlExp), dateKv("Medical Exp",d.medicalExp), ssnBox,
+      kv("Driver ID",d.id||rec.driverId), kv("CDL #",d.cdl), kv("CDL State",d.cdlState), dateKv("CDL Exp",d.cdlExp), dateKv("Medical Exp",d.medicalExp), ssnBox, dobBox,
+      kv("Cell",d.phone), kv("Email",d.email), kv("Address",fullAddr),
       kv("Current truck",rec.truck), kv("Current authority",rec.authority), kv("DOT #",a.dot||rec.dot)
     ));
     var miss=missingBox([["CDL #",d.cdl],["CDL Exp",d.cdlExp],["Medical Exp",d.medicalExp],["Current truck",rec.truck],["Current authority",rec.authority],["SSN last 4",d.ssnLast4]]); if(miss) card.appendChild(miss);
@@ -7071,6 +7077,21 @@ UEsDBBQAAAAIAAAAIQCZVX4F+AAAAOECAAALAAAAX3JlbHMvLnJlbHOtkk1LAzEQhu+C/yHMvTvbKiLS
     return {key:category.toLowerCase()+"|"+expNorm(stableId||item)+"|"+expNorm(field), category:category, stableId:stableId||item, item:item||"", field:field, detail:detail||field, dateISO:iso, dateRaw:dateVal, meta:meta||{}};
   }
   function loadExpirationItems(){
+    function splitDriverAddress(full){
+      full=clean(full);
+      var out={street:full, city:"", state:"", zip:""};
+      if(!full) return out;
+      var parts=full.split(",").map(function(p){return clean(p);}).filter(Boolean);
+      if(parts.length>=3){
+        out.street=parts.slice(0,parts.length-2).join(", ");
+        out.city=parts[parts.length-2]||"";
+        var stZip=parts[parts.length-1]||"";
+        var m=stZip.match(/^([A-Za-z]{2})\s+(.+)$/);
+        if(m){ out.state=m[1].toUpperCase(); out.zip=m[2]; }
+        else { out.state=stZip; }
+      }
+      return out;
+    }
     function readMaybe(tab){ return readSheet(tab).catch(function(){ return []; }); }
     return Promise.all([readMaybe("Drivers"), readMaybe("Authorities"), readMaybe("Trucks"), readMaybe("Trailers")]).then(function(all){
       var items=[];
@@ -7367,7 +7388,7 @@ UEsDBBQAAAAIAAAAIQCZVX4F+AAAAOECAAALAAAAX3JlbHMvLnJlbHOtkk1LAzEQhu+C/yHMvTvbKiLS
       }
       if(drVals.length){
         var dh=drVals[0]||[], iid=hidx(dh,["Driver ID","DriverID","ID"]), iname=hidx(dh,["Driver Name","Full Name","Name"]), ifirst=hidx(dh,["First","First Name"]), imiddle=hidx(dh,["Middle","Middle Name"]), ilast=hidx(dh,["Last","Last Name"]), isuffix=hidx(dh,["Suffix"]), icurD=hidx(dh,["Current?","Current"]),
-          iaddr=hidx(dh,["Address","Driver Address","Street Address"]), icity=hidx(dh,["City","Driver City"]), istate=hidx(dh,["State","Driver State"]), izip=hidx(dh,["Zip","Zip Code","Postal Code"]), iphone=hidx(dh,["Phone","Phone Number","Driver Phone"]), iemail=hidx(dh,["Email","Email Address","Driver Email"]), iyor=hidx(dh,["Years of OTR","Years OTR","OTR Years","YOR"]),
+          iaddr=hidx(dh,["Address","Driver Address","Street Address"]), icity=hidx(dh,["City","Driver City"]), istate=hidx(dh,["State","Driver State"]), izip=hidx(dh,["Zip","Zip Code","Postal Code"]), iphone=hidx(dh,["Cell","Cell Phone","Mobile","Mobile Phone","Phone","Phone Number","Driver Phone"]), iemail=hidx(dh,["Email","Email Address","Driver Email"]), idob=hidx(dh,["DOB","Date of Birth","Birth Date","Driver DOB"]), iyor=hidx(dh,["Years of OTR","Years OTR","OTR Years","YOR"]),
           icdl=hidx(dh,["CDL #","CDL#","CDL Number","License #"]), icdlState=hidx(dh,["CDL State","State"]), icdlExp=hidx(dh,["CDL Exp","CDL Expiration","CDL Exp.","CDL Exp Date","CDL Expiration Date"]), imed=hidx(dh,["Medical Exp","Medical Expiration","Medical Exp.","Medical Exp Date","Medical Expiration Date","Med Exp","Med. Exp"]), issn=hidx(dh,["SSN Last 4","SSN Last4","Last 4","SSN"]);
         for(var d=1;d<drVals.length;d++){
           var dr=drVals[d]||[], id=iid>=0?clean(dr[iid]):"", first=ifirst>=0?clean(dr[ifirst]):"", last=ilast>=0?clean(dr[ilast]):"";
@@ -7379,7 +7400,9 @@ UEsDBBQAAAAIAAAAIQCZVX4F+AAAAOECAAALAAAAX3JlbHMvLnJlbHOtkk1LAzEQhu+C/yHMvTvbKiLS
           var label=(last&&first)?(last+", "+first):name;
           if(name){
             var ssnRaw=issn>=0?clean(dr[issn]):"";
-            var recD={id:id, driverId:id, name:name, label:label, first:first, middle:imiddle>=0?clean(dr[imiddle]):"", last:last, suffix:isuffix>=0?clean(dr[isuffix]):"", current:icurD>=0?clean(dr[icurD]):"", address:iaddr>=0?clean(dr[iaddr]):"", city:icity>=0?clean(dr[icity]):"", state:istate>=0?clean(dr[istate]):"", zip:izip>=0?clean(dr[izip]):"", phone:iphone>=0?clean(dr[iphone]):"", email:iemail>=0?clean(dr[iemail]):"", yearsOtr:iyor>=0?clean(dr[iyor]):"", cdl:icdl>=0?clean(dr[icdl]):"", cdlState:icdlState>=0?clean(dr[icdlState]):"", cdlExp:icdlExp>=0?clean(dr[icdlExp]):"", medicalExp:imed>=0?clean(dr[imed]):"", ssnLast4:ssnRaw?ssnRaw.slice(-4):""};
+            var rawAddr=iaddr>=0?clean(dr[iaddr]):"", parsedAddr=splitDriverAddress(rawAddr);
+            var city=icity>=0?clean(dr[icity]):parsedAddr.city, st=istate>=0?clean(dr[istate]):parsedAddr.state, zip=izip>=0?clean(dr[izip]):parsedAddr.zip;
+            var recD={id:id, driverId:id, name:name, label:label, first:first, middle:imiddle>=0?clean(dr[imiddle]):"", last:last, suffix:isuffix>=0?clean(dr[isuffix]):"", current:icurD>=0?clean(dr[icurD]):"", address:rawAddr?(city||st||zip?parsedAddr.street:rawAddr):"", city:city, state:st, zip:zip, phone:iphone>=0?clean(dr[iphone]):"", email:iemail>=0?clean(dr[iemail]):"", dob:idob>=0?clean(dr[idob]):"", yearsOtr:iyor>=0?clean(dr[iyor]):"", cdl:icdl>=0?clean(dr[icdl]):"", cdlState:icdlState>=0?clean(dr[icdlState]):"", cdlExp:icdlExp>=0?clean(dr[icdlExp]):"", medicalExp:imed>=0?clean(dr[imed]):"", ssnLast4:ssnRaw?ssnRaw.slice(-4):""};
             out.driversByName[key(name)]=recD;
             if(id){ out.driversByName[key(id)]=recD; out.driversById[key(id)]=recD; }
             if(label) out.driversByName[key(label)]=recD;
@@ -7767,6 +7790,7 @@ UEsDBBQAAAAIAAAAIQCZVX4F+AAAAOECAAALAAAAX3JlbHMvLnJlbHOtkk1LAzEQhu+C/yHMvTvbKiLS
     packageValues.DriverZip=d.zip||packageValues.DriverZip;
     packageValues.DriverPhone=d.phone||packageValues.DriverPhone;
     packageValues.DriverEmailaddress=d.email||packageValues.DriverEmailaddress;
+    packageValues.DOB=packageDate(d.dob)||d.dob||packageValues.DOB;
     packageValues.CDLNumber=d.cdl||packageValues.CDLNumber;
     packageValues.CDLIssueState=d.cdlState||packageValues.CDLIssueState;
     packageValues.CDLExpDate=packageDate(d.cdlExp)||packageValues.CDLExpDate;
@@ -7828,7 +7852,7 @@ UEsDBBQAAAAIAAAAIQCZVX4F+AAAAOECAAALAAAAX3JlbHMvLnJlbHOtkk1LAzEQhu+C/yHMvTvbKiLS
   }
   function renderDriverPackage(){
     packageBody.textContent="";
-    packageBody.appendChild(el("p",{class:"note",text:"Beta proof-of-concept: fills the New Driver → Commercial Package (60-40) Word template from Fleet Master plus manual fields. DOB/full SSN are used only in the generated Word file and are not saved."}));
+    packageBody.appendChild(el("p",{class:"note",text:"Beta proof-of-concept: fills the New Driver → Commercial Package (60-40) Word template from Fleet Master plus manual fields. DOB can come from Fleet Master; full SSN stays manual and is not saved."}));
     var look=(S365&&S365.coverLookups)||{}, drivers=currentDriverRecords();
     var top=el("div",{class:"pkg-grid"});
     top.appendChild(packageSelectField("Driver", "driverPick", drivers, function(r){return r.key;}, function(r){return r.display||r.label||r.name;}, function(r){ applyPackageDriver(r); }));
@@ -7840,7 +7864,7 @@ UEsDBBQAAAAIAAAAIQCZVX4F+AAAAOECAAALAAAAX3JlbHMvLnJlbHOtkk1LAzEQhu+C/yHMvTvbKiLS
       el("span",{class:"pkg-pill",text:"Driver: "+([packageValues.FirstName,packageValues.LastName].filter(Boolean).join(" ")||"—")}),
       el("span",{class:"pkg-pill",text:"Truck: "+(packageValues.TractorUnitNumber||"—")})
     ));
-    packageBody.appendChild(el("div",{class:"pkg-sensitive"}, el("p",{class:"note",text:"Private fields like DOB and full SSN stay manual and are not saved. Leave blanks if the package should remain partly blank."})));
+    packageBody.appendChild(el("div",{class:"pkg-sensitive"}, el("p",{class:"note",text:"Full SSN stays manual and is not saved. DOB, cell, email, and address can auto-fill from the Drivers tab when those columns exist."})));
     packageBody.appendChild(el("div",{class:"manual-toggle"}, el("button",{class:"btn small",text:(packageManualOpen?"Hide details / Manual Fields":"Show details / Manual Fields"),onclick:function(){ capturePackageFields(); packageManualOpen=!packageManualOpen; renderDriverPackage(); }})));
     if(packageManualOpen){
       var manual=el("div",{class:"manual-fields"});
