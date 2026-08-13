@@ -172,7 +172,7 @@
   .exp-summary{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 12px}
   .exp-pill{border:1px solid var(--line);background:var(--bg);color:var(--muted);border-radius:999px;padding:3px 9px;font-size:12px;font-weight:700}
   .exp-list{display:block;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
-  .exp-table-head,.exp-row-main{display:grid;grid-template-columns:minmax(170px,1.25fr) minmax(145px,.95fr) 108px 94px minmax(210px,1.4fr) 124px;gap:10px;align-items:center}
+  .exp-table-head,.exp-row-main{display:grid;grid-template-columns:minmax(170px,1.25fr) minmax(145px,.95fr) 108px 94px minmax(210px,1.4fr) 170px;gap:10px;align-items:center}
   .exp-table-head{background:#f8fafc;border-bottom:1px solid var(--line);padding:8px 10px 8px 14px;color:var(--muted);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
   .exp-row{border-bottom:1px solid var(--line);background:#fff}
   .exp-row:last-child{border-bottom:0}
@@ -5308,7 +5308,21 @@
     modalState=null;
     if(currentView==="home") renderHome(); else renderBrowse();
   }
-  overlay.addEventListener("click", function(e){ if(e.target===overlay) closeCard(); });
+  function addSafeBackdropClose(ov, closeFn){
+    if(!ov || !closeFn) return;
+    var startedOnBackdrop=false;
+    function down(e){ startedOnBackdrop=(e.target===ov); }
+    if(window.PointerEvent) ov.addEventListener("pointerdown", down);
+    else{
+      ov.addEventListener("mousedown", down);
+      ov.addEventListener("touchstart", down);
+    }
+    ov.addEventListener("click", function(e){
+      if(e.target===ov && startedOnBackdrop) closeFn();
+      startedOnBackdrop=false;
+    });
+  }
+  addSafeBackdropClose(overlay, closeCard);
 
   function openGenerateFromCard(kind){
     captureContextForm();
@@ -6212,7 +6226,7 @@
   var bOverlay=document.getElementById("builder-overlay");
   var bBody=document.getElementById("builder-body");
   document.getElementById("builder-close").onclick=closeBuilder;
-  bOverlay.addEventListener("click", function(e){ if(e.target===bOverlay) closeBuilder(); });
+  addSafeBackdropClose(bOverlay, closeBuilder);
 
   var builderModel=null;
   function openBuilder(){
@@ -6464,10 +6478,10 @@
     document.getElementById("settings-btn").addEventListener("click", openSettings);
     document.getElementById("lookup-btn").addEventListener("click", openFleetLookup);
     document.getElementById("lookup-close").addEventListener("click", closeFleetLookup);
-    document.getElementById("lookup-overlay").addEventListener("click", function(e){ if(e.target.id==="lookup-overlay") closeFleetLookup(); });
+    addSafeBackdropClose(document.getElementById("lookup-overlay"), closeFleetLookup);
     document.getElementById("exp-btn").addEventListener("click", openExpirations);
     document.getElementById("exp-close").addEventListener("click", closeExpirations);
-    document.getElementById("exp-overlay").addEventListener("click", function(e){ if(e.target.id==="exp-overlay") closeExpirations(); });
+    addSafeBackdropClose(document.getElementById("exp-overlay"), closeExpirations);
     function closeGenerateMenu(){ var gm=document.getElementById("generate-menu"); if(gm) gm.open=false; }
     document.addEventListener("click", function(e){
       var gm=document.getElementById("generate-menu"); if(gm && gm.open && !gm.contains(e.target)) gm.open=false;
@@ -6475,12 +6489,12 @@
     });
     document.getElementById("cover-btn").addEventListener("click", function(){ closeGenerateMenu(); openCoverPage(); });
     document.getElementById("cover-close").addEventListener("click", closeCoverPage);
-    document.getElementById("cover-overlay").addEventListener("click", function(e){ if(e.target.id==="cover-overlay") closeCoverPage(); });
+    addSafeBackdropClose(document.getElementById("cover-overlay"), closeCoverPage);
     document.getElementById("lease-btn").addEventListener("click", function(){ closeGenerateMenu(); openLeaseTermination(); });
     document.getElementById("lease-close").addEventListener("click", closeLeaseTermination);
-    document.getElementById("lease-overlay").addEventListener("click", function(e){ if(e.target.id==="lease-overlay") closeLeaseTermination(); });
+    addSafeBackdropClose(document.getElementById("lease-overlay"), closeLeaseTermination);
     document.getElementById("settings-close").addEventListener("click", closeSettings);
-    document.getElementById("settings-overlay").addEventListener("click", function(e){ if(e.target.id==="settings-overlay") closeSettings(); });
+    addSafeBackdropClose(document.getElementById("settings-overlay"), closeSettings);
 
     if(typeof msal==="undefined"){ setSync("err","Sign-in unavailable"); btn.textContent="Sign-in unavailable"; btn.disabled=true; return; }
 
@@ -6974,7 +6988,7 @@
   /* ----- expirations tracker ----- */
   var expOverlay=document.getElementById("exp-overlay");
   var expBody=document.getElementById("exp-body");
-  var expirationState={category:"all", view:"attention", search:""};
+  var expirationState={category:"all", view:"attention", search:"", sort:"date", dir:"asc"};
   var expirationEditingKey="";
   var expirationImportBusy=false;
   var EXP_NOTE_TYPES=["Info","Emailed","Waiting","Follow-up","Temp / exception","Done"];
@@ -7005,12 +7019,18 @@
     return -1;
   }
   function expSort(a,b){
-    var na=expActiveNote(a), nb=expActiveNote(b), ra=na&&expNoteNeedsReview(na,a), rb=nb&&expNoteNeedsReview(nb,b);
-    if(ra!==rb) return ra?-1:1;
-    var sa=expStatusFor(a.dateISO), sb=expStatusFor(b.dateISO), rank={expired:0,expiring:1,due:2,missing:3,upcoming:4,ok:5};
-    if(rank[sa.id]!==rank[sb.id]) return rank[sa.id]-rank[sb.id];
-    var da=sa.days===null?999999:sa.days, db=sb.days===null?999999:sb.days;
-    if(da!==db) return da-db;
+    var sort=expirationState.sort||"date", dir=(expirationState.dir==="desc")?-1:1;
+    function dateVal(it){ var st=expStatusFor(it.dateISO); return st.days===null?999999:st.days; }
+    function statusRank(it){ var st=expStatusFor(it.dateISO), rank={expired:0,expiring:1,due:2,upcoming:3,missing:4,ok:5}; return rank[st.id] == null ? 9 : rank[st.id]; }
+    var av="", bv="";
+    if(sort==="item"){ av=String(a.item||""); bv=String(b.item||""); }
+    else if(sort==="category"){ av=String(a.category||"")+" "+String(a.item||""); bv=String(b.category||"")+" "+String(b.item||""); }
+    else if(sort==="type"){ av=String(a.detail||a.field||"")+" "+String(a.item||""); bv=String(b.detail||b.field||"")+" "+String(b.item||""); }
+    else if(sort==="status"){ av=statusRank(a); bv=statusRank(b); }
+    else { av=dateVal(a); bv=dateVal(b); }
+    if(typeof av==="number" || typeof bv==="number"){ if(av!==bv) return (av-bv)*dir; }
+    else { var cmp=String(av).localeCompare(String(bv), undefined, {numeric:true, sensitivity:"base"}); if(cmp) return cmp*dir; }
+    var da=dateVal(a), db=dateVal(b); if(da!==db) return da-db;
     return String(a.item).localeCompare(String(b.item), undefined, {numeric:true, sensitivity:"base"});
   }
   function makeExpItem(category, stableId, item, field, detail, dateVal, meta){
@@ -7052,25 +7072,59 @@
   }
   function expActiveNote(item){ var b=expBucket(item.key); return b.active && !b.active.archived ? b.active : null; }
   function expArchivedNotes(item){ return expBucket(item.key).archived || []; }
-  function expNoteNeedsReview(note,item){ return !!(note && item && note.dateISO && item.dateISO && note.dateISO!==item.dateISO); }
+  function expReviewStore(){ config.expirationReviewFlags=config.expirationReviewFlags||{}; return config.expirationReviewFlags; }
+  function expManualReviewFlag(item){ var f=expReviewStore()[item.key]; return f && f.active ? f : null; }
+  function expNoteDateChanged(note,item){ return !!(note && item && note.dateISO && item.dateISO && note.dateISO!==item.dateISO); }
+  function expNeedsReview(item){ return !!(expManualReviewFlag(item) || expNoteDateChanged(expActiveNote(item),item)); }
+  function expReviewReason(item){
+    var f=expManualReviewFlag(item), n=expActiveNote(item);
+    if(f && f.reason) return f.reason;
+    if(expNoteDateChanged(n,item)) return "Date changed from "+(n.dateLabel||expPrettyDate(n.dateISO))+" to "+expPrettyDate(item.dateISO)+". Review this note so old follow-ups don't linger.";
+    return "Marked for review.";
+  }
   function expSaveNote(item,text,type){
     text=expClean(text); if(!text){ window.alert("Type a note first, or use Delete to remove the note."); return; }
-    var b=expBucket(item.key), prev=b.active||{}, now=new Date().toISOString();
-    b.active={id:prev.id||uid("expnote"), type:type||expInferType(text)||prev.type||"Info", text:text, createdAt:prev.createdAt||now, updatedAt:now, updatedBy:expAccountName(), dateISO:item.dateISO||"", dateLabel:expPrettyDate(item.dateISO)};
+    var b=expBucket(item.key), prev=b.active||{}, now=new Date().toISOString(), wasReview=expNeedsReview(item);
+    b.active={id:prev.id||uid("expnote"), type:type||expInferType(text)||prev.type||"Info", text:text, createdAt:prev.createdAt||now, updatedAt:now, updatedBy:expAccountName(), dateISO:prev.dateISO || item.dateISO || "", dateLabel:prev.dateLabel || expPrettyDate(item.dateISO)};
+    if(wasReview && !expManualReviewFlag(item) && !expNoteDateChanged(b.active,item)){
+      expReviewStore()[item.key]={active:true, reason:"Marked for review before the note was edited.", createdAt:now, updatedAt:now, updatedBy:expAccountName(), dateISO:item.dateISO||""};
+    }
     expirationEditingKey=""; flushConfig(); renderExpirations();
   }
-  function expDeleteActive(item){ var b=expBucket(item.key); b.active=null; flushConfig(); renderExpirations(); }
-  function expArchiveActive(item){ var b=expBucket(item.key), n=b.active; if(!n) return; n.archivedAt=new Date().toISOString(); n.archivedBy=expAccountName(); b.archived.unshift(n); b.active=null; flushConfig(); renderExpirations(); }
-  function expMarkReviewed(item){ var n=expActiveNote(item); if(!n) return; n.dateISO=item.dateISO||""; n.dateLabel=expPrettyDate(item.dateISO); n.reviewedAt=new Date().toISOString(); n.reviewedBy=expAccountName(); flushConfig(); renderExpirations(); }
+  function expMarkForReview(item){
+    var now=new Date().toISOString();
+    expReviewStore()[item.key]={active:true, reason:"Marked for review.", createdAt:now, updatedAt:now, updatedBy:expAccountName(), dateISO:item.dateISO||""};
+    flushConfig(); renderExpirations();
+  }
+  function expDeleteActive(item){
+    if(expNeedsReview(item) && !expManualReviewFlag(item)){
+      var now=new Date().toISOString();
+      expReviewStore()[item.key]={active:true, reason:"Note was deleted while this item still needed review.", createdAt:now, updatedAt:now, updatedBy:expAccountName(), dateISO:item.dateISO||""};
+    }
+    var b=expBucket(item.key); b.active=null; flushConfig(); renderExpirations();
+  }
+  function expArchiveActive(item){
+    if(expNeedsReview(item) && !expManualReviewFlag(item)){
+      var now=new Date().toISOString();
+      expReviewStore()[item.key]={active:true, reason:"Note was archived while this item still needed review.", createdAt:now, updatedAt:now, updatedBy:expAccountName(), dateISO:item.dateISO||""};
+    }
+    var b=expBucket(item.key), n=b.active; if(!n) return; n.archivedAt=new Date().toISOString(); n.archivedBy=expAccountName(); b.archived.unshift(n); b.active=null; flushConfig(); renderExpirations();
+  }
+  function expMarkReviewed(item){
+    var n=expActiveNote(item);
+    if(n){ n.dateISO=item.dateISO||""; n.dateLabel=expPrettyDate(item.dateISO); n.reviewedAt=new Date().toISOString(); n.reviewedBy=expAccountName(); }
+    var store=expReviewStore(); if(store[item.key]) store[item.key].active=false;
+    flushConfig(); renderExpirations();
+  }
   function expDeleteArchived(item,idx){ var b=expBucket(item.key); b.archived.splice(idx,1); flushConfig(); renderExpirations(); }
   function expRestoreArchived(item,idx){ var b=expBucket(item.key), n=b.archived[idx]; if(!n) return; if(b.active && !window.confirm("Replace the active note with this archived note?")) return; b.archived.splice(idx,1); n.archivedAt=""; n.archivedBy=""; n.updatedAt=new Date().toISOString(); n.updatedBy=expAccountName(); b.active=n; flushConfig(); renderExpirations(); }
   function expInferType(text){ var s=expNorm(text); if(s.indexOf("temp")>=0) return "Temp / exception"; if(s.indexOf("email")>=0 || s.indexOf("emailed")>=0) return "Emailed"; if(s.indexOf("waiting")>=0) return "Waiting"; if(s.indexOf("follow")>=0) return "Follow-up"; return "Info"; }
   function expSummaryCounts(items){
     var c={expired:0,expiring:0,due:0,upcoming:0,missing:0,review:0,notes:0,temp:0};
-    items.forEach(function(it){ var st=expStatusFor(it.dateISO); if(c[st.id]!=null) c[st.id]++; var n=expActiveNote(it); if(n){ c.notes++; if(expNoteNeedsReview(n,it)) c.review++; if(n.type==="Temp / exception") c.temp++; } }); return c;
+    items.forEach(function(it){ var st=expStatusFor(it.dateISO); if(c[st.id]!=null) c[st.id]++; var n=expActiveNote(it); if(n){ c.notes++; if(n.type==="Temp / exception") c.temp++; } if(expNeedsReview(it)) c.review++; }); return c;
   }
   function expMatchesView(it,view){
-    var st=expStatusFor(it.dateISO), n=expActiveNote(it), rev=n&&expNoteNeedsReview(n,it), archived=expArchivedNotes(it).length;
+    var st=expStatusFor(it.dateISO), n=expActiveNote(it), rev=expNeedsReview(it), archived=expArchivedNotes(it).length;
     if(view==="all") return true;
     if(view==="attention") return rev || st.id==="expired" || st.id==="expiring" || st.id==="due" || st.id==="missing";
     if(view==="expired") return st.id==="expired";
@@ -7110,7 +7164,7 @@
     return el("div",{class:"exp-note-inline"}, el("span",{class:"txt",text:note.text||""}));
   }
   function renderExpCard(item){
-    var st=expStatusFor(item.dateISO), note=expActiveNote(item), rev=note&&expNoteNeedsReview(note,item), cls="exp-row "+(rev?"review":st.id);
+    var st=expStatusFor(item.dateISO), note=expActiveNote(item), rev=expNeedsReview(item), cls="exp-row "+(rev?"review":st.id);
     var row=el("div",{class:cls});
     var main=el("div",{class:"exp-row-main"});
     main.appendChild(el("div",{class:"exp-cell item"}, el("div",{class:"exp-title",text:item.item}), item.meta&&item.meta.dot?el("div",{class:"exp-sub",text:"DOT "+item.meta.dot}):null));
@@ -7122,15 +7176,16 @@
     var actions=[];
     if(note){
       actions.push(el("button",{class:"btn small",text:"Edit",onclick:function(){ expirationEditingKey=item.key; renderExpirations(); }}));
-      if(rev) actions.push(el("button",{class:"btn small",text:"Reviewed",onclick:function(){ expMarkReviewed(item); }}));
       actions.push(el("button",{class:"btn small",text:"Archive",onclick:function(){ expArchiveActive(item); }}));
       actions.push(el("button",{class:"btn danger small",text:"Delete",onclick:function(){ if(window.confirm("Delete this expiration note?")) expDeleteActive(item); }}));
     }else{
       actions.push(el("button",{class:"btn small",text:"Add note",onclick:function(){ expirationEditingKey=item.key; renderExpirations(); }}));
     }
+    if(rev) actions.push(el("button",{class:"btn small",text:"Reviewed",onclick:function(){ expMarkReviewed(item); }}));
+    else actions.push(el("button",{class:"btn small",text:"Mark review",onclick:function(){ expMarkForReview(item); }}));
     main.appendChild(el("div",{class:"exp-cell actions exp-note-actions"}, actions));
     row.appendChild(main);
-    if(rev){ row.appendChild(el("div",{class:"exp-row-expanded"}, el("div",{class:"exp-review-note",text:"Date changed from "+(note.dateLabel||expPrettyDate(note.dateISO))+" to "+expPrettyDate(item.dateISO)+". Review this note so old follow-ups don't linger."}))); }
+    if(rev){ row.appendChild(el("div",{class:"exp-row-expanded"}, el("div",{class:"exp-review-note",text:expReviewReason(item)}))); }
     if(expirationEditingKey===item.key){ row.appendChild(el("div",{class:"exp-row-expanded"}, renderExpNoteEditor(item,note||null))); }
     if(expirationState.view==="archived"){
       expArchivedNotes(item).forEach(function(n,idx){
@@ -7152,7 +7207,9 @@
     var cat=el("select"); [["all","All categories"],["Driver","Drivers"],["Authority","Authorities"],["Truck","Trucks"],["Trailer","Trailers"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===expirationState.category)o.selected=true; cat.appendChild(o); }); cat.addEventListener("change",function(){ expirationState.category=cat.value; renderExpirations(); });
     var view=el("select"); [["attention","Needs attention"],["all","All current items"],["expired","Expired"],["expiring","Expiring — 3 days"],["due","Due soon — 15 days"],["upcoming","Upcoming — 30 days"],["notes","Has active notes"],["review","Needs review"],["temp","Temp / exception"],["archived","Archived notes"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===expirationState.view)o.selected=true; view.appendChild(o); }); view.addEventListener("change",function(){ expirationState.view=view.value; renderExpirations(); });
     var search=el("input",{type:"search",placeholder:"Search driver, truck, note…"}); search.value=expirationState.search||""; search.addEventListener("input",function(){ expirationState.search=search.value; renderExpirations(); });
-    toolbar.appendChild(coverField("Category",cat)); toolbar.appendChild(coverField("View",view)); toolbar.appendChild(coverField("Search",search)); expBody.appendChild(toolbar);
+    var sort=el("select"); [["date","Expiration date"],["item","Item"],["category","Category"],["type","Type"],["status","Status"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===(expirationState.sort||"date")) o.selected=true; sort.appendChild(o); }); sort.addEventListener("change",function(){ expirationState.sort=sort.value; renderExpirations(); });
+    var dir=el("select"); [["asc","Oldest / A-Z"],["desc","Newest / Z-A"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===(expirationState.dir||"asc")) o.selected=true; dir.appendChild(o); }); dir.addEventListener("change",function(){ expirationState.dir=dir.value; renderExpirations(); });
+    toolbar.appendChild(coverField("Category",cat)); toolbar.appendChild(coverField("View",view)); toolbar.appendChild(coverField("Sort by",sort)); toolbar.appendChild(coverField("Direction",dir)); toolbar.appendChild(coverField("Search",search)); expBody.appendChild(toolbar);
     var actions=el("div",{class:"settings-actions"}, el("button",{class:"btn small",text:expirationImportBusy?"Importing…":"Import old Excel notes",onclick:function(){ importExcelExpirationNotes(); }}), el("button",{class:"btn small",text:"Refresh Fleet data",onclick:function(){ if(!S365.signedIn){ window.alert("Sign in first so the dashboard can refresh Fleet Master."); return; } setSync("saving","Looking for changes…"); reconnectM365().then(function(){ setSync("ok","Up to date ✓"); renderExpirations(); }).catch(function(e){ setSync("err",chipErr(e),String(e)); }); }}));
     expBody.appendChild(actions);
     var all=(S365.expirationItems||[]), counts=expSummaryCounts(all), filtered=expFilteredItems();
