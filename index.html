@@ -335,6 +335,8 @@
   .gen-panel{position:absolute;right:0;top:calc(100% + 6px);z-index:70;min-width:220px;background:#fff;border:1px solid var(--line-strong);border-radius:12px;box-shadow:0 16px 45px rgba(15,23,42,.18);padding:6px}
   .gen-panel button{display:block;width:100%;border:0;background:transparent;text-align:left;color:var(--ink);border-radius:9px;padding:9px 10px;font-weight:650;white-space:nowrap}
   .gen-panel button:hover{background:var(--accent-soft);color:var(--accent)}
+  .gen-panel .gen-label{font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding:7px 10px 4px;border-top:1px solid var(--line);margin-top:4px}
+  .gen-panel .gen-label:first-child{border-top:0;margin-top:0}
   .gear{border:1px solid var(--line-strong);background:var(--surface);border-radius:9px;padding:7px 10px;font-size:14px;line-height:1}
   .gear:hover{border-color:var(--accent);color:var(--accent)}
   .settings-row{display:flex;flex-direction:column;gap:5px;margin-bottom:13px}
@@ -4215,6 +4217,12 @@
           <button id="cover-btn" type="button" role="menuitem">📄 Cover page</button>
           <button id="lease-btn" type="button" role="menuitem">📝 Lease termination</button>
           <button id="package-btn" type="button" role="menuitem">📦 Driver package</button>
+          <div class="gen-label">Word docs</div>
+          <button type="button" role="menuitem" data-pkg-doc="new-commercial60">Commercial Package 60-40</button>
+          <button type="button" role="menuitem" data-pkg-doc="new-idaho-llc">Idaho LLC Operating Agreement</button>
+          <button type="button" role="menuitem" data-pkg-doc="new-two-page-lease">Two Page Lease</button>
+          <button type="button" role="menuitem" data-pkg-doc="truck-tractor-docs">Tractor Docs Only</button>
+          <button type="button" role="menuitem" data-pkg-doc="auth-driver-authority">Driver Authority Package without Lease</button>
         </div>
       </details>
       <button id="m365-btn" class="btn small">Sign in</button>
@@ -5379,6 +5387,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     if(kind==="cover") openCoverPage();
     else if(kind==="lease") openLeaseTermination();
     else if(kind==="package") openDriverPackage();
+    else if(String(kind||"").indexOf("doc:")===0) openDriverPackageDocument(String(kind).slice(4));
   }
   function cardGenerateMenu(){
     var genDetails=el("details",{class:"gen-menu card-gen-menu"});
@@ -5386,7 +5395,13 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     genDetails.appendChild(el("div",{class:"gen-panel",role:"menu","aria-label":"Generate from checklist"},
       el("button",{type:"button",role:"menuitem",text:"📄 Cover page",onclick:function(){ openGenerateFromCard("cover"); }}),
       el("button",{type:"button",role:"menuitem",text:"📝 Lease termination",onclick:function(){ openGenerateFromCard("lease"); }}),
-      el("button",{type:"button",role:"menuitem",text:"📦 Driver package",onclick:function(){ openGenerateFromCard("package"); }})
+      el("button",{type:"button",role:"menuitem",text:"📦 Driver package",onclick:function(){ openGenerateFromCard("package"); }}),
+      el("div",{class:"gen-label",text:"Word docs"}),
+      el("button",{type:"button",role:"menuitem",text:"Commercial Package 60-40",onclick:function(){ openGenerateFromCard("doc:new-commercial60"); }}),
+      el("button",{type:"button",role:"menuitem",text:"Idaho LLC Operating Agreement",onclick:function(){ openGenerateFromCard("doc:new-idaho-llc"); }}),
+      el("button",{type:"button",role:"menuitem",text:"Two Page Lease",onclick:function(){ openGenerateFromCard("doc:new-two-page-lease"); }}),
+      el("button",{type:"button",role:"menuitem",text:"Tractor Docs Only",onclick:function(){ openGenerateFromCard("doc:truck-tractor-docs"); }}),
+      el("button",{type:"button",role:"menuitem",text:"Driver Authority Package without Lease",onclick:function(){ openGenerateFromCard("doc:auth-driver-authority"); }})
     ));
     return genDetails;
   }
@@ -6574,6 +6589,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     document.getElementById("lease-close").addEventListener("click", closeLeaseTermination);
     addSafeBackdropClose(document.getElementById("lease-overlay"), closeLeaseTermination);
     document.getElementById("package-btn").addEventListener("click", function(){ closeGenerateMenu(); openDriverPackage(); });
+    document.querySelectorAll("[data-pkg-doc]").forEach(function(btn){ btn.addEventListener("click", function(){ closeGenerateMenu(); openDriverPackageDocument(btn.getAttribute("data-pkg-doc")); }); });
     document.getElementById("package-close").addEventListener("click", closeDriverPackage);
     addSafeBackdropClose(document.getElementById("package-overlay"), closeDriverPackage);
     document.getElementById("settings-close").addEventListener("click", closeSettings);
@@ -7795,7 +7811,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   var PACKAGE_TYPES=[
     {id:"newDriver", label:"New Driver", hint:"Commercial package, LLC operating agreement, and two-page lease."},
     {id:"changingTrucks", label:"Changing Trucks", hint:"Tractor docs and two-page lease for a truck change."},
-    {id:"changingAuthorities", label:"Changing Authorities", hint:"Driver authority package without the lease."}
+    {id:"changingAuthorities", label:"Changing Authorities", hint:"Authority change docs, tractor docs, and two-page lease."}
   ];
   var PACKAGE_TEMPLATES=[
     {id:"new-commercial60", type:"newDriver", label:"Commercial Package 60-40", fileName:"Commercial Package 60-40.docx", scriptId:"pkg-tpl-new-commercial60"},
@@ -7803,7 +7819,9 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     {id:"new-two-page-lease", type:"newDriver", label:"Two Page Lease", fileName:"Two Page Lease.docx", scriptId:"pkg-tpl-new-two-page-lease"},
     {id:"truck-tractor-docs", type:"changingTrucks", label:"Tractor Docs Only", fileName:"Tractor Docs Only.docx", scriptId:"pkg-tpl-truck-tractor-docs"},
     {id:"truck-two-page-lease", type:"changingTrucks", label:"Two Page Lease", fileName:"Two Page Lease.docx", scriptId:"pkg-tpl-truck-two-page-lease"},
-    {id:"auth-driver-authority", type:"changingAuthorities", label:"Driver’s Authority Package without Lease", fileName:"Driver Authority Package without Lease.docx", scriptId:"pkg-tpl-auth-driver-authority"}
+    {id:"auth-driver-authority", type:"changingAuthorities", label:"Driver’s Authority Package without Lease", fileName:"Driver Authority Package without Lease.docx", scriptId:"pkg-tpl-auth-driver-authority"},
+    {id:"auth-tractor-docs", type:"changingAuthorities", label:"Tractor Docs Only", fileName:"Tractor Docs Only.docx", scriptId:"pkg-tpl-truck-tractor-docs"},
+    {id:"auth-two-page-lease", type:"changingAuthorities", label:"Two Page Lease", fileName:"Two Page Lease.docx", scriptId:"pkg-tpl-truck-two-page-lease"}
   ];
   var packageValues=blankPackageValues();
 
@@ -7816,6 +7834,15 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   function openDriverPackage(){
     packageOverlay.classList.remove("hidden"); packageOverlay.setAttribute("aria-hidden","false"); document.body.style.overflow="hidden";
     resetPackageValues(); prefillPackageFromActiveCard(); renderDriverPackage();
+  }
+  function openDriverPackageDocument(templateId){
+    packageOverlay.classList.remove("hidden"); packageOverlay.setAttribute("aria-hidden","false"); document.body.style.overflow="hidden";
+    resetPackageValues();
+    var t=(PACKAGE_TEMPLATES||[]).filter(function(x){ return x.id===templateId; })[0];
+    if(t){ packageValues.packageType=t.type; packageValues.selectedTemplates=[t.id]; }
+    prefillPackageFromActiveCard();
+    if(t){ packageValues.packageType=t.type; packageValues.selectedTemplates=[t.id]; }
+    renderDriverPackage();
   }
   function closeDriverPackage(){ packageOverlay.classList.add("hidden"); packageOverlay.setAttribute("aria-hidden","true"); document.body.style.overflow=""; packageValues=blankPackageValues(); packageManualOpen=false; if(packageBody) packageBody.textContent=""; }
   function resetPackageValues(){ packageValues=blankPackageValues(); packageManualOpen=false; }
