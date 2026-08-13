@@ -6417,12 +6417,39 @@ UEsDBBQAAAAIAAAAIQCZVX4F+AAAAOECAAALAAAAX3JlbHMvLnJlbHOtkk1LAzEQhu+C/yHMvTvbKiLS
                fleetCacheAt:0, fleetLiveAt:0, fleetSource:"none", refreshingFleet:false,
                remote:{eTag:null, by:null, at:null, present:false} };
 
-  var FLEET_CACHE_KEY = "ultimateProceduresFleetMasterCacheV1";
+  var FLEET_CACHE_KEY = "ultimateProceduresFleetMasterCacheV2";
   var FLEET_CACHE_WARN_DAYS = 7;
   function hasFleetLookupData(){
     var look=(S365&&S365.coverLookups)||{};
     var roster=(S365&&S365.roster)||{};
     return !!((look.drivers&&look.drivers.length) || (look.authorities&&look.authorities.length) || (look.tractors&&look.tractors.length) || (S365.expirationItems&&S365.expirationItems.length) || (roster.drivers&&roster.drivers.length) || (roster.authorities&&roster.authorities.length) || (roster.fleetTrucks&&roster.fleetTrucks.length));
+  }
+  function splitDriverAddress(full){
+    full=String(full==null?"":full).trim();
+    var out={street:full, city:"", state:"", zip:""};
+    if(!full) return out;
+    var parts=full.split(",").map(function(p){return String(p||"").trim();}).filter(Boolean);
+    function parseStateZip(text){
+      var m=String(text||"").trim().match(/^([A-Za-z]{2})\s+(.+)$/);
+      if(m) return {state:m[1].toUpperCase(), zip:m[2].trim()};
+      return {state:String(text||"").trim(), zip:""};
+    }
+    if(parts.length>=3){
+      out.street=parts.slice(0,parts.length-2).join(", ");
+      out.city=parts[parts.length-2]||"";
+      var sz=parseStateZip(parts[parts.length-1]); out.state=sz.state; out.zip=sz.zip;
+      return out;
+    }
+    if(parts.length===2){
+      out.street=parts[0];
+      var m2=parts[1].match(/^(.+?)\s+([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?|[A-Za-z0-9 -]+)$/);
+      if(m2){ out.city=m2[1].trim(); out.state=m2[2].toUpperCase(); out.zip=m2[3].trim(); }
+      else { out.city=parts[1]; }
+      return out;
+    }
+    var m=full.match(/^(.*?)\s+([A-Za-z][A-Za-z .'-]+?)\s+([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+    if(m){ out.street=m[1].trim(); out.city=m[2].trim(); out.state=m[3].toUpperCase(); out.zip=m[4]; }
+    return out;
   }
   function fleetStampLabel(ts){
     if(!ts) return "never";
@@ -7077,21 +7104,6 @@ UEsDBBQAAAAIAAAAIQCZVX4F+AAAAOECAAALAAAAX3JlbHMvLnJlbHOtkk1LAzEQhu+C/yHMvTvbKiLS
     return {key:category.toLowerCase()+"|"+expNorm(stableId||item)+"|"+expNorm(field), category:category, stableId:stableId||item, item:item||"", field:field, detail:detail||field, dateISO:iso, dateRaw:dateVal, meta:meta||{}};
   }
   function loadExpirationItems(){
-    function splitDriverAddress(full){
-      full=clean(full);
-      var out={street:full, city:"", state:"", zip:""};
-      if(!full) return out;
-      var parts=full.split(",").map(function(p){return clean(p);}).filter(Boolean);
-      if(parts.length>=3){
-        out.street=parts.slice(0,parts.length-2).join(", ");
-        out.city=parts[parts.length-2]||"";
-        var stZip=parts[parts.length-1]||"";
-        var m=stZip.match(/^([A-Za-z]{2})\s+(.+)$/);
-        if(m){ out.state=m[1].toUpperCase(); out.zip=m[2]; }
-        else { out.state=stZip; }
-      }
-      return out;
-    }
     function readMaybe(tab){ return readSheet(tab).catch(function(){ return []; }); }
     return Promise.all([readMaybe("Drivers"), readMaybe("Authorities"), readMaybe("Trucks"), readMaybe("Trailers")]).then(function(all){
       var items=[];
