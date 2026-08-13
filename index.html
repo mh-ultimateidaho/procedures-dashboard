@@ -7998,21 +7998,57 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   function xmlValue(v){ return String(v==null?"":v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;"); }
   function saveBlob(blob,filename){ var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=filename; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },500); }
   function regexEscape(s){ return String(s).replace(/[.*+?^${}()|[\]\\]/g,"\\$&"); }
-  function fieldResultRun(v){ return '<w:r><w:rPr><w:noProof/></w:rPr><w:t xml:space="preserve">'+xmlValue(v)+'</w:t></w:r>'; }
-  function fillNamedFormFieldXml(txt,name,value){
-    var n=regexEscape(name);
-    var re=new RegExp('(<w:r[^>]*>\\s*<w:fldChar[^>]*w:fldCharType="begin"[^>]*>[\\s\\S]*?<w:name[^>]*w:val="'+n+'"[\\s\\S]*?</w:fldChar>\\s*</w:r>[\\s\\S]*?<w:r[^>]*>\\s*<w:fldChar[^>]*w:fldCharType="separate"[^>]*/>\\s*</w:r>)([\\s\\S]*?)(<w:r[^>]*>\\s*<w:fldChar[^>]*w:fldCharType="end"[^>]*/>\\s*</w:r>)','g');
-    return txt.replace(re,function(m,pre,old,post){ return pre+fieldResultRun(value)+post; });
+  function plainTextForXml(v){ return String(v==null?"":v); }
+  function titleCasePackageValue(v){
+    return String(v||"").toLowerCase().replace(/\b([a-z])/g,function(m,c){ return c.toUpperCase(); }).replace(/\b(Llc|Inc|Ii|Iii|Iv|Dot|Mc|Us)\b/g,function(m){ return m.toUpperCase(); });
   }
-  function fillRefFieldXml(txt,name,value){
-    var n=regexEscape(name);
-    var re=new RegExp('(<w:r[^>]*>\\s*<w:fldChar[^>]*w:fldCharType="begin"[^>]*/>\\s*</w:r>[\\s\\S]*?<w:instrText[^>]*>[\\s\\S]*?REF\\s+'+n+'(?:\\s|\\\\|<)[\\s\\S]*?</w:instrText>[\\s\\S]*?<w:r[^>]*>\\s*<w:fldChar[^>]*w:fldCharType="separate"[^>]*/>\\s*</w:r>)([\\s\\S]*?)(<w:r[^>]*>\\s*<w:fldChar[^>]*w:fldCharType="end"[^>]*/>\\s*</w:r>)','g');
-    return txt.replace(re,function(m,pre,old,post){ return pre+fieldResultRun(value)+post; });
+  function digitsOnly(v){ return String(v||"").replace(/\D/g,""); }
+  function formatPackagePhone(v){ var d=digitsOnly(v); if(d.length===11 && d.charAt(0)==="1") d=d.slice(1); return d.length===10 ? "("+d.slice(0,3)+") "+d.slice(3,6)+"-"+d.slice(6) : String(v||""); }
+  function formatPackageSsn(v){ var d=digitsOnly(v); return d.length===9 ? d.slice(0,3)+"-"+d.slice(3,5)+"-"+d.slice(5) : String(v||""); }
+  function formatPackageEin(v){ var d=digitsOnly(v); return d.length===9 ? d.slice(0,2)+"-"+d.slice(2) : String(v||""); }
+  function packageFieldFormatsFromXml(txt){
+    var out={};
+    txt.replace(/<w:name[^>]*w:val="([^"]+)"[\s\S]*?<w:textInput>([\s\S]*?)<\/w:textInput>/g,function(m,name,body){
+      var fm=(body.match(/<w:format[^>]*w:val="([^"]+)"/)||[])[1]||"";
+      if(name) out[name]=fm;
+      return m;
+    });
+    return out;
   }
-  function fillPackageXml(txt,values){
+  function applyPackageWordFormat(name,value,formats){
+    var v=plainTextForXml(value);
+    var fmt=String((formats&&formats[name])||"");
+    if(!v) return "";
+    if(/UPPERCASE/i.test(fmt)) v=v.toUpperCase();
+    else if(/TITLE CASE/i.test(fmt)) v=titleCasePackageValue(v);
+    if(/M\/d\/yyyy|date/i.test(fmt)){ v=packageDate(v)||v; }
+    if(/\(###\) ###-####/.test(fmt)) v=formatPackagePhone(v);
+    if(/###-##-####/.test(fmt)) v=formatPackageSsn(v);
+    if(/##-#######/.test(fmt)) v=formatPackageEin(v);
+    return v;
+  }
+  function packageValuesForXml(txt,values,baseFormats){
+    var formats=Object.assign({}, baseFormats||{}, packageFieldFormatsFromXml(txt));
+    var out={};
+    PACKAGE_FIELD_NAMES.forEach(function(k){ out[k]=applyPackageWordFormat(k,(values||{})[k]||"",formats); });
+    return out;
+  }
+  function replaceXmlTextPreservingRuns(txt,placeholder,value){
+    return txt.split(placeholder).join(xmlValue(value));
+  }
+  function syncFormFieldDefaults(txt,values){
     PACKAGE_FIELD_NAMES.forEach(function(k){
-      var v=values[k]||"";
-      txt=txt.split("{{"+k+"}}").join(xmlValue(v));
+      var val=values[k]||"", n=regexEscape(k);
+      var re=new RegExp('(<w:name[^>]*w:val="'+n+'"[\\s\\S]*?<w:textInput>[\\s\\S]*?<w:default[^>]*w:val=")([^"]*)("[^>]*/>)','g');
+      txt=txt.replace(re,function(m,pre,old,post){ return pre+xmlValue(val)+post; });
+    });
+    return txt;
+  }
+  function fillPackageXml(txt,values,baseFormats){
+    var formatted=packageValuesForXml(txt,values||{},baseFormats);
+    txt=syncFormFieldDefaults(txt,formatted);
+    PACKAGE_FIELD_NAMES.forEach(function(k){
+      txt=replaceXmlTextPreservingRuns(txt,"{{"+k+"}}",formatted[k]||"");
     });
     return txt;
   }
@@ -8024,12 +8060,16 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     var node=document.getElementById(t.scriptId), b64=node?node.textContent.trim():"";
     if(!b64) return Promise.reject(new Error("Missing template: "+t.label));
     return JSZip.loadAsync(b64ToUint8(b64)).then(function(zip){
-      var jobs=[]; zip.forEach(function(path,file){
-        if(!file.dir && path.indexOf("word/")===0 && /\.xml$/.test(path)){
-          jobs.push(file.async("string").then(function(txt){ zip.file(path, fillPackageXml(txt,values)); }));
-        }
+      var main=zip.file("word/document.xml");
+      return (main?main.async("string"):Promise.resolve("")).then(function(mainXml){
+        var baseFormats=packageFieldFormatsFromXml(mainXml||"");
+        var jobs=[]; zip.forEach(function(path,file){
+          if(!file.dir && path.indexOf("word/")===0 && /\.xml$/.test(path)){
+            jobs.push(file.async("string").then(function(txt){ zip.file(path, fillPackageXml(txt,values,baseFormats)); }));
+          }
+        });
+        return Promise.all(jobs).then(function(){ return zip.generateAsync({type:"blob",mimeType:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"}); });
       });
-      return Promise.all(jobs).then(function(){ return zip.generateAsync({type:"blob",mimeType:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"}); });
     });
   }
   function packageBaseFileName(){ return [packageValues.LastName||"Driver", packageValues.FirstName||"", packageValues.TractorUnitNumber?("Unit "+packageValues.TractorUnitNumber):""].filter(Boolean).join(" ") || "Driver Package"; }
