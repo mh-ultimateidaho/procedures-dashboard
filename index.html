@@ -8068,6 +8068,74 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       });
     }).split(placeholder).join(val);
   }
+
+  function packageParagraphRunPr(p){
+    var m=String(p||"").match(/<w:pPr>[\s\S]*?<w:rPr>([\s\S]*?)<\/w:rPr>[\s\S]*?<\/w:pPr>/);
+    return m ? ("<w:rPr>"+m[1]+"</w:rPr>") : "";
+  }
+  function packageLastVisualRunPr(part){
+    var best="";
+    String(part||"").replace(/<w:rPr>[\s\S]*?<\/w:rPr>/g,function(rpr){ if(packageRunPrHasVisualFormatting(rpr)) best=rpr; return rpr; });
+    return best;
+  }
+  function packageMergeRPrInner(primaryRPr, fallbackRPr){
+    var primary=packageRunPrInner(primaryRPr), fallback=packageRunPrInner(fallbackRPr);
+    if(!primary && !fallback) return "";
+    if(primary && fallback){
+      [["sz",/<w:sz\b/],["szCs",/<w:szCs\b/],["b",/<w:b\b/],["i",/<w:i\b/],["rFonts",/<w:rFonts\b/],["color",/<w:color\b/]].forEach(function(pair){
+        if(!pair[1].test(primary)){ var mm=fallback.match(new RegExp('<w:'+pair[0]+'\\b[^>]*/>')); if(mm) primary += mm[0]; }
+      });
+    }
+    return "<w:rPr>"+(primary||fallback)+"</w:rPr>";
+  }
+  function packageFieldNameFromBlock(block){
+    var b=String(block||""), m=b.match(/<w:name\b[^>]*w:val="([^"]+)"/);
+    if(m) return m[1];
+    m=b.match(/<w:instrText\b[^>]*>[\s\S]*?\bREF\s+([A-Za-z0-9_]+)/);
+    return m ? m[1] : "";
+  }
+  function packageBestRunPrForField(block,paragraph){
+    var b=String(block||""), pRPr=packageParagraphRunPr(paragraph);
+    var sep=b.search(/<w:fldChar\b[^>]*w:fldCharType="separate"/);
+    var resultPart=sep>=0 ? b.slice(sep) : "";
+    var fieldCodePart=sep>=0 ? b.slice(0,sep) : b;
+    var rpr=packageLastVisualRunPr(resultPart) || packageLastVisualRunPr(fieldCodePart) || pRPr;
+    return packageMergeRPrInner(rpr,pRPr);
+  }
+  function packagePlainRun(value,rPr){
+    var val=xmlValue(value||""), textStart='<w:t';
+    if(/^\s|\s$/.test(String(value||""))) textStart += ' xml:space="preserve"';
+    textStart += '>';
+    return '<w:r>'+(rPr||"")+textStart+val+'</w:t></w:r>';
+  }
+  function replacePackageComplexFieldsWithPlainRuns(txt,values){
+    var valueMap=values||{};
+    return String(txt||"").replace(/<w:p\b[\s\S]*?<\/w:p>/g,function(p){
+      var out="", pos=0;
+      while(pos<p.length){
+        var fld=p.indexOf('w:fldCharType="begin"',pos);
+        if(fld<0){ out += p.slice(pos); break; }
+        var runStart=p.lastIndexOf('<w:r',fld);
+        if(runStart<pos || runStart<0){ out += p.slice(pos,fld+1); pos=fld+1; continue; }
+        out += p.slice(pos,runStart);
+        var endFld=p.indexOf('w:fldCharType="end"',fld);
+        if(endFld<0){ out += p.slice(runStart); break; }
+        var endRun=p.indexOf('</w:r>',endFld);
+        if(endRun<0){ out += p.slice(runStart); break; }
+        endRun += 6;
+        var block=p.slice(runStart,endRun);
+        var name=packageFieldNameFromBlock(block);
+        if(name && Object.prototype.hasOwnProperty.call(valueMap,name)){
+          out += packagePlainRun(valueMap[name]||"", packageBestRunPrForField(block,p));
+        }else{
+          out += block;
+        }
+        pos=endRun;
+      }
+      return out;
+    });
+  }
+
   function syncFormFieldDefaults(txt,values){
     PACKAGE_FIELD_NAMES.forEach(function(k){
       var val=values[k]||"", n=regexEscape(k);
@@ -8079,6 +8147,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   function fillPackageXml(txt,values,baseFormats){
     var formatted=packageValuesForXml(txt,values||{},baseFormats);
     txt=syncFormFieldDefaults(txt,formatted);
+    txt=replacePackageComplexFieldsWithPlainRuns(txt,formatted);
     PACKAGE_FIELD_NAMES.forEach(function(k){
       txt=replaceXmlTextPreservingRuns(txt,"{{"+k+"}}",formatted[k]||"");
     });
