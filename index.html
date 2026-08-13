@@ -8033,8 +8033,40 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     PACKAGE_FIELD_NAMES.forEach(function(k){ out[k]=applyPackageWordFormat(k,(values||{})[k]||"",formats); });
     return out;
   }
+  function packageRunPrHasVisualFormatting(rpr){
+    return /<w:(rFonts|b|i|u|sz|szCs|color|highlight|caps|smallCaps|strike|vertAlign|spacing)/.test(String(rpr||""));
+  }
+  function packageRunPrInner(rpr){
+    var m=String(rpr||"").match(/<w:rPr>([\s\S]*?)<\/w:rPr>/);
+    return m?m[1]:"";
+  }
+  function packageMergeRunPrForPlaceholder(sourceRpr,currentRpr){
+    var source=packageRunPrInner(sourceRpr), current=packageRunPrInner(currentRpr);
+    if(!source) return currentRpr||"";
+    if(/<w:noProof/.test(current) && !/<w:noProof/.test(source)) source += "<w:noProof/>";
+    return "<w:rPr>"+source+"</w:rPr>";
+  }
+  function packageBestRunPrBefore(before,currentRpr){
+    if(packageRunPrHasVisualFormatting(currentRpr)) return currentRpr||"";
+    var best="";
+    String(before||"").replace(/<w:rPr>[\s\S]*?<\/w:rPr>/g,function(rpr){ if(packageRunPrHasVisualFormatting(rpr)) best=rpr; return rpr; });
+    return best ? packageMergeRunPrForPlaceholder(best,currentRpr) : (currentRpr||"");
+  }
   function replaceXmlTextPreservingRuns(txt,placeholder,value){
-    return txt.split(placeholder).join(xmlValue(value));
+    var token=regexEscape(placeholder), val=xmlValue(value);
+    return String(txt||"").replace(/<w:p[\s\S]*?<\/w:p>/g,function(p){
+      if(p.indexOf(placeholder)<0) return p;
+      var re=new RegExp('(<w:r\b[^>]*>)(<w:rPr>[\s\S]*?<\/w:rPr>)?(<w:t\b[^>]*>)'+token+'(<\/w:t>)(<\/w:r>)','g');
+      return p.replace(re,function(m,rStart,rPr,tStart,tEnd,rEnd,offset,whole){
+        var before=whole.slice(0,offset);
+        var useRPr=packageBestRunPrBefore(before,rPr||"");
+        var textStart=tStart;
+        if(/\s/.test(String(value||"").charAt(0)) || /\s/.test(String(value||"").slice(-1))){
+          textStart=textStart.replace(/<w:t(?![^>]*xml:space=)/,'<w:t xml:space="preserve"');
+        }
+        return rStart+useRPr+textStart+val+tEnd+rEnd;
+      });
+    }).split(placeholder).join(val);
   }
   function syncFormFieldDefaults(txt,values){
     PACKAGE_FIELD_NAMES.forEach(function(k){
