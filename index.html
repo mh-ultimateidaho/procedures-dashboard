@@ -6817,7 +6817,7 @@ UEsDBBQAAAAIAAAAIQCZVX4F+AAAAOECAAALAAAAX3JlbHMvLnJlbHOtkk1LAzEQhu+C/yHMvTvbKiLS
   function driverDetailsByText(v){
     var look=(S365&&S365.coverLookups)||{}, nm=look.driversByName||{}, id=look.driversById||{};
     var tests=[];
-    if(v && typeof v==="object") tests=[v.id,v.driverId,v.name,v.label,v.key,stripTruckSuffixFromDriverLabel(v.key||""),firstLastFromLastFirst(v.key||v.label||"")];
+    if(v && typeof v==="object") tests=[v.id,v.driverId,v.name,v.label,v.key,stripTruckSuffixFromDriverLabel(v.key||""),stripTruckSuffixFromDriverLabel(v.label||""),firstLastFromLastFirst(v.key||v.label||v.name||"")];
     else tests=[v, stripTruckSuffixFromDriverLabel(v||""), firstLastFromLastFirst(v||"")];
     for(var i=0;i<tests.length;i++){ var k=lookupNorm(tests[i]); if(k && (id[k]||nm[k])) return id[k]||nm[k]; }
     return null;
@@ -7852,10 +7852,15 @@ UEsDBBQAAAAIAAAAIQCZVX4F+AAAAOECAAALAAAAX3JlbHMvLnJlbHOtkk1LAzEQhu+C/yHMvTvbKiLS
   }
   function renderDriverPackage(){
     packageBody.textContent="";
-    packageBody.appendChild(el("p",{class:"note",text:"Beta proof-of-concept: fills the New Driver → Commercial Package (60-40) Word template from Fleet Master plus manual fields. DOB can come from Fleet Master; full SSN stays manual and is not saved."}));
-    var look=(S365&&S365.coverLookups)||{}, drivers=currentDriverRecords();
+    packageBody.appendChild(el("p",{class:"note",text:"Beta proof-of-concept: fills the New Driver → Commercial Package (60-40) Word template from Fleet Master plus manual fields. DOB, cell, email, and address come from the Drivers tab when those columns exist. Full SSN stays manual and is not saved."}));
+    var look=(S365&&S365.coverLookups)||{};
+    var driverDetails=(look.drivers||[]).map(function(d){
+      var assign=assignmentForDriverDetail(d)||{};
+      return Object.assign({}, assign, {driverDetail:d, key:d.label||d.name||d.id||"", label:d.label||d.name||"", name:d.name||"", display:d.label||d.name||""});
+    });
+    var drivers=driverDetails.length ? driverDetails : currentDriverRecords();
     var top=el("div",{class:"pkg-grid"});
-    top.appendChild(packageSelectField("Driver", "driverPick", drivers, function(r){return r.key;}, function(r){return r.display||r.label||r.name;}, function(r){ applyPackageDriver(r); }));
+    top.appendChild(packageSelectField("Driver from Drivers tab", "driverPick", drivers, function(r){return r.key;}, function(r){return r.display||r.label||r.name;}, function(r){ applyPackageDriver(r); }));
     top.appendChild(packageSelectField("Authority / company", "authorityPick", look.authorities||[], function(a){return a.authority;}, function(a){return a.authority;}, function(a){ applyPackageAuthority(a); }));
     top.appendChild(packageSelectField("Truck #", "truckPick", look.tractors||[], function(t){return t.unit;}, function(t){return t.unit;}, function(t){ applyPackageTruck(t); }));
     packageBody.appendChild(top);
