@@ -8180,6 +8180,51 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     });
   }
 
+
+  function packageReplaceTwoPageLeaseRefFieldsWithPlainRuns(txt,values,templateId){
+    // Two Page Lease tables use REF fields that point back to the data form.
+    // Word reopens those REF results at the source field's 11pt size, even if the target table is 16pt.
+    // For final generated docs, replace only those REF field blocks with plain 16pt text runs.
+    // Keep FORMTEXT/source fields intact so the rest of the package structure stays valid.
+    if(!/two-page-lease/i.test(String(templateId||""))) return txt;
+    var valueMap=values||{};
+    var halfPt="32"; // 16 pt
+    var targets={};
+    ["TransitCompanyName","DriverCompanyName","TractorUnitNumber","TractorYear","TractorMake","TractorPlate","TractorVin","TractorColor","LeaseStartDate","LeaseEndDate","TractorEquipCosts","LeaseNumberofMonths","LeaseBiMonthlyPay","LeaseMonthlyPay","TractorDownPay","TractorBalance","TractorBalloonPay","TrailerCostPerMonth"].forEach(function(k){ targets[k]=true; });
+    function refName(block){
+      var instr="";
+      String(block||"").replace(/<w:instrText\b[^>]*>([\s\S]*?)<\/w:instrText>/g,function(m,t){ instr += " "+t; return m; });
+      instr=instr.replace(/&quot;/g,'"').replace(/&amp;/g,'&').replace(/\s+/g,' ');
+      var m=instr.match(/\bREF\s+([A-Za-z0-9_]+)/);
+      return m?m[1]:"";
+    }
+    return String(txt||"").replace(/<w:p\b[\s\S]*?<\/w:p>/g,function(p){
+      var out="", pos=0;
+      while(pos<p.length){
+        var fld=p.indexOf('w:fldCharType="begin"',pos);
+        if(fld<0){ out += p.slice(pos); break; }
+        var runStart=p.lastIndexOf('<w:r',fld);
+        if(runStart<pos || runStart<0){ out += p.slice(pos,fld+1); pos=fld+1; continue; }
+        out += p.slice(pos,runStart);
+        var endFld=p.indexOf('w:fldCharType="end"',fld);
+        if(endFld<0){ out += p.slice(runStart); break; }
+        var endRun=p.indexOf('</w:r>',endFld);
+        if(endRun<0){ out += p.slice(runStart); break; }
+        endRun += 6;
+        var block=p.slice(runStart,endRun);
+        var name=refName(block);
+        if(name && targets[name] && Object.prototype.hasOwnProperty.call(valueMap,name)){
+          var rpr=packageSizedRunPr(packageBestRunPrForField(block,p)||"", halfPt);
+          out += packagePlainRun(valueMap[name]||"", rpr);
+        }else{
+          out += block;
+        }
+        pos=endRun;
+      }
+      return out;
+    });
+  }
+
   function syncFormFieldDefaults(txt,values){
     PACKAGE_FIELD_NAMES.forEach(function(k){
       var val=values[k]||"", n=regexEscape(k);
@@ -8191,6 +8236,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   function fillPackageXml(txt,values,baseFormats,templateId){
     var formatted=packageValuesForXml(txt,values||{},baseFormats);
     txt=syncFormFieldDefaults(txt,formatted);
+    txt=packageReplaceTwoPageLeaseRefFieldsWithPlainRuns(txt,formatted,templateId);
     PACKAGE_FIELD_NAMES.forEach(function(k){
       txt=replaceXmlTextPreservingRuns(txt,"{{"+k+"}}",formatted[k]||"");
     });
