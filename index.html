@@ -8136,6 +8136,50 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     });
   }
 
+  function packageSizedRunPr(rPr, halfPt){
+    var inner=packageRunPrInner(rPr);
+    inner=inner.replace(/<w:sz\b[^>]*\/>/g," ").replace(/<w:szCs\b[^>]*\/>/g," ");
+    if(!/<w:noProof\b/.test(inner)) inner += "<w:noProof/>";
+    inner += '<w:sz w:val="'+halfPt+'"/><w:szCs w:val="'+halfPt+'"/>';
+    return "<w:rPr>"+inner+"</w:rPr>";
+  }
+  function packageStyleFieldResultRuns(txt,templateId){
+    // The two-page lease templates use Word form fields whose result runs reopen at 11pt unless
+    // the result run gets an explicit size. Keep the fields intact, but size their visible result text.
+    if(!/two-page-lease/i.test(String(templateId||""))) return txt;
+    var halfPt="32"; // 16 pt, matching the original two-page lease table field styling.
+    var targets={};
+    ["TransitCompanyName","DriverCompanyName","TractorUnitNumber","TractorYear","TractorMake","TractorPlate","TractorVin","TractorColor","LeaseStartDate","LeaseEndDate","TractorEquipCosts","LeaseNumberofMonths","LeaseBiMonthlyPay","LeaseMonthlyPay","TractorDownPay","TractorBalance","TractorBalloonPay","TrailerCostPerMonth"].forEach(function(k){ targets[k]=true; });
+    function styleBlock(block){
+      var name=packageFieldNameFromBlock(block);
+      if(!targets[name]) return block;
+      return block.replace(/(<w:r\b[^>]*>[\s\S]*?<w:fldChar\b[^>]*w:fldCharType="separate"[\s\S]*?<\/w:r>)([\s\S]*?)(<w:r\b[^>]*>[\s\S]*?<w:fldChar\b[^>]*w:fldCharType="end"[\s\S]*?<\/w:r>)/,function(m,sepRun,result,endRun){
+        result=result.replace(/(<w:r\b[^>]*>)(<w:rPr>[\s\S]*?<\/w:rPr>)?([\s\S]*?<w:t\b[^>]*>[\s\S]*?<\/w:t>[\s\S]*?)(<\/w:r>)/g,function(mm,rStart,rPr,body,rEnd){
+          return rStart+packageSizedRunPr(rPr||"",halfPt)+body+rEnd;
+        });
+        return sepRun+result+endRun;
+      });
+    }
+    return String(txt||"").replace(/<w:p\b[\s\S]*?<\/w:p>/g,function(p){
+      var out="", pos=0;
+      while(pos<p.length){
+        var fld=p.indexOf('w:fldCharType="begin"',pos);
+        if(fld<0){ out += p.slice(pos); break; }
+        var runStart=p.lastIndexOf('<w:r',fld);
+        if(runStart<pos || runStart<0){ out += p.slice(pos,fld+1); pos=fld+1; continue; }
+        out += p.slice(pos,runStart);
+        var endFld=p.indexOf('w:fldCharType="end"',fld);
+        if(endFld<0){ out += p.slice(runStart); break; }
+        var endRun=p.indexOf('</w:r>',endFld);
+        if(endRun<0){ out += p.slice(runStart); break; }
+        endRun += 6;
+        out += styleBlock(p.slice(runStart,endRun));
+        pos=endRun;
+      }
+      return out;
+    });
+  }
+
   function syncFormFieldDefaults(txt,values){
     PACKAGE_FIELD_NAMES.forEach(function(k){
       var val=values[k]||"", n=regexEscape(k);
@@ -8144,13 +8188,13 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     });
     return txt;
   }
-  function fillPackageXml(txt,values,baseFormats){
+  function fillPackageXml(txt,values,baseFormats,templateId){
     var formatted=packageValuesForXml(txt,values||{},baseFormats);
     txt=syncFormFieldDefaults(txt,formatted);
-    txt=replacePackageComplexFieldsWithPlainRuns(txt,formatted);
     PACKAGE_FIELD_NAMES.forEach(function(k){
       txt=replaceXmlTextPreservingRuns(txt,"{{"+k+"}}",formatted[k]||"");
     });
+    txt=packageStyleFieldResultRuns(txt,templateId);
     return txt;
   }
   function selectedPackageTemplates(){
@@ -8166,7 +8210,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
         var baseFormats=packageFieldFormatsFromXml(mainXml||"");
         var jobs=[]; zip.forEach(function(path,file){
           if(!file.dir && path.indexOf("word/")===0 && /\.xml$/.test(path)){
-            jobs.push(file.async("string").then(function(txt){ zip.file(path, fillPackageXml(txt,values,baseFormats)); }));
+            jobs.push(file.async("string").then(function(txt){ zip.file(path, fillPackageXml(txt,values,baseFormats,t.id)); }));
           }
         });
         return Promise.all(jobs).then(function(){ return zip.generateAsync({type:"blob",mimeType:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"}); });
