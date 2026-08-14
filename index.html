@@ -181,7 +181,7 @@
   .exp-summary{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 12px}
   .exp-pill{border:1px solid var(--line);background:var(--bg);color:var(--muted);border-radius:999px;padding:3px 9px;font-size:12px;font-weight:700}
   .exp-list{display:block;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
-  .exp-table-head,.exp-row-main{display:grid;grid-template-columns:minmax(170px,1.25fr) minmax(145px,.95fr) 108px 94px minmax(210px,1.4fr) 170px;gap:10px;align-items:center}
+  .exp-table-head,.exp-row-main{display:grid;grid-template-columns:minmax(160px,1.18fr) minmax(135px,.85fr) 104px 92px minmax(180px,1.25fr) 210px;gap:10px;align-items:center}
   .exp-table-head{background:#f8fafc;border-bottom:1px solid var(--line);padding:8px 10px 8px 14px;color:var(--muted);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
   .exp-row{border-bottom:1px solid var(--line);background:#fff}
   .exp-row:last-child{border-bottom:0}
@@ -198,7 +198,7 @@
   .exp-note-inline .txt{overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
   .exp-note-type{font-size:11px;font-weight:800;color:var(--accent);background:#fff;border:1px solid #d4e0f6;border-radius:999px;padding:1px 7px;white-space:nowrap;flex:none}
   .exp-note-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:5px}.exp-note-meta{font-size:11.5px;color:var(--muted)}
-  .exp-note-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:0}
+  .exp-note-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:0;align-items:center;align-content:center}.exp-cell.actions{overflow:visible}.exp-cell.actions .btn.small{flex:0 0 auto;white-space:nowrap}
   .exp-note-actions .btn.small{padding:4px 8px;font-size:12px}
   .exp-row-expanded{border-top:1px solid #eef2f7;background:#fbfdff;padding:9px 10px 10px 14px}
   .exp-note-edit{display:grid;gap:8px}
@@ -8144,17 +8144,27 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     return "<w:rPr>"+inner+"</w:rPr>";
   }
   function packageStyleFieldResultRuns(txt,templateId){
-    // The two-page lease templates use REF fields. The cached result run can reopen at the
-    // source field's smaller default size unless the visible result run gets the target field
-    // formatting. Keep the fields intact and only restyle the result runs between SEPARATE and END.
-    if(!/two-page-lease/i.test(String(templateId||""))) return txt;
+    // Word package templates use form fields and REF fields. The cached field-result runs
+    // can reopen at the source field's smaller default size unless the visible result run
+    // gets the target/paragraph formatting. Apply this to every known package field in
+    // every current/future template, while keeping the Word field structure intact.
     var targets={};
-    ["TransitCompanyName","DriverCompanyName","TractorUnitNumber","TractorYear","TractorMake","TractorPlate","TractorVin","TractorColor","LeaseStartDate","LeaseEndDate","TractorEquipCosts","LeaseNumberofMonths","LeaseBiMonthlyPay","LeaseMonthlyPay","TractorDownPay","TractorBalance","TractorBalloonPay","TrailerCostPerMonth"].forEach(function(k){ targets[k]=true; });
+    PACKAGE_FIELD_NAMES.forEach(function(k){ targets[k]=true; });
     function keepNoProofFrom(currentRPr,useRPr){
       if(/<w:noProof\b/.test(String(currentRPr||"")) && !/<w:noProof\b/.test(String(useRPr||""))){
         return String(useRPr||"<w:rPr></w:rPr>").replace(/<\/w:rPr>/,"<w:noProof/></w:rPr>");
       }
       return useRPr||"";
+    }
+    function nearestOutsideRunPr(paragraph, block){
+      var p=String(paragraph||""), b=String(block||""), idx=p.indexOf(b);
+      if(idx<0) return "";
+      var before=p.slice(0,idx), after=p.slice(idx+b.length);
+      var prev=packageLastVisualRunPr(before);
+      if(prev) return prev;
+      var next="";
+      String(after||"").replace(/<w:rPr>[\s\S]*?<\/w:rPr>/g,function(rpr){ if(!next && packageRunPrHasVisualFormatting(rpr)) next=rpr; return rpr; });
+      return next;
     }
     function styleBlock(block,paragraph){
       var name=packageFieldNameFromBlock(block);
@@ -8168,6 +8178,10 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       sepRunEnd += 6;
       var before=block.slice(0,sepRunEnd), result=block.slice(sepRunEnd,endRunStart), after=block.slice(endRunStart);
       var fieldRPr=packageBestRunPrForField(block,paragraph);
+      if(!packageRunPrHasVisualFormatting(fieldRPr)){
+        var neighbor=nearestOutsideRunPr(paragraph,block);
+        if(neighbor) fieldRPr=packageMergeRPrInner(neighbor,fieldRPr);
+      }
       result=result.replace(/(<w:r\b[^>]*>)(<w:rPr>[\s\S]*?<\/w:rPr>)?([\s\S]*?<w:t\b[^>]*>[\s\S]*?<\/w:t>[\s\S]*?)(<\/w:r>)/g,function(mm,rStart,rPr,body,rEnd){
         var useRPr=packageMergeRPrInner(fieldRPr,rPr||"");
         useRPr=keepNoProofFrom(rPr,useRPr);
