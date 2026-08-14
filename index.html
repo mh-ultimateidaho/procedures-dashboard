@@ -4211,6 +4211,7 @@
       </div>
       <button id="lookup-btn" class="btn small" title="Fleet Master info snapshot">🚚 Fleet Info</button>
       <button id="exp-btn" class="btn small" title="Expiration tracker">⏰ Expirations</button>
+      <button id="ins-btn" class="btn small" title="Insurance tracker">🛡️ Insurance</button>
       <details id="generate-menu" class="gen-menu">
         <summary title="Generate documents">📄 Generate ▾</summary>
         <div class="gen-panel" role="menu" aria-label="Generate documents">
@@ -4288,6 +4289,19 @@
       </div>
     </div>
     <div class="m-body" id="exp-body"></div>
+  </div>
+</div>
+
+<!-- Insurance modal -->
+<div id="ins-overlay" class="overlay hidden" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" style="max-width:1180px">
+    <div class="m-head">
+      <div class="t"><h2 style="margin-top:0">Insurance</h2></div>
+      <div class="m-actions">
+        <button class="icon-btn x" id="ins-close" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div class="m-body" id="ins-body"></div>
   </div>
 </div>
 
@@ -6430,6 +6444,8 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       if(popup){ closePopup(); return; }
       var eov=document.getElementById("exp-overlay");
       if(eov && !eov.classList.contains("hidden")){ closeExpirations(); return; }
+      var iov=document.getElementById("ins-overlay");
+      if(iov && !iov.classList.contains("hidden")){ closeInsurance(); return; }
       var sov=document.getElementById("settings-overlay");
       if(sov && !sov.classList.contains("hidden")){ closeSettings(); return; }
       if(!bOverlay.classList.contains("hidden")){ closeBuilder(); return; }
@@ -6577,6 +6593,9 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     document.getElementById("exp-btn").addEventListener("click", openExpirations);
     document.getElementById("exp-close").addEventListener("click", closeExpirations);
     addSafeBackdropClose(document.getElementById("exp-overlay"), closeExpirations);
+    document.getElementById("ins-btn").addEventListener("click", openInsurance);
+    document.getElementById("ins-close").addEventListener("click", closeInsurance);
+    addSafeBackdropClose(document.getElementById("ins-overlay"), closeInsurance);
     function closeGenerateMenu(){ var gm=document.getElementById("generate-menu"); if(gm) gm.open=false; }
     document.addEventListener("click", function(e){
       var gm=document.getElementById("generate-menu"); if(gm && gm.open && !gm.contains(e.target)) gm.open=false;
@@ -7098,6 +7117,17 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   var expirationImportBusy=false;
   var EXP_NOTE_TYPES=["Info","Emailed","Waiting","Follow-up","Temp / exception","Done"];
 
+  /* ----- insurance tracker ----- */
+  var insOverlay=document.getElementById("ins-overlay");
+  var insBody=document.getElementById("ins-body");
+  var insuranceState={view:"all", search:"", sort:"date", dir:"asc"};
+  var insuranceEditingKey="";
+  var INS_STAGES=["Not started","Shopping quotes","Quotes in / comparing","Bound","Docs pending"];
+  var INS_BROKERS=["Terri (HUB)","Roxie (AMP)","Bret (Mustard Seed)","OOIDA direct","Other"];
+
+  function openInsurance(){ insOverlay.classList.remove("hidden"); insOverlay.setAttribute("aria-hidden","false"); document.body.style.overflow="hidden"; renderInsurance(); }
+  function closeInsurance(){ insOverlay.classList.add("hidden"); insOverlay.setAttribute("aria-hidden","true"); document.body.style.overflow=""; insuranceEditingKey=""; }
+
   function openExpirations(){ expOverlay.classList.remove("hidden"); expOverlay.setAttribute("aria-hidden","false"); document.body.style.overflow="hidden"; renderExpirations(); }
   function closeExpirations(){ expOverlay.classList.add("hidden"); expOverlay.setAttribute("aria-hidden","true"); document.body.style.overflow=""; expirationEditingKey=""; }
   function expClean(v){ return String(v==null?"":v).trim(); }
@@ -7336,6 +7366,147 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       for(var r=1;r<vals.length;r++){ var row=vals[r]||[], noteText=expClean(row[inn]); if(!noteText) continue; var k=expLooseKey(row[ic],row[ii],row[id]), item=map[k]; if(!item){ unmatched++; continue; } var b=expBucket(item.key); if(b.active && expClean(b.active.text)){ skipped++; continue; } b.active={id:uid("expnote"), type:expInferType(noteText), text:noteText, createdAt:new Date().toISOString(), updatedAt:new Date().toISOString(), updatedBy:expAccountName(), dateISO:ix>=0?expDateISO(row[ix]):(item.dateISO||""), dateLabel:ix>=0?expPrettyDate(expDateISO(row[ix])):expPrettyDate(item.dateISO), importedFromExcel:true}; imported++; }
       flushConfig(); expirationImportBusy=false; window.alert("Imported "+imported+" old note(s)."+(skipped?" Skipped "+skipped+" item(s) that already had dashboard notes.":"")+(unmatched?" Could not match "+unmatched+" old note row(s).": "")); renderExpirations();
     }).catch(function(e){ expirationImportBusy=false; renderExpirations(); window.alert("Could not import old Excel notes: "+String(e.message||e)); });
+  }
+
+  /* ----- insurance tracker (deeper view over Authority items than Expirations gives) ----- */
+  function insLookupAuthority(name){
+    var books=S365.coverLookups && S365.coverLookups.authoritiesByName;
+    if(!books) return null;
+    var k=String(name||"").trim().toLowerCase();
+    return books[k] || null;
+  }
+  function insItems(){
+    return (S365.expirationItems||[]).filter(function(it){ return it.category==="Authority"; });
+  }
+  function insStageOf(item){
+    var n=expActiveNote(item);
+    if(n && n.stage) return n.stage;
+    if(n && expClean(n.text)) return "Shopping quotes";
+    return "Not started";
+  }
+  function insStageRank(stage){ var r={"Not started":0,"Shopping quotes":1,"Quotes in / comparing":2,"Docs pending":3,"Bound":4}; return r[stage]==null?0:r[stage]; }
+  function insSaveNote(item, fields){
+    var b=expBucket(item.key), prev=b.active||{}, now=new Date().toISOString();
+    var text=expClean(fields.text);
+    b.active={
+      id: prev.id||uid("expnote"),
+      type: expInferType(text)||prev.type||"Info",
+      text: text,
+      stage: fields.stage||"Not started",
+      brokers: Array.isArray(fields.brokers)?fields.brokers:[],
+      quoteType: fields.quoteType||"",
+      quoteAmount: expClean(fields.quoteAmount),
+      createdAt: prev.createdAt||now,
+      updatedAt: now,
+      updatedBy: expAccountName(),
+      dateISO: prev.dateISO || item.dateISO || "",
+      dateLabel: prev.dateLabel || expPrettyDate(item.dateISO)
+    };
+    insuranceEditingKey=""; flushConfig(); renderInsurance();
+  }
+  function insClearNote(item){
+    if(!window.confirm("Clear this insurance tracking note? This also clears it from Expirations, since they share the same note.")) return;
+    var b=expBucket(item.key); b.active=null; flushConfig(); renderInsurance();
+  }
+  function insStageSelect(value){
+    var sel=el("select");
+    INS_STAGES.forEach(function(s){ var o=el("option",{value:s,text:s}); if(s===(value||"Not started")) o.selected=true; sel.appendChild(o); });
+    return sel;
+  }
+  function renderInsNoteEditor(item, note){
+    note=note||{};
+    var wrap=el("div",{class:"exp-note-edit"});
+    var stageSel=insStageSelect(note.stage);
+    var brokerBoxes=[], brokerRow=el("div",{class:"exp-note-actions"});
+    INS_BROKERS.forEach(function(b){
+      var cb=el("input",{type:"checkbox"}); cb.checked=(note.brokers||[]).indexOf(b)>=0;
+      var lbl=el("label",{style:"display:inline-flex;align-items:center;gap:4px;margin-right:10px;font-size:13px;font-weight:600;color:var(--muted)"}, cb, document.createTextNode(b));
+      brokerBoxes.push({box:cb, name:b});
+      brokerRow.appendChild(lbl);
+    });
+    var quoteTypeSel=el("select"); [["","Coverage type…"],["Liability-only","Liability-only"],["Full coverage","Full coverage"],["Both requested","Both requested"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===(note.quoteType||"")) o.selected=true; quoteTypeSel.appendChild(o); });
+    var quoteAmt=el("input",{type:"text",placeholder:"Quote amount, e.g. $13,054/yr"}); quoteAmt.value=note.quoteAmount||"";
+    var ta=el("textarea",{placeholder:"Latest update — e.g. secured rate w/ OOIDA, need ID card"}); ta.value=note.text||"";
+    wrap.appendChild(coverField("Stage",stageSel));
+    wrap.appendChild(coverField("Broker(s) in play",brokerRow));
+    wrap.appendChild(coverField("Coverage type",quoteTypeSel));
+    wrap.appendChild(coverField("Quote amount",quoteAmt));
+    wrap.appendChild(coverField("Latest update",ta));
+    wrap.appendChild(el("div",{class:"exp-note-actions"},
+      el("button",{class:"btn primary small",text:"Save",onclick:function(){
+        var brokers=brokerBoxes.filter(function(x){return x.box.checked;}).map(function(x){return x.name;});
+        insSaveNote(item,{text:ta.value, stage:stageSel.value, brokers:brokers, quoteType:quoteTypeSel.value, quoteAmount:quoteAmt.value});
+      }}),
+      el("button",{class:"btn small",text:"Cancel",onclick:function(){ insuranceEditingKey=""; renderInsurance(); }})
+    ));
+    return wrap;
+  }
+  function renderInsCard(item){
+    var info=insLookupAuthority(item.item)||{}, note=expActiveNote(item), st=expStatusFor(item.dateISO), stage=insStageOf(item);
+    var cls="exp-row "+(stage==="Bound"?"ok":st.id);
+    var row=el("div",{class:cls});
+    var main=el("div",{class:"exp-row-main"});
+    main.appendChild(el("div",{class:"exp-cell item"}, el("div",{class:"exp-title",text:item.item}), item.meta&&item.meta.dot?el("div",{class:"exp-sub",text:"DOT "+item.meta.dot}):null));
+    main.appendChild(el("div",{class:"exp-cell detail exp-muted"}, el("div",{text:info.insurerAgent||"No broker on file"}), info.policyType?el("div",{class:"exp-sub",text:info.policyType}):null));
+    var dateText=expPrettyDate(item.dateISO), daysText=st.days===null?"":(st.days<0?(Math.abs(st.days)+" days ago"):(st.days+" days"));
+    main.appendChild(el("div",{class:"exp-cell exp-date"}, el("div",{text:dateText}), daysText?el("div",{class:"exp-muted",text:daysText}):null));
+    main.appendChild(el("div",{class:"exp-cell status"}, el("span",{class:"exp-status "+(stage==="Bound"?"ok":st.id),text:stage})));
+    var noteCell=el("div",{class:"exp-cell note"});
+    if(note){
+      if(note.brokers && note.brokers.length) noteCell.appendChild(el("div",{class:"exp-sub",text:note.brokers.join(", ")}));
+      if(note.quoteType || note.quoteAmount) noteCell.appendChild(el("div",{class:"exp-sub",text:[note.quoteType,note.quoteAmount].filter(Boolean).join(" — ")}));
+      noteCell.appendChild(el("div",{class:"txt",text:note.text||""}));
+    } else { noteCell.appendChild(el("div",{class:"exp-muted",text:"—"})); }
+    main.appendChild(noteCell);
+    var actions=[];
+    actions.push(el("button",{class:"btn small",text:note?"Edit":"Start tracking",onclick:function(){ insuranceEditingKey=item.key; renderInsurance(); }}));
+    if(note) actions.push(el("button",{class:"btn danger small",text:"Clear",onclick:function(){ insClearNote(item); }}));
+    main.appendChild(el("div",{class:"exp-cell actions exp-note-actions"}, actions));
+    row.appendChild(main);
+    if(insuranceEditingKey===item.key){ row.appendChild(el("div",{class:"exp-row-expanded"}, renderInsNoteEditor(item,note||null))); }
+    return row;
+  }
+  function insMatchesView(item,view){
+    var stage=insStageOf(item);
+    if(view==="all") return true;
+    if(view==="open") return stage!=="Bound";
+    return stage===view;
+  }
+  function insFilteredItems(){
+    var q=expNorm(insuranceState.search||"");
+    var items=insItems().filter(function(it){
+      if(!insMatchesView(it, insuranceState.view||"all")) return false;
+      if(q){ var n=expActiveNote(it)||{}, info=insLookupAuthority(it.item)||{}; var hay=expNorm([it.item, n.text, info.insurerAgent, (n.brokers||[]).join(" ")].join(" ")); if(hay.indexOf(q)<0) return false; }
+      return true;
+    });
+    var dir=(insuranceState.dir==="desc")?-1:1, sort=insuranceState.sort||"date";
+    items.sort(function(a,b){
+      if(sort==="stage"){ var d=(insStageRank(insStageOf(a))-insStageRank(insStageOf(b)))*dir; if(d) return d; }
+      else if(sort==="name"){ var c=String(a.item).localeCompare(String(b.item), undefined, {numeric:true, sensitivity:"base"})*dir; if(c) return c; }
+      else { var da=expStatusFor(a.dateISO).days, db=expStatusFor(b.dateISO).days; da=da===null?999999:da; db=db===null?999999:db; if(da!==db) return (da-db)*dir; }
+      return String(a.item).localeCompare(String(b.item), undefined, {numeric:true, sensitivity:"base"});
+    });
+    return items;
+  }
+  function renderInsurance(){
+    insBody.textContent="";
+    if(!hasFleetLookupData()) insBody.appendChild(el("div",{class:"warn-note",text:"Fleet Master data is not loaded yet. Sign in or wait for remembered data/live refresh."}));
+    else insBody.appendChild(el("p",{class:"note",text:"One row per authority, pulled from the Authorities tab. Stage, broker(s), and quote info live here — shares its underlying note with Expirations, so clearing or editing here updates there too."}));
+    var toolbar=el("div",{class:"exp-toolbar"});
+    var view=el("select"); [["all","All authorities"],["open","Not yet bound"]].concat(INS_STAGES.map(function(s){return [s,s];})).forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===insuranceState.view) o.selected=true; view.appendChild(o); }); view.addEventListener("change",function(){ insuranceState.view=view.value; renderInsurance(); });
+    var search=el("input",{type:"search",placeholder:"Search authority, broker, note…"}); search.value=insuranceState.search||""; search.addEventListener("input",function(){ insuranceState.search=search.value; renderInsurance(); });
+    var sort=el("select"); [["date","Insurance exp date"],["name","Authority name"],["stage","Stage"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===(insuranceState.sort||"date")) o.selected=true; sort.appendChild(o); }); sort.addEventListener("change",function(){ insuranceState.sort=sort.value; renderInsurance(); });
+    var dir=el("select"); [["asc","Oldest / A-Z"],["desc","Newest / Z-A"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===(insuranceState.dir||"asc")) o.selected=true; dir.appendChild(o); }); dir.addEventListener("change",function(){ insuranceState.dir=dir.value; renderInsurance(); });
+    toolbar.appendChild(coverField("Stage",view)); toolbar.appendChild(coverField("Sort by",sort)); toolbar.appendChild(coverField("Direction",dir)); toolbar.appendChild(coverField("Search",search)); insBody.appendChild(toolbar);
+    var all=insItems(), stageCounts={};
+    INS_STAGES.forEach(function(s){ stageCounts[s]=0; }); all.forEach(function(it){ var s=insStageOf(it); stageCounts[s]=(stageCounts[s]||0)+1; });
+    var pills=[el("span",{class:"exp-pill",text:all.length+" total"})];
+    INS_STAGES.forEach(function(s){ if(stageCounts[s]) pills.push(el("span",{class:"exp-pill",text:stageCounts[s]+" "+s.toLowerCase()})); });
+    insBody.appendChild(el("div",{class:"exp-summary"}, pills));
+    var filtered=insFilteredItems(), list=el("div",{class:"exp-list"});
+    if(!filtered.length) list.appendChild(el("div",{class:"exp-empty",text:"No authorities match this view."}));
+    else { list.appendChild(renderExpTableHead()); filtered.forEach(function(it){ list.appendChild(renderInsCard(it)); }); }
+    insBody.appendChild(list);
   }
 
   /* ----- cover page generator ----- */
