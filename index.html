@@ -205,6 +205,9 @@
   .exp-note-actions .btn.small{padding:4px 8px;font-size:12px}
   .exp-row-expanded{border-top:1px solid #eef2f7;background:#fbfdff;padding:9px 10px 10px 14px}
   .exp-note-edit{display:grid;gap:8px}
+  .ins-quote-row{display:grid;grid-template-columns:1.4fr 1.4fr .8fr 1fr auto;gap:6px;margin-bottom:6px;align-items:center}
+  .ins-quote-row input,.ins-quote-row select{width:100%}
+  .ins-log-existing{display:grid;gap:2px;max-height:140px;overflow:auto;padding:6px;background:var(--bg-soft,#f7f7f7);border-radius:6px}
   .exp-note-edit textarea{width:100%;min-height:70px;border:1px solid var(--line-strong);border-radius:8px;padding:8px;resize:vertical}.exp-note-edit select{border:1px solid var(--line-strong);border-radius:8px;padding:7px 8px;background:#fff}
   .exp-review-note{border:1px solid #ddd6fe;background:#faf5ff;color:#4c1d95;border-radius:9px;padding:7px 9px;font-size:12.5px;font-weight:700}
   .exp-archived-note{border:1px solid #e2e8f0;background:#f8fafc;color:var(--muted);border-radius:9px;padding:8px 9px;margin-top:7px;font-size:12.5px}
@@ -7372,6 +7375,9 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   }
 
   /* ----- insurance tracker (deeper view over Authority items than Expirations gives) ----- */
+  var INS_QUOTE_TYPES=["FULL","LIAB","FULL?","LIAB?"];
+  var insDraftQuotes=[]; // transient, only while an editor is open
+
   function insLookupAuthority(name){
     var books=S365.coverLookups && S365.coverLookups.authoritiesByName;
     if(!books) return null;
@@ -7384,28 +7390,41 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   function insStageOf(item){
     var n=expActiveNote(item);
     if(n && n.stage) return n.stage;
-    if(n && expClean(n.text)) return "Shopping quotes";
+    if(n && (expClean(n.text) || (n.log&&n.log.length) || (n.quotes&&n.quotes.length))) return "Shopping quotes";
     return "Not started";
   }
   function insStageRank(stage){ var r={"Not started":0,"Shopping quotes":1,"Quotes in / comparing":2,"Docs pending":3,"Bound":4}; return r[stage]==null?0:r[stage]; }
+  function insQuotesOf(note){
+    if(!note) return [];
+    if(Array.isArray(note.quotes)) return note.quotes;
+    // legacy single-quote migration, read-only display only
+    if(note.quoteType||note.quoteAmount) return [{id:"legacy",broker:(note.brokers||[]).join("/"),carrier:"",type:note.quoteType||"",amount:note.quoteAmount||""}];
+    return [];
+  }
+  function insLogOf(note){
+    if(!note) return [];
+    if(Array.isArray(note.log)) return note.log;
+    if(expClean(note.text)) return [{id:"legacy",date:note.updatedAt||note.createdAt||"",text:note.text}];
+    return [];
+  }
   function insSaveNote(item, fields){
     var b=expBucket(item.key), prev=b.active||{}, now=new Date().toISOString();
-    var text=expClean(fields.text);
+    var prevLog=insLogOf(prev).slice();
+    var newEntryText=expClean(fields.newLogEntry);
+    if(newEntryText) prevLog.push({id:uid("inslog"), date:now, text:newEntryText, by:expAccountName()});
     b.active={
       id: prev.id||uid("expnote"),
-      type: expInferType(text)||prev.type||"Info",
-      text: text,
+      type: prev.type||"Info",
       stage: fields.stage||"Not started",
-      brokers: Array.isArray(fields.brokers)?fields.brokers:[],
-      quoteType: fields.quoteType||"",
-      quoteAmount: expClean(fields.quoteAmount),
+      quotes: fields.quotes||[],
+      log: prevLog,
       createdAt: prev.createdAt||now,
       updatedAt: now,
       updatedBy: expAccountName(),
       dateISO: prev.dateISO || item.dateISO || "",
       dateLabel: prev.dateLabel || expPrettyDate(item.dateISO)
     };
-    insuranceEditingKey=""; flushConfig(); renderInsurance();
+    insuranceEditingKey=""; insDraftQuotes=[]; flushConfig(); renderInsurance();
   }
   function insClearNote(item){
     if(!window.confirm("Clear this insurance tracking note? This also clears it from Expirations, since they share the same note.")) return;
@@ -7416,31 +7435,60 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     INS_STAGES.forEach(function(s){ var o=el("option",{value:s,text:s}); if(s===(value||"Not started")) o.selected=true; sel.appendChild(o); });
     return sel;
   }
+  function insQuoteTypeSelect(value){
+    var sel=el("select");
+    [["","type?"]].concat(INS_QUOTE_TYPES.map(function(t){return [t,t];})).forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===(value||"")) o.selected=true; sel.appendChild(o); });
+    return sel;
+  }
+  function renderQuoteRow(q, onRemove){
+    var brokerIn=el("input",{type:"text",placeholder:"Broker (Terri, Roxie, Bret, OOIDA...)",list:"ins-broker-list"}); brokerIn.value=q.broker||"";
+    var carrierIn=el("input",{type:"text",placeholder:"Carrier (Progressive, Lancer...)"}); carrierIn.value=q.carrier||"";
+    var typeSel=insQuoteTypeSelect(q.type);
+    var amtIn=el("input",{type:"text",placeholder:"$ amount"}); amtIn.value=q.amount||"";
+    brokerIn.addEventListener("input",function(){ q.broker=brokerIn.value; });
+    carrierIn.addEventListener("input",function(){ q.carrier=carrierIn.value; });
+    typeSel.addEventListener("change",function(){ q.type=typeSel.value; });
+    amtIn.addEventListener("input",function(){ q.amount=amtIn.value; });
+    var rmBtn=el("button",{class:"btn danger small",text:"\u2715",title:"Remove this quote",onclick:onRemove});
+    return el("div",{class:"ins-quote-row"}, brokerIn, carrierIn, typeSel, amtIn, rmBtn);
+  }
   function renderInsNoteEditor(item, note){
     note=note||{};
     var wrap=el("div",{class:"exp-note-edit"});
     var stageSel=insStageSelect(note.stage);
-    var brokerBoxes=[], brokerRow=el("div",{class:"exp-note-actions"});
-    INS_BROKERS.forEach(function(b){
-      var cb=el("input",{type:"checkbox"}); cb.checked=(note.brokers||[]).indexOf(b)>=0;
-      var lbl=el("label",{style:"display:inline-flex;align-items:center;gap:4px;margin-right:10px;font-size:13px;font-weight:600;color:var(--muted)"}, cb, document.createTextNode(b));
-      brokerBoxes.push({box:cb, name:b});
-      brokerRow.appendChild(lbl);
-    });
-    var quoteTypeSel=el("select"); [["","Coverage type…"],["Liability-only","Liability-only"],["Full coverage","Full coverage"],["Both requested","Both requested"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===(note.quoteType||"")) o.selected=true; quoteTypeSel.appendChild(o); });
-    var quoteAmt=el("input",{type:"text",placeholder:"Quote amount, e.g. $13,054/yr"}); quoteAmt.value=note.quoteAmount||"";
-    var ta=el("textarea",{placeholder:"Latest update — e.g. secured rate w/ OOIDA, need ID card"}); ta.value=note.text||"";
     wrap.appendChild(coverField("Stage",stageSel));
-    wrap.appendChild(coverField("Broker(s) in play",brokerRow));
-    wrap.appendChild(coverField("Coverage type",quoteTypeSel));
-    wrap.appendChild(coverField("Quote amount",quoteAmt));
-    wrap.appendChild(coverField("Latest update",ta));
+
+    // quotes editor
+    insDraftQuotes=clone(insQuotesOf(note));
+    var quotesWrap=el("div",{class:"ins-quotes-edit"});
+    function redrawQuotes(){
+      quotesWrap.textContent="";
+      insDraftQuotes.forEach(function(q,idx){
+        quotesWrap.appendChild(renderQuoteRow(q, function(){ insDraftQuotes.splice(idx,1); redrawQuotes(); }));
+      });
+    }
+    redrawQuotes();
+    var addQuoteBtn=el("button",{class:"btn small",text:"+ Add quote",onclick:function(){ insDraftQuotes.push({id:uid("insq"),broker:"",carrier:"",type:"",amount:""}); redrawQuotes(); }});
+    wrap.appendChild(coverField("Quotes received",el("div",{}, quotesWrap, addQuoteBtn)));
+
+    // existing dated log, read-only
+    var existingLog=insLogOf(note);
+    if(existingLog.length){
+      var logList=el("div",{class:"ins-log-existing"});
+      existingLog.forEach(function(en){
+        logList.appendChild(el("div",{class:"exp-sub",text:(en.date?expPrettyDate(en.date.slice(0,10))+": ":"")+en.text}));
+      });
+      wrap.appendChild(coverField("Existing notes (kept as history)",logList));
+    }
+    var ta=el("textarea",{placeholder:"Add a new dated note — e.g. \u201cemailed Terri for an update\u201d"});
+    wrap.appendChild(coverField("Add a new note",ta));
+
     wrap.appendChild(el("div",{class:"exp-note-actions"},
       el("button",{class:"btn primary small",text:"Save",onclick:function(){
-        var brokers=brokerBoxes.filter(function(x){return x.box.checked;}).map(function(x){return x.name;});
-        insSaveNote(item,{text:ta.value, stage:stageSel.value, brokers:brokers, quoteType:quoteTypeSel.value, quoteAmount:quoteAmt.value});
+        var cleanQuotes=insDraftQuotes.filter(function(q){ return q.broker||q.carrier||q.amount; });
+        insSaveNote(item,{stage:stageSel.value, quotes:cleanQuotes, newLogEntry:ta.value});
       }}),
-      el("button",{class:"btn small",text:"Cancel",onclick:function(){ insuranceEditingKey=""; renderInsurance(); }})
+      el("button",{class:"btn small",text:"Cancel",onclick:function(){ insuranceEditingKey=""; insDraftQuotes=[]; renderInsurance(); }})
     ));
     return wrap;
   }
@@ -7455,11 +7503,20 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     main.appendChild(el("div",{class:"exp-cell exp-date"}, el("div",{text:dateText}), daysText?el("div",{class:"exp-muted",text:daysText}):null));
     main.appendChild(el("div",{class:"exp-cell status"}, el("span",{class:"exp-status "+(stage==="Bound"?"ok":st.id),text:stage})));
     var noteCell=el("div",{class:"exp-cell note"});
-    if(note){
-      if(note.brokers && note.brokers.length) noteCell.appendChild(el("div",{class:"exp-sub",text:note.brokers.join(", ")}));
-      if(note.quoteType || note.quoteAmount) noteCell.appendChild(el("div",{class:"exp-sub",text:[note.quoteType,note.quoteAmount].filter(Boolean).join(" — ")}));
-      noteCell.appendChild(el("div",{class:"txt",text:note.text||""}));
-    } else { noteCell.appendChild(el("div",{class:"exp-muted",text:"—"})); }
+    var quotes=insQuotesOf(note), log=insLogOf(note);
+    if(quotes.length){
+      quotes.forEach(function(q){
+        var label=[q.broker,q.carrier].filter(Boolean).join(" \u2014 ");
+        var val=[q.type,q.amount].filter(Boolean).join(" ");
+        noteCell.appendChild(el("div",{class:"exp-sub"}, el("b",{text:label?label+": ":""}), document.createTextNode(val)));
+      });
+    }
+    if(log.length){
+      log.forEach(function(en){
+        noteCell.appendChild(el("div",{class:"txt",text:(en.date?expPrettyDate(en.date.slice(0,10))+": ":"")+en.text}));
+      });
+    }
+    if(!quotes.length && !log.length) noteCell.appendChild(el("div",{class:"exp-muted",text:"—"}));
     main.appendChild(noteCell);
     var actions=[];
     actions.push(el("button",{class:"btn small",text:note?"Edit":"Start tracking",onclick:function(){ insuranceEditingKey=item.key; renderInsurance(); }}));
@@ -7479,7 +7536,13 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     var q=expNorm(insuranceState.search||"");
     var items=insItems().filter(function(it){
       if(!insMatchesView(it, insuranceState.view||"all")) return false;
-      if(q){ var n=expActiveNote(it)||{}, info=insLookupAuthority(it.item)||{}; var hay=expNorm([it.item, n.text, info.insurerAgent, (n.brokers||[]).join(" ")].join(" ")); if(hay.indexOf(q)<0) return false; }
+      if(q){
+        var n=expActiveNote(it)||{}, info=insLookupAuthority(it.item)||{};
+        var quoteText=insQuotesOf(n).map(function(x){return [x.broker,x.carrier,x.type,x.amount].join(" ");}).join(" ");
+        var logText=insLogOf(n).map(function(x){return x.text;}).join(" ");
+        var hay=expNorm([it.item, quoteText, logText, info.insurerAgent].join(" "));
+        if(hay.indexOf(q)<0) return false;
+      }
       return true;
     });
     var dir=(insuranceState.dir==="desc")?-1:1, sort=insuranceState.sort||"date";
@@ -7491,16 +7554,65 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     });
     return items;
   }
+  function insStatusFill(stage){
+    var s=String(stage||"").toLowerCase();
+    if(s==="bound") return "E8F5E9";
+    if(s.indexOf("urgent")>=0) return "FDECEA";
+    if(s.indexOf("stalled")>=0) return "FDECEA";
+    if(s.indexOf("shopping")>=0) return "FFF8E1";
+    return "F0F0F0";
+  }
+  function insEsc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+  function buildInsuranceRecapHtml(){
+    var items=insItems().slice().sort(function(a,b){ return String(a.item).localeCompare(String(b.item), undefined, {numeric:true, sensitivity:"base"}); });
+    var rows=items.map(function(it){
+      var note=expActiveNote(it), stage=insStageOf(it), quotes=insQuotesOf(note), log=insLogOf(note);
+      var quotesHtml=quotes.map(function(q){
+        var label=[q.broker,q.carrier].filter(Boolean).join(" \u2014 ");
+        var val=[q.type,q.amount].filter(Boolean).join(" ");
+        return "<div>"+(label?"<b>"+insEsc(label)+":</b> ":"")+insEsc(val)+"</div>";
+      }).join("") || "<div>None yet</div>";
+      var logHtml=log.map(function(en){
+        var d=en.date?expPrettyDate(en.date.slice(0,10))+": ":"";
+        return "<div>"+insEsc(d)+insEsc(en.text)+"</div>";
+      }).join("") || "<div>\u2014</div>";
+      var fill=insStatusFill(stage);
+      return "<tr>"+
+        "<td style='padding:6px;border:1px solid #ccc;font-weight:bold;vertical-align:top'>"+insEsc(it.item)+"</td>"+
+        "<td style='padding:6px;border:1px solid #ccc;font-weight:bold;background:#"+fill+";vertical-align:top'>"+insEsc(stage)+"</td>"+
+        "<td style='padding:6px;border:1px solid #ccc;vertical-align:top'>"+quotesHtml+"</td>"+
+        "<td style='padding:6px;border:1px solid #ccc;vertical-align:top'>"+logHtml+"</td>"+
+        "</tr>";
+    }).join("");
+    var today=new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"});
+    return "<html><head><meta charset='utf-8'></head><body style=\"font-family:Calibri,Arial,sans-serif\">"+
+      "<h1 style='font-size:22px'>Insurance Recap \u2014 "+insEsc(today)+"</h1>"+
+      "<p style='color:#555;font-style:italic'>Exported from the Fleet Dashboard Insurance tracker.</p>"+
+      "<table style='border-collapse:collapse;width:100%;font-size:13px'>"+
+      "<tr>"+["Account","Status","Quotes Received (Broker \u2014 Carrier)","Key Note"].map(function(h){ return "<th style='padding:6px;border:1px solid #ccc;background:#1F4E79;color:#fff;text-align:left'>"+h+"</th>"; }).join("")+"</tr>"+
+      rows+"</table></body></html>";
+  }
+  function exportInsuranceRecap(){
+    var html=buildInsuranceRecapHtml();
+    var blob=new Blob(["\ufeff", html], { type: "application/msword" });
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement("a");
+    a.href=url; a.download="Insurance-Recap-"+(new Date().toISOString().slice(0,10))+".doc";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+  }
   function renderInsurance(){
     insBody.textContent="";
     if(!hasFleetLookupData()) insBody.appendChild(el("div",{class:"warn-note",text:"Fleet Master data is not loaded yet. Sign in or wait for remembered data/live refresh."}));
-    else insBody.appendChild(el("p",{class:"note",text:"One row per authority, pulled from the Authorities tab. Stage, broker(s), and quote info live here — shares its underlying note with Expirations, so clearing or editing here updates there too."}));
+    else insBody.appendChild(el("p",{class:"note",text:"One row per authority, pulled from the Authorities tab. Stage, quotes, and dated notes live here — shares its underlying record with Expirations, so clearing or editing here updates there too."}));
+    var dl=el("datalist",{id:"ins-broker-list"}); INS_BROKERS.forEach(function(b){ dl.appendChild(el("option",{value:b})); }); insBody.appendChild(dl);
     var toolbar=el("div",{class:"exp-toolbar"});
     var view=el("select"); [["all","All authorities"],["open","Not yet bound"]].concat(INS_STAGES.map(function(s){return [s,s];})).forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===insuranceState.view) o.selected=true; view.appendChild(o); }); view.addEventListener("change",function(){ insuranceState.view=view.value; renderInsurance(); });
     var search=el("input",{type:"search",placeholder:"Search authority, broker, note…"}); search.value=insuranceState.search||""; search.addEventListener("input",function(){ insuranceState.search=search.value; renderInsurance(); });
     var sort=el("select"); [["date","Insurance exp date"],["name","Authority name"],["stage","Stage"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===(insuranceState.sort||"date")) o.selected=true; sort.appendChild(o); }); sort.addEventListener("change",function(){ insuranceState.sort=sort.value; renderInsurance(); });
     var dir=el("select"); [["asc","Oldest / A-Z"],["desc","Newest / Z-A"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===(insuranceState.dir||"asc")) o.selected=true; dir.appendChild(o); }); dir.addEventListener("change",function(){ insuranceState.dir=dir.value; renderInsurance(); });
-    toolbar.appendChild(coverField("Stage",view)); toolbar.appendChild(coverField("Sort by",sort)); toolbar.appendChild(coverField("Direction",dir)); toolbar.appendChild(coverField("Search",search)); insBody.appendChild(toolbar);
+    var exportBtn=el("button",{class:"btn small",text:"\u2b07 Export Recap",onclick:exportInsuranceRecap});
+    toolbar.appendChild(coverField("Stage",view)); toolbar.appendChild(coverField("Sort by",sort)); toolbar.appendChild(coverField("Direction",dir)); toolbar.appendChild(coverField("Search",search)); toolbar.appendChild(coverField("\u00A0",exportBtn)); insBody.appendChild(toolbar);
     var all=insItems(), stageCounts={};
     INS_STAGES.forEach(function(s){ stageCounts[s]=0; }); all.forEach(function(it){ var s=insStageOf(it); stageCounts[s]=(stageCounts[s]||0)+1; });
     var pills=[el("span",{class:"exp-pill",text:all.length+" total"})];
