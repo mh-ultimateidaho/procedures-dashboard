@@ -7441,7 +7441,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   function expMatchesView(it,view){
     var st=expStatusFor(it.dateISO), n=expActiveNote(it), rev=expNeedsReview(it), archived=expArchivedNotes(it).length;
     if(view==="all") return true;
-    if(view==="attention") return rev || st.id==="expired" || st.id==="expiring" || st.id==="due" || st.id==="missing";
+    if(view==="attention") return rev || st.id==="expired" || st.id==="expiring" || st.id==="due" || st.id==="upcoming" || st.id==="missing";
     if(view==="expired") return st.id==="expired";
     if(view==="expiring") return st.id==="expiring";
     if(view==="due") return st.id==="due";
