@@ -214,7 +214,7 @@
   .ins-editor .pkg-grid{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
   .ins-quote-box{border:1px solid var(--line);border-radius:12px;background:#fff;padding:12px}
   .ins-quote-box h3{margin:0 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-  .ins-quote-head,.ins-quote-row{display:grid;grid-template-columns:minmax(120px,.85fr) minmax(145px,1fr) 94px minmax(120px,.8fr) minmax(180px,1.25fr) auto;gap:7px;align-items:center}
+  .ins-quote-head,.ins-quote-row{display:grid;grid-template-columns:minmax(120px,.85fr) minmax(145px,1fr) 120px minmax(110px,.7fr) minmax(190px,1.3fr) auto;gap:7px;align-items:center}
   .ins-quote-head{font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);padding:0 4px 5px}
   .ins-quote-row{margin-bottom:7px}
   .ins-quote-row input,.ins-quote-row select,.ins-note-tools input{width:100%;border:1px solid var(--line-strong);border-radius:8px;padding:7px 8px;background:#fff;font-size:13px}
@@ -7666,22 +7666,70 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     if(n && (expClean(n.text) || expClean(n.quotesText) || expClean(n.keyNote) || (n.log&&n.log.length) || (n.quotes&&n.quotes.length))) return "Shopping Quotes";
     return "Not started";
   }
+  function insQuoteOutcomeWords(){ return ["declined","pending","in progress","not eligible","bound","blocked","unable to quote","submitted","no quote","no quotes back yet"]; }
+  function insNormalizeQuoteType(v){
+    var raw=expClean(v); if(!raw) return "";
+    var n=expNorm(raw);
+    if(n==="liab" || n==="liability" || n==="liability only") return "LIAB";
+    if(n==="full" || n==="full coverage") return "FULL";
+    if(n==="liab?") return "LIAB?";
+    if(n==="full?") return "FULL?";
+    if(n==="declined") return "Declined";
+    if(n==="pending") return "Pending";
+    if(n==="in progress" || n==="progress") return "In progress";
+    if(n==="not eligible" || n==="ineligible") return "Not eligible";
+    if(n==="bound") return "Bound";
+    if(n==="blocked") return "Blocked";
+    if(n==="unable to quote") return "Unable to quote";
+    if(n==="submitted") return "Submitted";
+    return raw;
+  }
+  function insLooksLikeOutcome(v){
+    var n=expNorm(v);
+    return insQuoteOutcomeWords().some(function(w){ return n===expNorm(w) || n.indexOf(expNorm(w))===0; });
+  }
+  function insFormatMoney(v){
+    var raw=expClean(v); if(!raw) return "";
+    if(insLooksLikeOutcome(raw)) return raw;
+    var approx=/^~/.test(raw) || /\bapprox\b|\babout\b/i.test(raw);
+    var plusParts=raw.split(/\s*\+\s*/);
+    function fmtOne(part){
+      var x=expClean(part).replace(/^(approx\.?|about)\s+/i,"");
+      var m=x.match(/^~?\$?\s*([0-9][0-9,]*)(?:\.([0-9]{1,2}))?\s*([kK])?$/);
+      if(!m) return part;
+      var num=Number(m[1].replace(/,/g,""));
+      if(!isFinite(num)) return part;
+      if(m[3]) num*=1000;
+      if(m[2]) num+=Number("0."+m[2]);
+      var opts={minimumFractionDigits:m[2]?2:0, maximumFractionDigits:m[2]?2:0};
+      return "$"+num.toLocaleString(undefined,opts);
+    }
+    var out=plusParts.map(fmtOne).join(" + ");
+    return approx && out && out[0]!=="~" ? "~"+out : out;
+  }
+  function insExtractMoney(rest){
+    var m=String(rest||"").match(/~?\$?\s*[0-9][0-9,]*(?:\.\d{1,2})?\s*[kK]?(?:\s*\+\s*\$?\s*[0-9][0-9,]*(?:\.\d{1,2})?\s*[kK]?)*?/);
+    if(!m) return {amount:"", rest:rest};
+    return {amount:insFormatMoney(m[0]), rest:expClean(String(rest||"").replace(m[0],""))};
+  }
   function insParseQuoteLines(text){
     return expClean(text).split(/\n+/).map(function(line){ return expClean(line); }).filter(Boolean).map(function(line){
       var broker="", carrier="", rest=line, type="", amount="", extra="";
       var m=line.match(/^(.+?)\s+[—-]\s+([^:]+):\s*(.*)$/);
       if(m){ broker=expClean(m[1]); carrier=expClean(m[2]); rest=expClean(m[3]); }
       else { var m2=line.match(/^([^:]+):\s*(.*)$/); if(m2){ carrier=expClean(m2[1]); rest=expClean(m2[2]); } }
-      var tm=rest.match(/\b(FULL\??|LIAB\??)\b/i); if(tm){ type=tm[1].toUpperCase(); rest=expClean(rest.replace(tm[0],"")); }
-      var am=rest.match(/(?:~?\$[0-9,]+(?:\.\d{2})?(?:\s*\+\s*\$?[0-9,]+(?:\.\d{2})?)?|declined|not eligible|in progress|pending|unable to quote|blocked[^,]*)/i);
-      if(am){ amount=expClean(am[0]); rest=expClean(rest.replace(am[0],"")); }
+      var tm=rest.match(/\b(FULL\??|LIAB\??|Declined|Pending|In progress|Not eligible|Bound|Blocked|Unable to quote|Submitted)\b/i);
+      if(tm){ type=insNormalizeQuoteType(tm[1]); rest=expClean(rest.replace(tm[0],"")); }
+      var money=insExtractMoney(rest); amount=money.amount; rest=money.rest;
+      if(!type && insLooksLikeOutcome(rest)){ type=insNormalizeQuoteType(rest); rest=""; }
       extra=expClean(rest.replace(/^[,:;\-–—]+/,""));
       return {id:uid("insq"),broker:broker,carrier:carrier,type:type,amount:amount,note:extra,line:line};
     });
   }
   function insQuoteLineFromObj(q){
     q=q||{};
-    var broker=expClean(q.broker), carrier=expClean(q.carrier), type=expClean(q.type), amount=expClean(q.amount), note=expClean(q.note);
+    var broker=expClean(q.broker), carrier=expClean(q.carrier), type=insNormalizeQuoteType(q.type), amount=insFormatMoney(q.amount), note=expClean(q.note);
+    if(!type && insLooksLikeOutcome(amount)){ type=insNormalizeQuoteType(amount); amount=""; }
     var label=[broker,carrier].filter(Boolean).join(" — ");
     var bits=[type,amount,note].filter(Boolean).join(" ");
     return expClean((label?(label+": "):"")+bits);
@@ -7750,8 +7798,8 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     return sel;
   }
   function insCoverageSelect(value){
-    var sel=el("select"), vals=["","LIAB","FULL","LIAB?","FULL?","Declined","Pending","In progress","Not eligible","Bound"];
-    var val=expClean(value);
+    var sel=el("select"), vals=["","LIAB","FULL","LIAB?","FULL?","Declined","Pending","In progress","Not eligible","Bound","Blocked","Unable to quote","Submitted"];
+    var val=insNormalizeQuoteType(value);
     vals.concat(val && vals.indexOf(val)<0?[val]:[]).forEach(function(v){ var o=el("option",{value:v,text:v||"—"}); if(v===val) o.selected=true; sel.appendChild(o); });
     return sel;
   }
@@ -7760,9 +7808,14 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     var row=el("div",{class:"ins-quote-row"});
     var broker=el("input",{type:"text",placeholder:"Terri / Bret / Direct"}); broker.value=expClean(q.broker); broker.dataset.field="broker";
     var carrier=el("input",{type:"text",placeholder:"Progressive / Lancer"}); carrier.value=expClean(q.carrier); carrier.dataset.field="carrier";
-    var cov=insCoverageSelect(q.type); cov.dataset.field="type";
-    var amount=el("input",{type:"text",placeholder:"$13,054 / declined"}); amount.value=expClean(q.amount); amount.dataset.field="amount";
-    var note=el("input",{type:"text",placeholder:"needs revision / blocked / + $300"}); note.value=expClean(q.note); note.dataset.field="note";
+    var cov=insCoverageSelect(q.type || (insLooksLikeOutcome(q.amount)?q.amount:"")); cov.dataset.field="type";
+    var amount=el("input",{type:"text",inputmode:"decimal",placeholder:"$13,054"}); amount.value=insLooksLikeOutcome(q.amount)?"":insFormatMoney(q.amount); amount.dataset.field="amount";
+    amount.addEventListener("blur",function(){
+      var v=expClean(amount.value);
+      if(insLooksLikeOutcome(v)){ cov.value=insNormalizeQuoteType(v); amount.value=""; }
+      else amount.value=insFormatMoney(v);
+    });
+    var note=el("input",{type:"text",placeholder:"+ $300 / needs revision / blocked by broker"}); note.value=expClean(q.note); note.dataset.field="note";
     row.appendChild(broker); row.appendChild(carrier); row.appendChild(cov); row.appendChild(amount); row.appendChild(note);
     row.appendChild(el("button",{class:"btn danger small",type:"button",text:"Remove",onclick:function(){ row.remove(); }}));
     box.appendChild(row);
@@ -7772,6 +7825,9 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     (box?box.querySelectorAll(".ins-quote-row"):[]).forEach(function(row){
       var q={id:row.dataset.id||uid("insq")};
       row.querySelectorAll("[data-field]").forEach(function(inp){ q[inp.dataset.field]=expClean(inp.value); });
+      if(insLooksLikeOutcome(q.amount) && !q.type){ q.type=insNormalizeQuoteType(q.amount); q.amount=""; }
+      q.type=insNormalizeQuoteType(q.type);
+      q.amount=insFormatMoney(q.amount);
       if(insQuoteLineFromObj(q)) rows.push(q);
     });
     return rows;
@@ -7786,8 +7842,8 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     var acctNoteIn=el("input",{type:"text",placeholder:"Optional account line, e.g. Exp. 9/22/26 or NEW POLICY"}); acctNoteIn.value=insAccountNoteOf(item,note).replace(/^No insurance exp date$/,"") || "";
     wrap.appendChild(el("div",{class:"pkg-grid"}, coverField("Status",stageSel), coverField("Status detail",statusNoteIn), coverField("Account note",acctNoteIn)));
 
-    var qPanel=el("div",{class:"ins-quote-box"}, el("h3",{text:"Quotes received"}), el("p",{class:"note",text:"Add one row per quote. The table view/export will still display them as Broker — Carrier: Coverage $/status."}));
-    var qHead=el("div",{class:"ins-quote-head"}, el("div",{text:"Broker"}), el("div",{text:"Insurance company"}), el("div",{text:"Coverage"}), el("div",{text:"$/status"}), el("div",{text:"Quote note"}), el("div",{text:""}));
+    var qPanel=el("div",{class:"ins-quote-box"}, el("h3",{text:"Quotes received"}), el("p",{class:"note",text:"Add one row per quote. Use Coverage / outcome for LIAB, FULL, declined, pending, etc.; the $ box is only for money and auto-formats."}));
+    var qHead=el("div",{class:"ins-quote-head"}, el("div",{text:"Broker"}), el("div",{text:"Insurance company"}), el("div",{text:"Coverage / outcome"}), el("div",{text:"$"}), el("div",{text:"Quote note"}), el("div",{text:""}));
     var qRows=el("div",{class:"ins-quote-rows"});
     qPanel.appendChild(qHead); qPanel.appendChild(qRows);
     var existing=(Array.isArray(note.quotes)&&note.quotes.length)?note.quotes:insParseQuoteLines(insQuotesTextOf(note));
