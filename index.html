@@ -7902,10 +7902,15 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     if(insuranceEditingKey===item.key){ row.appendChild(el("div",{class:"exp-row-expanded"}, renderInsNoteEditor(item,note||null))); }
     return row;
   }
+  function insHasKeyNote(item){
+    var n=expActiveNote(item);
+    return !!(n && expClean(insKeyNoteTextOf(n)));
+  }
   function insMatchesView(item,view){
     var stage=insStageOf(item);
     if(view==="all") return true;
     if(view==="open") return stage!=="Bound" && stage!=="Completed";
+    if(view==="notes") return insHasKeyNote(item);
     return stage===view;
   }
   function insFilteredItems(){
@@ -7977,7 +7982,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     if(!hasFleetLookupData()) insBody.appendChild(el("div",{class:"warn-note",text:"Fleet Master data is not loaded yet. Sign in or wait for remembered data/live refresh. Recap rows from the attached document can still display while Fleet loads."}));
     else insBody.appendChild(el("p",{class:"note",text:"One row per authority. Expiration dates come from Fleet Master automatically; tracking fields are for status, quotes, and key notes."}));
     var toolbar=el("div",{class:"exp-toolbar"});
-    var view=el("select"); [["all","All authorities"],["open","Not bound/completed"]].concat(INS_STAGES.map(function(s){return [s,s];})).forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===insuranceState.view) o.selected=true; view.appendChild(o); }); view.addEventListener("change",function(){ insuranceState.view=view.value; renderInsurance(); });
+    var view=el("select"); [["all","All authorities"],["open","Not bound/completed"],["notes","With key notes"]].concat(INS_STAGES.map(function(s){return [s,s];})).forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===insuranceState.view) o.selected=true; view.appendChild(o); }); view.addEventListener("change",function(){ insuranceState.view=view.value; renderInsurance(); });
     var search=el("input",{type:"search",placeholder:"Search account, quote, note…"}); search.value=insuranceState.search||""; search.addEventListener("input",function(){ insuranceState.search=search.value; renderInsurance(); });
     var sort=el("select"); [["date","Insurance exp date"],["name","Account name"],["stage","Status"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===(insuranceState.sort||"date")) o.selected=true; sort.appendChild(o); }); sort.addEventListener("change",function(){ insuranceState.sort=sort.value; renderInsurance(); });
     var dir=el("select"); [["asc","Oldest / A-Z"],["desc","Newest / Z-A"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===(insuranceState.dir||"asc")) o.selected=true; dir.appendChild(o); }); dir.addEventListener("change",function(){ insuranceState.dir=dir.value; renderInsurance(); });
@@ -7985,7 +7990,10 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     var importBtn=el("button",{class:"btn small",text:"Import Aug 19 recap",onclick:insImportRecap});
     toolbar.appendChild(coverField("View",view)); toolbar.appendChild(coverField("Sort by",sort)); toolbar.appendChild(coverField("Direction",dir)); toolbar.appendChild(coverField("Search",search)); toolbar.appendChild(coverField("Export",exportBtn)); toolbar.appendChild(coverField("Seed data",importBtn)); insBody.appendChild(toolbar);
     var all=insItems(), stageCounts={}; INS_STAGES.forEach(function(s){ stageCounts[s]=0; }); all.forEach(function(it){ var s=insStageOf(it); stageCounts[s]=(stageCounts[s]||0)+1; });
-    var pills=[el("span",{class:"exp-pill",text:all.length+" total"})]; INS_STAGES.forEach(function(s){ if(stageCounts[s]) pills.push(el("span",{class:"exp-pill",text:stageCounts[s]+" "+s.toLowerCase()})); });
+    var notesCount=all.filter(insHasKeyNote).length;
+    var pills=[el("span",{class:"exp-pill",text:all.length+" total"})];
+    if(notesCount) pills.push(el("span",{class:"exp-pill",text:notesCount+" with key notes"}));
+    INS_STAGES.forEach(function(s){ if(stageCounts[s]) pills.push(el("span",{class:"exp-pill",text:stageCounts[s]+" "+s.toLowerCase()})); });
     insBody.appendChild(el("div",{class:"exp-summary"}, pills));
     var filtered=insFilteredItems(), list=el("div",{class:"exp-list ins-list"});
     if(!filtered.length) list.appendChild(el("div",{class:"exp-empty",text:"No insurance rows match this view."}));
