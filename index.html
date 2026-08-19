@@ -210,11 +210,21 @@
   .exp-note-actions .btn.small{padding:4px 8px;font-size:12px}
   .exp-row-expanded{border-top:1px solid #eef2f7;background:#fbfdff;padding:9px 10px 10px 14px}
   .exp-note-edit{display:grid;gap:8px}
-  .ins-quote-row{display:grid;grid-template-columns:1.4fr 1.4fr .8fr 1fr auto;gap:6px;margin-bottom:6px;align-items:center}
-  .ins-quote-row input,.ins-quote-row select{width:100%}
-  .ins-textarea{width:100%;min-height:110px;border:1px solid var(--line-strong);border-radius:8px;padding:8px;resize:vertical;background:#fff}
-  .ins-textarea.short{min-height:54px}
+  .ins-editor{display:grid;gap:12px}
+  .ins-editor .pkg-grid{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+  .ins-quote-box{border:1px solid var(--line);border-radius:12px;background:#fff;padding:12px}
+  .ins-quote-box h3{margin:0 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .ins-quote-head,.ins-quote-row{display:grid;grid-template-columns:minmax(120px,.85fr) minmax(145px,1fr) 94px minmax(120px,.8fr) minmax(180px,1.25fr) auto;gap:7px;align-items:center}
+  .ins-quote-head{font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);padding:0 4px 5px}
+  .ins-quote-row{margin-bottom:7px}
+  .ins-quote-row input,.ins-quote-row select,.ins-note-tools input{width:100%;border:1px solid var(--line-strong);border-radius:8px;padding:7px 8px;background:#fff;font-size:13px}
+  .ins-quote-row .btn.small{padding:6px 8px}
+  .ins-quote-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:7px}
+  .ins-textarea{width:100%;min-height:150px;border:1px solid var(--line-strong);border-radius:8px;padding:9px;resize:vertical;background:#fff;line-height:1.4}
+  .ins-textarea.short{min-height:68px}
+  .ins-note-tools{display:grid;grid-template-columns:132px minmax(220px,1fr) auto;gap:8px;align-items:end;margin-top:8px}
   .ins-log-existing{display:grid;gap:2px;max-height:140px;overflow:auto;padding:6px;background:var(--bg-soft,#f7f7f7);border-radius:6px}
+  @media (max-width:940px){.ins-quote-head{display:none}.ins-quote-row{grid-template-columns:1fr 1fr}.ins-quote-row .btn{grid-column:1/-1}.ins-note-tools{grid-template-columns:1fr}.ins-list .exp-table-head{display:none}}
   .exp-note-edit textarea{width:100%;min-height:70px;border:1px solid var(--line-strong);border-radius:8px;padding:8px;resize:vertical}.exp-note-edit select{border:1px solid var(--line-strong);border-radius:8px;padding:7px 8px;background:#fff}
   .exp-review-note{border:1px solid #ddd6fe;background:#faf5ff;color:#4c1d95;border-radius:9px;padding:7px 9px;font-size:12.5px;font-weight:700}
   .exp-archived-note{border:1px solid #e2e8f0;background:#f8fafc;color:var(--muted);border-radius:9px;padding:8px 9px;margin-top:7px;font-size:12.5px}
@@ -7658,29 +7668,31 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   }
   function insParseQuoteLines(text){
     return expClean(text).split(/\n+/).map(function(line){ return expClean(line); }).filter(Boolean).map(function(line){
-      var broker="", carrier="", rest=line, type="", amount="";
+      var broker="", carrier="", rest=line, type="", amount="", extra="";
       var m=line.match(/^(.+?)\s+[—-]\s+([^:]+):\s*(.*)$/);
       if(m){ broker=expClean(m[1]); carrier=expClean(m[2]); rest=expClean(m[3]); }
       else { var m2=line.match(/^([^:]+):\s*(.*)$/); if(m2){ carrier=expClean(m2[1]); rest=expClean(m2[2]); } }
-      var tm=rest.match(/\b(FULL\??|LIAB\??)\b/i); if(tm) type=tm[1].toUpperCase();
-      var am=rest.match(/(?:~?\$[0-9,]+(?:\.\d{2})?|declined|not eligible|in progress|pending|unable to quote|blocked[^,]*)/i); if(am) amount=expClean(am[0]);
-      return {id:uid("insq"),broker:broker,carrier:carrier,type:type,amount:amount,line:line};
+      var tm=rest.match(/\b(FULL\??|LIAB\??)\b/i); if(tm){ type=tm[1].toUpperCase(); rest=expClean(rest.replace(tm[0],"")); }
+      var am=rest.match(/(?:~?\$[0-9,]+(?:\.\d{2})?(?:\s*\+\s*\$?[0-9,]+(?:\.\d{2})?)?|declined|not eligible|in progress|pending|unable to quote|blocked[^,]*)/i);
+      if(am){ amount=expClean(am[0]); rest=expClean(rest.replace(am[0],"")); }
+      extra=expClean(rest.replace(/^[,:;\-–—]+/,""));
+      return {id:uid("insq"),broker:broker,carrier:carrier,type:type,amount:amount,note:extra,line:line};
     });
+  }
+  function insQuoteLineFromObj(q){
+    q=q||{};
+    var broker=expClean(q.broker), carrier=expClean(q.carrier), type=expClean(q.type), amount=expClean(q.amount), note=expClean(q.note);
+    var label=[broker,carrier].filter(Boolean).join(" — ");
+    var bits=[type,amount,note].filter(Boolean).join(" ");
+    return expClean((label?(label+": "):"")+bits);
   }
   function insQuoteLinesOf(note){
     if(!note) return [];
-    if(expClean(note.quotesText)) return expClean(note.quotesText).split(/\n+/).map(expClean).filter(Boolean);
-    var arr=[];
-    if(Array.isArray(note.quotes)){
-      note.quotes.forEach(function(q){
-        if(q.line){ arr.push(q.line); return; }
-        var label=[q.broker,q.carrier].filter(Boolean).join(" — ");
-        var val=[q.type,q.amount].filter(Boolean).join(" ");
-        var line=(label?(label+": "):"")+val;
-        if(expClean(line)) arr.push(expClean(line));
-      });
+    if(Array.isArray(note.quotes) && note.quotes.length){
+      return note.quotes.map(insQuoteLineFromObj).filter(Boolean);
     }
-    return arr;
+    if(expClean(note.quotesText)) return expClean(note.quotesText).split(/\n+/).map(expClean).filter(Boolean);
+    return [];
   }
   function insQuotesTextOf(note){ return insQuoteLinesOf(note).join("\n"); }
   function insKeyNoteTextOf(note){
@@ -7705,7 +7717,8 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   }
   function insSaveNote(item, fields){
     var b=expBucket(item.key), prev=b.active||{}, now=new Date().toISOString();
-    var quotesText=expClean(fields.quotesText), keyNote=expClean(fields.keyNote), stage=insNormalizeStage(fields.stage);
+    var stage=insNormalizeStage(fields.stage), quotes=(fields.quotes||[]).filter(function(q){ return insQuoteLineFromObj(q); });
+    var quotesText=quotes.map(insQuoteLineFromObj).join("\n");
     b.active={
       id: prev.id||uid("expnote"),
       type: prev.type||"Info",
@@ -7713,8 +7726,8 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       statusNote: expClean(fields.statusNote),
       accountNote: expClean(fields.accountNote),
       quotesText: quotesText,
-      keyNote: keyNote,
-      quotes: insParseQuoteLines(quotesText),
+      keyNote: expClean(fields.keyNote),
+      quotes: quotes.length ? quotes : insParseQuoteLines(quotesText),
       log: [],
       createdAt: prev.createdAt||now,
       updatedAt: now,
@@ -7736,23 +7749,62 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     INS_STAGES.concat(val && INS_STAGES.indexOf(val)<0?[val]:[]).forEach(function(s){ if(seen[s]) return; seen[s]=1; var o=el("option",{value:s,text:s}); if(s===val) o.selected=true; sel.appendChild(o); });
     return sel;
   }
+  function insCoverageSelect(value){
+    var sel=el("select"), vals=["","LIAB","FULL","LIAB?","FULL?","Declined","Pending","In progress","Not eligible","Bound"];
+    var val=expClean(value);
+    vals.concat(val && vals.indexOf(val)<0?[val]:[]).forEach(function(v){ var o=el("option",{value:v,text:v||"—"}); if(v===val) o.selected=true; sel.appendChild(o); });
+    return sel;
+  }
+  function insAddQuoteRow(box, q){
+    q=q||{};
+    var row=el("div",{class:"ins-quote-row"});
+    var broker=el("input",{type:"text",placeholder:"Terri / Bret / Direct"}); broker.value=expClean(q.broker); broker.dataset.field="broker";
+    var carrier=el("input",{type:"text",placeholder:"Progressive / Lancer"}); carrier.value=expClean(q.carrier); carrier.dataset.field="carrier";
+    var cov=insCoverageSelect(q.type); cov.dataset.field="type";
+    var amount=el("input",{type:"text",placeholder:"$13,054 / declined"}); amount.value=expClean(q.amount); amount.dataset.field="amount";
+    var note=el("input",{type:"text",placeholder:"needs revision / blocked / + $300"}); note.value=expClean(q.note); note.dataset.field="note";
+    row.appendChild(broker); row.appendChild(carrier); row.appendChild(cov); row.appendChild(amount); row.appendChild(note);
+    row.appendChild(el("button",{class:"btn danger small",type:"button",text:"Remove",onclick:function(){ row.remove(); }}));
+    box.appendChild(row);
+  }
+  function insCollectQuoteRows(box){
+    var rows=[];
+    (box?box.querySelectorAll(".ins-quote-row"):[]).forEach(function(row){
+      var q={id:row.dataset.id||uid("insq")};
+      row.querySelectorAll("[data-field]").forEach(function(inp){ q[inp.dataset.field]=expClean(inp.value); });
+      if(insQuoteLineFromObj(q)) rows.push(q);
+    });
+    return rows;
+  }
+  function insTodayISO(){ return new Date().toISOString().slice(0,10); }
+  function insShortDate(iso){ var p=String(iso||"").split("-"); if(p.length===3) return Number(p[1])+"/"+Number(p[2]); return expClean(iso); }
   function renderInsNoteEditor(item, note){
     note=note||{};
-    var wrap=el("div",{class:"exp-note-edit"});
+    var wrap=el("div",{class:"exp-note-edit ins-editor"});
     var stageSel=insStageSelect(note.stage);
     var statusNoteIn=el("input",{type:"text",placeholder:"Optional status detail, e.g. 8/07/26"}); statusNoteIn.value=insStatusNoteOf(note);
     var acctNoteIn=el("input",{type:"text",placeholder:"Optional account line, e.g. Exp. 9/22/26 or NEW POLICY"}); acctNoteIn.value=insAccountNoteOf(item,note).replace(/^No insurance exp date$/,"") || "";
-    var qta=el("textarea",{class:"ins-textarea",placeholder:"Quotes received — one per line, e.g. Terri — Progressive: LIAB $13,054"}); qta.value=insQuotesTextOf(note);
-    var nta=el("textarea",{class:"ins-textarea",placeholder:"Key note / updates — one per line"}); nta.value=insKeyNoteTextOf(note);
-    wrap.appendChild(el("div",{class:"pkg-grid"},
-      coverField("Status",stageSel),
-      coverField("Status detail",statusNoteIn),
-      coverField("Account note",acctNoteIn),
-      coverField("Quotes received",qta),
-      coverField("Key note",nta)
-    ));
+    wrap.appendChild(el("div",{class:"pkg-grid"}, coverField("Status",stageSel), coverField("Status detail",statusNoteIn), coverField("Account note",acctNoteIn)));
+
+    var qPanel=el("div",{class:"ins-quote-box"}, el("h3",{text:"Quotes received"}), el("p",{class:"note",text:"Add one row per quote. The table view/export will still display them as Broker — Carrier: Coverage $/status."}));
+    var qHead=el("div",{class:"ins-quote-head"}, el("div",{text:"Broker"}), el("div",{text:"Insurance company"}), el("div",{text:"Coverage"}), el("div",{text:"$/status"}), el("div",{text:"Quote note"}), el("div",{text:""}));
+    var qRows=el("div",{class:"ins-quote-rows"});
+    qPanel.appendChild(qHead); qPanel.appendChild(qRows);
+    var existing=(Array.isArray(note.quotes)&&note.quotes.length)?note.quotes:insParseQuoteLines(insQuotesTextOf(note));
+    existing.forEach(function(q){ insAddQuoteRow(qRows,q); });
+    if(!existing.length) insAddQuoteRow(qRows,{});
+    qPanel.appendChild(el("div",{class:"ins-quote-actions"}, el("button",{class:"btn small",type:"button",text:"+ Add quote",onclick:function(){ insAddQuoteRow(qRows,{}); }})));
+    wrap.appendChild(qPanel);
+
+    var keyNoteIn=el("textarea",{class:"ins-textarea",placeholder:"Key note / updates — one per line"}); keyNoteIn.value=insKeyNoteTextOf(note);
+    var notePanel=el("div",{class:"ins-quote-box"}, el("h3",{text:"Key note"}), coverField("Current key note",keyNoteIn,"wide"));
+    var dateIn=el("input",{type:"date"}); dateIn.value=insTodayISO();
+    var quickIn=el("input",{type:"text",placeholder:"Add quick update, e.g. emailed Bret for status update"});
+    notePanel.appendChild(el("div",{class:"ins-note-tools"}, dateIn, quickIn, el("button",{class:"btn small",type:"button",text:"Add update",onclick:function(){ var t=expClean(quickIn.value); if(!t) return; var prefix=insShortDate(dateIn.value); keyNoteIn.value=expClean(keyNoteIn.value)+(expClean(keyNoteIn.value)?"\n":"")+prefix+": "+t; quickIn.value=""; }})));
+    wrap.appendChild(notePanel);
+
     wrap.appendChild(el("div",{class:"exp-note-actions"},
-      el("button",{class:"btn primary small",text:"Save tracking",onclick:function(){ insSaveNote(item,{stage:stageSel.value,statusNote:statusNoteIn.value,accountNote:acctNoteIn.value,quotesText:qta.value,keyNote:nta.value}); }}),
+      el("button",{class:"btn primary small",text:"Save tracking",onclick:function(){ insSaveNote(item,{stage:stageSel.value,statusNote:statusNoteIn.value,accountNote:acctNoteIn.value,quotes:insCollectQuoteRows(qRows),keyNote:keyNoteIn.value}); }}),
       el("button",{class:"btn small",text:"Cancel",onclick:function(){ insuranceEditingKey=""; renderInsurance(); }})
     ));
     return wrap;
@@ -7836,16 +7888,18 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
         "</tr>";
     }).join("");
     var today=new Date().toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"});
-    return "<html><head><meta charset='utf-8'><style>"+
-      "@page{size:11in 8.5in;margin:.45in}.body{font-family:Calibri,Arial,sans-serif}.title{font-size:18pt;font-weight:700;margin:0 0 10px;color:#1f4e79}"+
+    return "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word'><head><meta charset='utf-8'>"+
+      "<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View></w:WordDocument></xml><![endif]-->"+
+      "<style>"+
+      "@page Section1{size:11in 8.5in;mso-page-orientation:landscape;margin:.35in .35in .35in .35in}div.Section1{page:Section1}.body{font-family:Calibri,Arial,sans-serif}.title{font-size:18pt;font-weight:700;margin:0 0 10px;color:#1f4e79}"+
       "table{border-collapse:collapse;width:100%;font-family:Calibri,Arial,sans-serif;font-size:9.5pt;table-layout:fixed}"+
       "th{background:#1f4e79;color:#fff;text-align:left;font-weight:700;border:1px solid #777;padding:5px;vertical-align:top}"+
       "td{border:1px solid #999;padding:5px;vertical-align:top;line-height:1.22;word-wrap:break-word}"+
       ".acct{width:18%;font-weight:700}.acct span{font-weight:400}.status{width:13%;text-align:center}.quotes{width:36%}.note{width:33%}"+
-      "</style></head><body class='body'>"+
+      "</style></head><body class='body'><div class='Section1'>"+
       "<div class='title'>Insurance Recap — Updated "+insEsc(today)+"</div>"+
       "<table><tr><th class='acct'>Account</th><th class='status'>Status</th><th class='quotes'>Quotes Received (Broker — Carrier)</th><th class='note'>Key Note</th></tr>"+
-      rows+"</table></body></html>";
+      rows+"</table></div></body></html>";
   }
   function exportInsuranceRecap(){
     var html=buildInsuranceRecapHtml();
@@ -7860,7 +7914,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     insApplyRecapSeed(false);
     insBody.textContent="";
     if(!hasFleetLookupData()) insBody.appendChild(el("div",{class:"warn-note",text:"Fleet Master data is not loaded yet. Sign in or wait for remembered data/live refresh. Recap rows from the attached document can still display while Fleet loads."}));
-    else insBody.appendChild(el("p",{class:"note",text:"One row per authority. Status, quote list, and key note are saved in the shared dashboard notes and also feed the export recap."}));
+    else insBody.appendChild(el("p",{class:"note",text:"One row per authority. The table stays recap-style, but editing uses structured quote rows so you do not have to hand-format every line."}));
     var toolbar=el("div",{class:"exp-toolbar"});
     var view=el("select"); [["all","All authorities"],["open","Not bound/completed"]].concat(INS_STAGES.map(function(s){return [s,s];})).forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===insuranceState.view) o.selected=true; view.appendChild(o); }); view.addEventListener("change",function(){ insuranceState.view=view.value; renderInsurance(); });
     var search=el("input",{type:"search",placeholder:"Search account, quote, note…"}); search.value=insuranceState.search||""; search.addEventListener("input",function(){ insuranceState.search=search.value; renderInsurance(); });
