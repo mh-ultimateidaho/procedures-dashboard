@@ -7752,9 +7752,11 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   }
   function insStatusNoteOf(note){ return note && expClean(note.statusNote) || ""; }
   function insAccountNoteOf(item,note){
-    if(note && expClean(note.accountNote)) return expClean(note.accountNote);
-    if(item && item.meta && expClean(item.meta.accountNote)) return expClean(item.meta.accountNote);
+    // Insurance expiration is source-of-truth data from Fleet Master, not manual tracking text.
+    // Old imported/manual accountNote values are only used for synthetic recap rows that do not match a Fleet authority yet.
     if(item && item.dateISO) return "Exp. "+insPrettyShortDate(item.dateISO);
+    if(item && item.meta && expClean(item.meta.accountNote)) return expClean(item.meta.accountNote);
+    if(item && item.meta && item.meta.synthetic && note && expClean(note.accountNote)) return expClean(note.accountNote);
     return item && item.meta && item.meta.synthetic ? "" : "No insurance exp date";
   }
   function insLogOf(note){
@@ -7772,7 +7774,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       type: prev.type||"Info",
       stage: stage,
       statusNote: expClean(fields.statusNote),
-      accountNote: expClean(fields.accountNote),
+      accountNote: "",
       quotesText: quotesText,
       keyNote: expClean(fields.keyNote),
       quotes: quotes.length ? quotes : insParseQuoteLines(quotesText),
@@ -7839,8 +7841,11 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     var wrap=el("div",{class:"exp-note-edit ins-editor"});
     var stageSel=insStageSelect(note.stage);
     var statusNoteIn=el("input",{type:"text",placeholder:"Optional status detail, e.g. 8/07/26"}); statusNoteIn.value=insStatusNoteOf(note);
-    var acctNoteIn=el("input",{type:"text",placeholder:"Optional account line, e.g. Exp. 9/22/26 or NEW POLICY"}); acctNoteIn.value=insAccountNoteOf(item,note).replace(/^No insurance exp date$/,"") || "";
-    wrap.appendChild(el("div",{class:"pkg-grid"}, coverField("Status",stageSel), coverField("Status detail",statusNoteIn), coverField("Account note",acctNoteIn)));
+    var expDisplay=el("div",{class:"info-kv"},
+      el("div",{class:"k",text:"Insurance expiration"}),
+      el("div",{class:"v muted",text:insAccountNoteOf(item,note)||"—"})
+    );
+    wrap.appendChild(el("div",{class:"pkg-grid"}, coverField("Status",stageSel), coverField("Status detail",statusNoteIn), expDisplay));
 
     var qPanel=el("div",{class:"ins-quote-box"}, el("h3",{text:"Quotes received"}), el("p",{class:"note",text:"Add one row per quote. Use Coverage / outcome for LIAB, FULL, declined, pending, etc.; the $ box is only for money and auto-formats."}));
     var qHead=el("div",{class:"ins-quote-head"}, el("div",{text:"Broker"}), el("div",{text:"Insurance company"}), el("div",{text:"Coverage / outcome"}), el("div",{text:"$"}), el("div",{text:"Quote note"}), el("div",{text:""}));
@@ -7860,7 +7865,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     wrap.appendChild(notePanel);
 
     wrap.appendChild(el("div",{class:"exp-note-actions"},
-      el("button",{class:"btn primary small",text:"Save tracking",onclick:function(){ insSaveNote(item,{stage:stageSel.value,statusNote:statusNoteIn.value,accountNote:acctNoteIn.value,quotes:insCollectQuoteRows(qRows),keyNote:keyNoteIn.value}); }}),
+      el("button",{class:"btn primary small",text:"Save tracking",onclick:function(){ insSaveNote(item,{stage:stageSel.value,statusNote:statusNoteIn.value,quotes:insCollectQuoteRows(qRows),keyNote:keyNoteIn.value}); }}),
       el("button",{class:"btn small",text:"Cancel",onclick:function(){ insuranceEditingKey=""; renderInsurance(); }})
     ));
     return wrap;
@@ -7970,7 +7975,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     insApplyRecapSeed(false);
     insBody.textContent="";
     if(!hasFleetLookupData()) insBody.appendChild(el("div",{class:"warn-note",text:"Fleet Master data is not loaded yet. Sign in or wait for remembered data/live refresh. Recap rows from the attached document can still display while Fleet loads."}));
-    else insBody.appendChild(el("p",{class:"note",text:"One row per authority. The table stays recap-style, but editing uses structured quote rows so you do not have to hand-format every line."}));
+    else insBody.appendChild(el("p",{class:"note",text:"One row per authority. Expiration dates come from Fleet Master automatically; tracking fields are for status, quotes, and key notes."}));
     var toolbar=el("div",{class:"exp-toolbar"});
     var view=el("select"); [["all","All authorities"],["open","Not bound/completed"]].concat(INS_STAGES.map(function(s){return [s,s];})).forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===insuranceState.view) o.selected=true; view.appendChild(o); }); view.addEventListener("change",function(){ insuranceState.view=view.value; renderInsurance(); });
     var search=el("input",{type:"search",placeholder:"Search account, quote, note…"}); search.value=insuranceState.search||""; search.addEventListener("input",function(){ insuranceState.search=search.value; renderInsurance(); });
