@@ -7369,8 +7369,10 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   }
   function expSort(a,b){
     var sort=expirationState.sort||"date", dir=(expirationState.dir==="desc")?-1:1;
-    function dateVal(it){ var st=expStatusFor(it.dateISO); return st.days===null?999999:st.days; }
-    function statusRank(it){ var st=expStatusFor(it.dateISO), rank={expired:0,expiring:1,due:2,upcoming:3,missing:4,ok:5}; return rank[st.id] == null ? 9 : rank[st.id]; }
+    // Treat missing dates as the oldest item when sorting ascending, so
+    // no-date driver/equipment/insurance rows rise to the top for review.
+    function dateVal(it){ var st=expStatusFor(it.dateISO); return st.days===null?-999999:st.days; }
+    function statusRank(it){ var st=expStatusFor(it.dateISO), rank={missing:-1,expired:0,expiring:1,due:2,upcoming:3,ok:5}; return rank[st.id] == null ? 9 : rank[st.id]; }
     var av="", bv="";
     if(sort==="item"){ av=String(a.item||""); bv=String(b.item||""); }
     else if(sort==="category"){ av=String(a.category||"")+" "+String(a.item||""); bv=String(b.category||"")+" "+String(b.item||""); }
