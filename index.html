@@ -186,6 +186,7 @@
   .ins-list .exp-cell.status{min-width:0}.ins-list .exp-status{max-width:100%;white-space:normal;text-align:center;line-height:1.2}
   .ins-list .exp-cell.quote,.ins-list .exp-cell.note{padding-left:4px;overflow-wrap:anywhere;white-space:pre-line}
   .ins-list .ins-line{font-size:12.5px;line-height:1.35;margin:0 0 3px}
+  .ins-list .ins-quote-note{font-weight:800;color:var(--ink)}
   .ins-list .ins-key{font-size:12.5px;line-height:1.35;white-space:pre-line}
   .ins-list .ins-status-note{font-size:11.5px;color:var(--muted);font-weight:700;margin-top:3px}
   .ins-account-note{font-size:12px;color:var(--muted);font-weight:700;margin-top:2px}
@@ -6767,7 +6768,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
         var head=vals[0]||[], idx=colIndex(head,"Truck #");
         if(idx<0) idx=0;
         for(var r=1;r<vals.length;r++){
-          var row=vals[r]; if(!row) continue;
+          var row=vals[r]; if(!row || dashboardIsPlaceholderRow.apply(null,row)) continue;
           var truck=String(row[idx]||"").trim();
           if(truck) seen[truck]=1;
         }
@@ -7338,6 +7339,14 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     if(!hasDateCol && !hasStatusCol) return true;
     return false;
   }
+  function dashboardIsPlaceholderRow(){
+    // Fleet Master helper rows like “NEXT ID → / A279 / ← start typing…” are formulas/instructions,
+    // not real drivers or authorities. They can accidentally look like Pending/New because the instruction
+    // text contains words such as “new row”, so ignore them before status/date filtering.
+    var vals=Array.prototype.slice.call(arguments).map(function(v){ return String(v==null?"":v).trim(); }).join(" | ");
+    var n=vals.toLowerCase();
+    return /next\s*id/.test(n) || /start typing.*new row/.test(n) || /use this id/.test(n) || /move \(drag\).*row/.test(n);
+  }
   function expParseDate(v){
     if(v==null || v==="") return null;
     if(v instanceof Date && !isNaN(v)) return v;
@@ -7384,11 +7393,11 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       var drVals=all[0]||[], auVals=all[1]||[], trVals=all[2]||[], tlVals=all[3]||[];
       if(drVals.length){
         var h=drVals[0]||[], iid=expHeaderIndex(h,["Driver ID","DriverID","ID"]), ifi=expHeaderIndex(h,["First","First Name"]), ila=expHeaderIndex(h,["Last","Last Name"]), istat=expHeaderIndex(h,["Status","Current?","Current"]), icdl=expHeaderIndex(h,["CDL #","CDL#","CDL Number"]), icdle=expHeaderIndex(h,["CDL Exp","CDL Expiration","CDL Exp Date"]), imed=expHeaderIndex(h,["Medical Exp","Medical Expiration","Medical Exp Date","Med Exp"]);
-        for(var r=1;r<drVals.length;r++){ var row=drVals[r]||[]; if(!dashboardIncludeByStatusOrDate(imed>=0?row[imed]:"", istat>=0?row[istat]:"", imed>=0, istat>=0)) continue; var id=iid>=0?expClean(row[iid]):"", first=ifi>=0?expClean(row[ifi]):"", last=ila>=0?expClean(row[ila]):"", name=[first,last].filter(Boolean).join(" ") || last || id; if(!name) continue; var cdl=icdl>=0?expClean(row[icdl]):"", dstatus=istat>=0?expClean(row[istat]):""; items.push(makeExpItem("Driver",id||name,name,"CDL",cdl?("CDL "+cdl):"CDL",icdle>=0?row[icdle]:"",{driverId:id, cdl:cdl, status:dstatus})); items.push(makeExpItem("Driver",id||name,name,"Medical","Medical",imed>=0?row[imed]:"",{driverId:id, status:dstatus})); }
+        for(var r=1;r<drVals.length;r++){ var row=drVals[r]||[]; if(dashboardIsPlaceholderRow.apply(null,row)) continue; if(!dashboardIncludeByStatusOrDate(imed>=0?row[imed]:"", istat>=0?row[istat]:"", imed>=0, istat>=0)) continue; var id=iid>=0?expClean(row[iid]):"", first=ifi>=0?expClean(row[ifi]):"", last=ila>=0?expClean(row[ila]):"", name=[first,last].filter(Boolean).join(" ") || last || id; if(!name) continue; var cdl=icdl>=0?expClean(row[icdl]):"", dstatus=istat>=0?expClean(row[istat]):""; items.push(makeExpItem("Driver",id||name,name,"CDL",cdl?("CDL "+cdl):"CDL",icdle>=0?row[icdle]:"",{driverId:id, cdl:cdl, status:dstatus})); items.push(makeExpItem("Driver",id||name,name,"Medical","Medical",imed>=0?row[imed]:"",{driverId:id, status:dstatus})); }
       }
       if(auVals.length){
         var ah=auVals[0]||[], aid=expHeaderIndex(ah,["Authority ID","Auth ID","ID"]), an=expHeaderIndex(ah,["Name","Authority","Company","Company Name"]), astat=expHeaderIndex(ah,["Status","Current?","Current"]), aexp=expHeaderIndex(ah,["Insurance Exp","Insurance Expiration","Insurance Exp Date","Ins Exp"]), adot=expHeaderIndex(ah,["DOT #","DOT#","USDOT"]);
-        for(var ar=1;ar<auVals.length;ar++){ var arow=auVals[ar]||[]; if(!dashboardIncludeByStatusOrDate(aexp>=0?arow[aexp]:"", astat>=0?arow[astat]:"", aexp>=0, astat>=0)) continue; var nameA=an>=0?expClean(arow[an]):"", idA=aid>=0?expClean(arow[aid]):""; if(!nameA) continue; items.push(makeExpItem("Authority",idA||nameA,nameA,"Insurance","Insurance",aexp>=0?arow[aexp]:"",{authorityId:idA,dot:adot>=0?expClean(arow[adot]):"",status:astat>=0?expClean(arow[astat]):""})); }
+        for(var ar=1;ar<auVals.length;ar++){ var arow=auVals[ar]||[]; if(dashboardIsPlaceholderRow.apply(null,arow)) continue; if(!dashboardIncludeByStatusOrDate(aexp>=0?arow[aexp]:"", astat>=0?arow[astat]:"", aexp>=0, astat>=0)) continue; var nameA=an>=0?expClean(arow[an]):"", idA=aid>=0?expClean(arow[aid]):""; if(!nameA) continue; items.push(makeExpItem("Authority",idA||nameA,nameA,"Insurance","Insurance",aexp>=0?arow[aexp]:"",{authorityId:idA,dot:adot>=0?expClean(arow[adot]):"",status:astat>=0?expClean(arow[astat]):""})); }
       }
       if(trVals.length){
         var th=trVals[0]||[], tu=expHeaderIndex(th,["Truck #","Truck#","Unit #","Unit#","Unit"]), tin=expHeaderIndex(th,["In Service?","In Service"]), ta=expHeaderIndex(th,["Annual Inspection","Annual Inspection Exp","Inspection Exp"]), tv=expHeaderIndex(th,["VIN","VIN #"]), tp=expHeaderIndex(th,["Plate","Plate #"]);
@@ -7759,6 +7768,36 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     var bits=[type,amount,note].filter(Boolean).join(" ");
     return expClean((label?(label+": "):"")+bits);
   }
+  function insQuoteMainFromObj(q){
+    q=q||{};
+    var broker=expClean(q.broker), carrier=expClean(q.carrier), type=insNormalizeQuoteType(q.type), amount=insFormatMoney(q.amount);
+    if(!type && insLooksLikeOutcome(amount)){ type=insNormalizeQuoteType(amount); amount=""; }
+    var label=[broker,carrier].filter(Boolean).join(" — ");
+    var bits=[type,amount].filter(Boolean).join(" ");
+    return expClean((label?(label+": "):"")+bits);
+  }
+  function insQuotePartsOf(note){
+    if(!note) return [];
+    var source=[];
+    if(Array.isArray(note.quotes) && note.quotes.length) source=note.quotes;
+    else if(expClean(note.quotesText)) source=insParseQuoteLines(expClean(note.quotesText));
+    return source.map(function(q){
+      var main=insQuoteMainFromObj(q), qnote=expClean(q&&q.note), full=insQuoteLineFromObj(q);
+      if(!main && !qnote && q && q.line) main=expClean(q.line);
+      return {main:main,note:qnote,full:full};
+    }).filter(function(p){ return p.main || p.note || p.full; });
+  }
+  function insQuoteNode(p){
+    p=p||{};
+    var main=expClean(p.main), qnote=expClean(p.note);
+    return el("div",{class:"ins-line"}, main?document.createTextNode(main):null, qnote?el("span",{class:"ins-quote-note",text:(main?" ":"")+qnote}):null);
+  }
+  function insQuoteHtmlOf(note){
+    return insQuotePartsOf(note).map(function(p){
+      var main=expClean(p.main), qnote=expClean(p.note);
+      return (main?insEsc(main):"")+(qnote?" <b>"+insEsc(qnote)+"</b>":"");
+    }).filter(Boolean).join("<br>");
+  }
   function insQuoteLinesOf(note){
     if(!note) return [];
     if(Array.isArray(note.quotes) && note.quotes.length){
@@ -7916,8 +7955,8 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     if(item.meta&&item.meta.dot) itemParts.push(el("div",{class:"exp-sub",text:"DOT "+item.meta.dot}));
     main.appendChild(el("div",{class:"exp-cell item"}, itemParts));
     main.appendChild(el("div",{class:"exp-cell status"}, insStatusPill(stage,note)));
-    var quotes=insQuoteLinesOf(note);
-    main.appendChild(el("div",{class:"exp-cell quote"}, quotes.length?quotes.map(function(line){ return el("div",{class:"ins-line",text:line}); }):el("div",{class:"exp-muted",text:"—"})));
+    var quoteParts=insQuotePartsOf(note);
+    main.appendChild(el("div",{class:"exp-cell quote"}, quoteParts.length?quoteParts.map(insQuoteNode):el("div",{class:"exp-muted",text:"—"})));
     var key=insKeyNoteTextOf(note);
     main.appendChild(el("div",{class:"exp-cell note"}, key?el("div",{class:"ins-key",text:key}):el("div",{class:"exp-muted",text:"—"})));
     var actions=[el("button",{class:"btn small",text:note?"Edit":"Start tracking",onclick:function(){ insuranceEditingKey=item.key; renderInsurance(); }})];
@@ -7953,7 +7992,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     items.sort(function(a,b){
       if(sort==="stage"){ var d=(insStageRank(insStageOf(a))-insStageRank(insStageOf(b)))*dir; if(d) return d; }
       else if(sort==="name"){ var c=String(a.item).localeCompare(String(b.item), undefined, {numeric:true, sensitivity:"base"})*dir; if(c) return c; }
-      else { var da=expStatusFor(a.dateISO).days, db=expStatusFor(b.dateISO).days; da=da===null?999999:da; db=db===null?999999:db; if(da!==db) return (da-db)*dir; }
+      else { var da=expStatusFor(a.dateISO).days, db=expStatusFor(b.dateISO).days; da=da===null?-999999:da; db=db===null?-999999:db; if(da!==db) return (da-db)*dir; }
       return String(a.item).localeCompare(String(b.item), undefined, {numeric:true, sensitivity:"base"});
     });
     return items;
@@ -7969,12 +8008,12 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   function buildInsuranceRecapHtml(){
     var items=insFilteredItems();
     var rows=items.map(function(it){
-      var note=expActiveNote(it), stage=insStageOf(it), quotesText=insQuotesTextOf(note), keyNote=insKeyNoteTextOf(note), acctNote=insAccountNoteOf(it,note), statusNote=insStatusNoteOf(note);
+      var note=expActiveNote(it), stage=insStageOf(it), quotesHtml=insQuoteHtmlOf(note), keyNote=insKeyNoteTextOf(note), acctNote=insAccountNoteOf(it,note), statusNote=insStatusNoteOf(note);
       var fill=insStatusFill(stage);
       return "<tr>"+
         "<td class='acct'><b>"+insEsc(it.item)+"</b>"+(acctNote?"<br><span>"+insEsc(acctNote)+"</span>":"")+"</td>"+
         "<td class='status' style='background:#"+fill+"'><b>"+insEsc(stage)+"</b>"+(statusNote?"<br>"+insEsc(statusNote):"")+"</td>"+
-        "<td>"+(quotesText?insEsc(quotesText):"&nbsp;")+"</td>"+
+        "<td>"+(quotesHtml||"&nbsp;")+"</td>"+
         "<td>"+(keyNote?insEsc(keyNote):"&nbsp;")+"</td>"+
         "</tr>";
     }).join("");
@@ -8092,7 +8131,8 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
           iagent=hidx(h,["Insurer/Agent","Insurer","Agent","Insurance Agent"]), ipolicy=hidx(h,["Policy Type","Coverage","Coverage Type"]), ipolicyDate=hidx(h,["Policy Date","Effective Date","Policy Effective"]), idrug=hidx(h,["Drug Testing Policy Date","Drug Test Policy Date","D&A Policy Date","DA Policy Date"]),
           icur=hidx(h,["Status","Current?","Current"]), iins=hidx(h,["Insurance Exp","Insurance Expiration","Insurance Exp.","Insurance Exp Date","Insurance Expiration Date","Ins Exp","Ins. Exp","Policy Exp","Policy Expiration"]);
         for(var r=1;r<authVals.length;r++){
-          var row=authVals[r]||[], name=ia>=0?clean(row[ia]):""; if(!name) continue;
+          var row=authVals[r]||[]; if(dashboardIsPlaceholderRow.apply(null,row)) continue;
+          var name=ia>=0?clean(row[ia]):""; if(!name) continue;
           var rec={authority:name, dot:idot>=0?clean(row[idot]):"", mc:imc>=0?clean(row[imc]):"", ein:iein>=0?clean(row[iein]):"", insurerAgent:iagent>=0?clean(row[iagent]):"", policyType:ipolicy>=0?clean(row[ipolicy]):"", policyDate:ipolicyDate>=0?clean(row[ipolicyDate]):"", drugTestDate:idrug>=0?clean(row[idrug]):"", current:icur>=0?clean(row[icur]):"", status:icur>=0?clean(row[icur]):"", insuranceExp:iins>=0?clean(row[iins]):""};
           out.authoritiesByName[key(name)]=rec;
           // Authority dropdowns use the Fleet Master Status dropdown first, then fall back to Insurance Exp for older sheet versions.
@@ -8124,7 +8164,8 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
           iaddr=hidx(dh,["Address","Driver Address","Street Address"]), icity=hidx(dh,["City","Driver City"]), istate=hidx(dh,["State","Driver State"]), izip=hidx(dh,["Zip","Zip Code","Postal Code"]), iphone=hidx(dh,["Cell","Cell Phone","Mobile","Mobile Phone","Phone","Phone Number","Driver Phone"]), iemail=hidx(dh,["Email","Email Address","Driver Email"]), idob=hidx(dh,["DOB","Date of Birth","Birth Date","Driver DOB"]), iyor=hidx(dh,["Years of OTR","Years OTR","OTR Years","YOR"]),
           icdl=hidx(dh,["CDL #","CDL#","CDL Number","License #"]), icdlState=hidx(dh,["CDL State","State"]), icdlExp=hidx(dh,["CDL Exp","CDL Expiration","CDL Exp.","CDL Exp Date","CDL Expiration Date"]), imed=hidx(dh,["Medical Exp","Medical Expiration","Medical Exp.","Medical Exp Date","Medical Expiration Date","Med Exp","Med. Exp"]), issn=hidx(dh,["SSN Last 4","SSN Last4","Last 4","SSN"]);
         for(var d=1;d<drVals.length;d++){
-          var dr=drVals[d]||[], id=iid>=0?clean(dr[iid]):"", first=ifirst>=0?clean(dr[ifirst]):"", last=ilast>=0?clean(dr[ilast]):"";
+          var dr=drVals[d]||[]; if(dashboardIsPlaceholderRow.apply(null,dr)) continue;
+          var id=iid>=0?clean(dr[iid]):"", first=ifirst>=0?clean(dr[ifirst]):"", last=ilast>=0?clean(dr[ilast]):"";
           // Prefer First + Last for the actual cover-page Driver field.
           // The Drivers tab has a separate Driver ID column, and that should never become the printed driver name.
           var full=[first,last].filter(Boolean).join(" ");
