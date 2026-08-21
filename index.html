@@ -6494,7 +6494,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
                fleetCacheAt:0, fleetLiveAt:0, fleetSource:"none", refreshingFleet:false,
                remote:{eTag:null, by:null, at:null, present:false} };
 
-  var FLEET_CACHE_KEY = "ultimateProceduresFleetMasterCacheV2";
+  var FLEET_CACHE_KEY = "ultimateProceduresFleetMasterCacheV3";
   var FLEET_CACHE_WARN_DAYS = 7;
   function hasFleetLookupData(){
     var look=(S365&&S365.coverLookups)||{};
@@ -7313,6 +7313,31 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   function expClean(v){ return String(v==null?"":v).trim(); }
   function expNorm(v){ return expClean(v).toLowerCase().replace(/[^a-z0-9]+/g," ").replace(/\s+/g," ").trim(); }
   function expIsYes(v){ var x=expNorm(v); return x==="yes" || x==="y" || x==="true" || x==="active" || x==="current" || x==="1"; }
+  function dashboardStatusDecision(v){
+    var x=expNorm(v);
+    if(!x) return null;
+    if(x==="no" || x==="n" || x==="false" || x==="0" || x.indexOf("not current")>=0 || /(^| )(quit|fired|old|inactive|former|terminated)( |$)/.test(x)) return false;
+    if(x==="yes" || x==="y" || x==="true" || x==="1" || /(^| )(current|returning|potential|pending|new|temp|temporary|active)( |$)/.test(x)) return true;
+    return false;
+  }
+  function dashboardDateNotExpired(v){
+    var d=expParseDate(v);
+    if(!d) return false;
+    var today=new Date(); today.setHours(0,0,0,0);
+    d.setHours(0,0,0,0);
+    return d.getTime()>=today.getTime();
+  }
+  function dashboardIncludeByStatusOrDate(dateVal, statusVal, hasDateCol, hasStatusCol){
+    // New Fleet Master rule: Status drives inclusion when present.
+    // Include: Current, Returning, Potential, Pending, New, Temp.
+    // Exclude: Quit, Fired, Old.
+    // If Status is blank/missing, fall back to the old future-date/current-style behavior.
+    if(hasStatusCol && expClean(statusVal)){ return dashboardStatusDecision(statusVal)===true; }
+    if(hasDateCol && dashboardDateNotExpired(dateVal)) return true;
+    if(hasStatusCol && expIsYes(statusVal)) return true;
+    if(!hasDateCol && !hasStatusCol) return true;
+    return false;
+  }
   function expParseDate(v){
     if(v==null || v==="") return null;
     if(v instanceof Date && !isNaN(v)) return v;
@@ -7358,12 +7383,12 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       var items=[];
       var drVals=all[0]||[], auVals=all[1]||[], trVals=all[2]||[], tlVals=all[3]||[];
       if(drVals.length){
-        var h=drVals[0]||[], iid=expHeaderIndex(h,["Driver ID","DriverID","ID"]), ifi=expHeaderIndex(h,["First","First Name"]), ila=expHeaderIndex(h,["Last","Last Name"]), icur=expHeaderIndex(h,["Current?","Current"]), icdl=expHeaderIndex(h,["CDL #","CDL#","CDL Number"]), icdle=expHeaderIndex(h,["CDL Exp","CDL Expiration","CDL Exp Date"]), imed=expHeaderIndex(h,["Medical Exp","Medical Expiration","Medical Exp Date","Med Exp"]);
-        for(var r=1;r<drVals.length;r++){ var row=drVals[r]||[]; if(icur>=0 && !expIsYes(row[icur])) continue; var id=iid>=0?expClean(row[iid]):"", first=ifi>=0?expClean(row[ifi]):"", last=ila>=0?expClean(row[ila]):"", name=[first,last].filter(Boolean).join(" ") || last || id; if(!name) continue; var cdl=icdl>=0?expClean(row[icdl]):""; items.push(makeExpItem("Driver",id||name,name,"CDL",cdl?("CDL "+cdl):"CDL",icdle>=0?row[icdle]:"",{driverId:id, cdl:cdl})); items.push(makeExpItem("Driver",id||name,name,"Medical","Medical",imed>=0?row[imed]:"",{driverId:id})); }
+        var h=drVals[0]||[], iid=expHeaderIndex(h,["Driver ID","DriverID","ID"]), ifi=expHeaderIndex(h,["First","First Name"]), ila=expHeaderIndex(h,["Last","Last Name"]), istat=expHeaderIndex(h,["Status","Current?","Current"]), icdl=expHeaderIndex(h,["CDL #","CDL#","CDL Number"]), icdle=expHeaderIndex(h,["CDL Exp","CDL Expiration","CDL Exp Date"]), imed=expHeaderIndex(h,["Medical Exp","Medical Expiration","Medical Exp Date","Med Exp"]);
+        for(var r=1;r<drVals.length;r++){ var row=drVals[r]||[]; if(!dashboardIncludeByStatusOrDate(imed>=0?row[imed]:"", istat>=0?row[istat]:"", imed>=0, istat>=0)) continue; var id=iid>=0?expClean(row[iid]):"", first=ifi>=0?expClean(row[ifi]):"", last=ila>=0?expClean(row[ila]):"", name=[first,last].filter(Boolean).join(" ") || last || id; if(!name) continue; var cdl=icdl>=0?expClean(row[icdl]):"", dstatus=istat>=0?expClean(row[istat]):""; items.push(makeExpItem("Driver",id||name,name,"CDL",cdl?("CDL "+cdl):"CDL",icdle>=0?row[icdle]:"",{driverId:id, cdl:cdl, status:dstatus})); items.push(makeExpItem("Driver",id||name,name,"Medical","Medical",imed>=0?row[imed]:"",{driverId:id, status:dstatus})); }
       }
       if(auVals.length){
-        var ah=auVals[0]||[], aid=expHeaderIndex(ah,["Authority ID","Auth ID","ID"]), an=expHeaderIndex(ah,["Name","Authority","Company","Company Name"]), acur=expHeaderIndex(ah,["Current?","Current"]), aexp=expHeaderIndex(ah,["Insurance Exp","Insurance Expiration","Insurance Exp Date","Ins Exp"]), adot=expHeaderIndex(ah,["DOT #","DOT#","USDOT"]);
-        for(var ar=1;ar<auVals.length;ar++){ var arow=auVals[ar]||[]; if(acur>=0 && !expIsYes(arow[acur])) continue; var nameA=an>=0?expClean(arow[an]):"", idA=aid>=0?expClean(arow[aid]):""; if(!nameA) continue; items.push(makeExpItem("Authority",idA||nameA,nameA,"Insurance","Insurance",aexp>=0?arow[aexp]:"",{authorityId:idA,dot:adot>=0?expClean(arow[adot]):""})); }
+        var ah=auVals[0]||[], aid=expHeaderIndex(ah,["Authority ID","Auth ID","ID"]), an=expHeaderIndex(ah,["Name","Authority","Company","Company Name"]), astat=expHeaderIndex(ah,["Status","Current?","Current"]), aexp=expHeaderIndex(ah,["Insurance Exp","Insurance Expiration","Insurance Exp Date","Ins Exp"]), adot=expHeaderIndex(ah,["DOT #","DOT#","USDOT"]);
+        for(var ar=1;ar<auVals.length;ar++){ var arow=auVals[ar]||[]; if(!dashboardIncludeByStatusOrDate(aexp>=0?arow[aexp]:"", astat>=0?arow[astat]:"", aexp>=0, astat>=0)) continue; var nameA=an>=0?expClean(arow[an]):"", idA=aid>=0?expClean(arow[aid]):""; if(!nameA) continue; items.push(makeExpItem("Authority",idA||nameA,nameA,"Insurance","Insurance",aexp>=0?arow[aexp]:"",{authorityId:idA,dot:adot>=0?expClean(arow[adot]):"",status:astat>=0?expClean(arow[astat]):""})); }
       }
       if(trVals.length){
         var th=trVals[0]||[], tu=expHeaderIndex(th,["Truck #","Truck#","Unit #","Unit#","Unit"]), tin=expHeaderIndex(th,["In Service?","In Service"]), ta=expHeaderIndex(th,["Annual Inspection","Annual Inspection Exp","Inspection Exp"]), tv=expHeaderIndex(th,["VIN","VIN #"]), tp=expHeaderIndex(th,["Plate","Plate #"]);
@@ -8043,14 +8068,8 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       d.setHours(0,0,0,0);
       return d.getTime()>=today.getTime();
     }
-    function includeByDateOrCurrent(dateVal, currentVal, hasDateCol, hasCurrentCol){
-      // Primary rule: include if the relevant expiration date is valid and not expired.
-      // Catch-all rule: also include rows marked Current? = Yes, even if the date is missing/expired.
-      // If neither column exists, do not accidentally hide everything.
-      if(hasDateCol && dateNotExpired(dateVal)) return true;
-      if(hasCurrentCol && isActiveCurrent(currentVal)) return true;
-      if(!hasDateCol && !hasCurrentCol) return true;
-      return false;
+    function includeByDateOrCurrent(dateVal, statusVal, hasDateCol, hasStatusCol){
+      return dashboardIncludeByStatusOrDate(dateVal, statusVal, hasDateCol, hasStatusCol);
     }
     function hidx(head, names){
       head=(head||[]).map(function(x){return clean(x).toLowerCase().replace(/[.]/g,"").replace(/[#]/g,"#").replace(/\s+/g," ");});
@@ -8071,13 +8090,13 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
         var h=authVals[0]||[], ia=hidx(h,["Authority","Authority / LLC","LLC","Company","Company Name","Name","Legal Name"]),
           idot=hidx(h,["DOT #","DOT#","U.S. DOT#","USDOT","US DOT","DOT"]), imc=hidx(h,["MC #","MC#","MC","MC Number"]), iein=hidx(h,["EIN","FEIN","Federal ID","Federal ID #","Tax ID"]),
           iagent=hidx(h,["Insurer/Agent","Insurer","Agent","Insurance Agent"]), ipolicy=hidx(h,["Policy Type","Coverage","Coverage Type"]), ipolicyDate=hidx(h,["Policy Date","Effective Date","Policy Effective"]), idrug=hidx(h,["Drug Testing Policy Date","Drug Test Policy Date","D&A Policy Date","DA Policy Date"]),
-          icur=hidx(h,["Current?","Current"]), iins=hidx(h,["Insurance Exp","Insurance Expiration","Insurance Exp.","Insurance Exp Date","Insurance Expiration Date","Ins Exp","Ins. Exp","Policy Exp","Policy Expiration"]);
+          icur=hidx(h,["Status","Current?","Current"]), iins=hidx(h,["Insurance Exp","Insurance Expiration","Insurance Exp.","Insurance Exp Date","Insurance Expiration Date","Ins Exp","Ins. Exp","Policy Exp","Policy Expiration"]);
         for(var r=1;r<authVals.length;r++){
           var row=authVals[r]||[], name=ia>=0?clean(row[ia]):""; if(!name) continue;
-          var rec={authority:name, dot:idot>=0?clean(row[idot]):"", mc:imc>=0?clean(row[imc]):"", ein:iein>=0?clean(row[iein]):"", insurerAgent:iagent>=0?clean(row[iagent]):"", policyType:ipolicy>=0?clean(row[ipolicy]):"", policyDate:ipolicyDate>=0?clean(row[ipolicyDate]):"", drugTestDate:idrug>=0?clean(row[idrug]):"", current:icur>=0?clean(row[icur]):"", insuranceExp:iins>=0?clean(row[iins]):""};
+          var rec={authority:name, dot:idot>=0?clean(row[idot]):"", mc:imc>=0?clean(row[imc]):"", ein:iein>=0?clean(row[iein]):"", insurerAgent:iagent>=0?clean(row[iagent]):"", policyType:ipolicy>=0?clean(row[ipolicy]):"", policyDate:ipolicyDate>=0?clean(row[ipolicyDate]):"", drugTestDate:idrug>=0?clean(row[idrug]):"", current:icur>=0?clean(row[icur]):"", status:icur>=0?clean(row[icur]):"", insuranceExp:iins>=0?clean(row[iins]):""};
           out.authoritiesByName[key(name)]=rec;
-          // Authority dropdowns use Insurance Exp as the main active signal, plus Current? = Yes as a catch-all.
-          // This keeps insured authorities available even when they don't currently have a driver assigned.
+          // Authority dropdowns use the Fleet Master Status dropdown first, then fall back to Insurance Exp for older sheet versions.
+          // Include Current, Returning, Potential, Pending, New, and Temp; exclude Quit, Fired, and Old.
           if(includeByDateOrCurrent(rec.insuranceExp, rec.current, iins>=0, icur>=0)) out.authorities.push(rec);
         }
         out.authorities.sort(function(a,b){ return a.authority.localeCompare(b.authority); });
@@ -8101,7 +8120,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
         out.tractors.sort(function(a,b){ return String(a.unit).localeCompare(String(b.unit), undefined, {numeric:true, sensitivity:"base"}); });
       }
       if(drVals.length){
-        var dh=drVals[0]||[], iid=hidx(dh,["Driver ID","DriverID","ID"]), iname=hidx(dh,["Driver Name","Full Name","Name"]), ifirst=hidx(dh,["First","First Name"]), imiddle=hidx(dh,["Middle","Middle Name"]), ilast=hidx(dh,["Last","Last Name"]), isuffix=hidx(dh,["Suffix"]), icurD=hidx(dh,["Current?","Current"]),
+        var dh=drVals[0]||[], iid=hidx(dh,["Driver ID","DriverID","ID"]), iname=hidx(dh,["Driver Name","Full Name","Name"]), ifirst=hidx(dh,["First","First Name"]), imiddle=hidx(dh,["Middle","Middle Name"]), ilast=hidx(dh,["Last","Last Name"]), isuffix=hidx(dh,["Suffix"]), icurD=hidx(dh,["Status","Current?","Current"]),
           iaddr=hidx(dh,["Address","Driver Address","Street Address"]), icity=hidx(dh,["City","Driver City"]), istate=hidx(dh,["State","Driver State"]), izip=hidx(dh,["Zip","Zip Code","Postal Code"]), iphone=hidx(dh,["Cell","Cell Phone","Mobile","Mobile Phone","Phone","Phone Number","Driver Phone"]), iemail=hidx(dh,["Email","Email Address","Driver Email"]), idob=hidx(dh,["DOB","Date of Birth","Birth Date","Driver DOB"]), iyor=hidx(dh,["Years of OTR","Years OTR","OTR Years","YOR"]),
           icdl=hidx(dh,["CDL #","CDL#","CDL Number","License #"]), icdlState=hidx(dh,["CDL State","State"]), icdlExp=hidx(dh,["CDL Exp","CDL Expiration","CDL Exp.","CDL Exp Date","CDL Expiration Date"]), imed=hidx(dh,["Medical Exp","Medical Expiration","Medical Exp.","Medical Exp Date","Medical Expiration Date","Med Exp","Med. Exp"]), issn=hidx(dh,["SSN Last 4","SSN Last4","Last 4","SSN"]);
         for(var d=1;d<drVals.length;d++){
@@ -8116,7 +8135,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
             var ssnRaw=issn>=0?clean(dr[issn]):"";
             var rawAddr=iaddr>=0?clean(dr[iaddr]):"", parsedAddr=splitDriverAddress(rawAddr);
             var city=icity>=0?clean(dr[icity]):parsedAddr.city, st=istate>=0?clean(dr[istate]):parsedAddr.state, zip=izip>=0?clean(dr[izip]):parsedAddr.zip;
-            var recD={id:id, driverId:id, name:name, label:label, first:first, middle:imiddle>=0?clean(dr[imiddle]):"", last:last, suffix:isuffix>=0?clean(dr[isuffix]):"", current:icurD>=0?clean(dr[icurD]):"", address:rawAddr?(city||st||zip?parsedAddr.street:rawAddr):"", city:city, state:st, zip:zip, phone:iphone>=0?clean(dr[iphone]):"", email:iemail>=0?clean(dr[iemail]):"", dob:idob>=0?clean(dr[idob]):"", yearsOtr:iyor>=0?clean(dr[iyor]):"", cdl:icdl>=0?clean(dr[icdl]):"", cdlState:icdlState>=0?clean(dr[icdlState]):"", cdlExp:icdlExp>=0?clean(dr[icdlExp]):"", medicalExp:imed>=0?clean(dr[imed]):"", ssnLast4:ssnRaw?ssnRaw.slice(-4):""};
+            var recD={id:id, driverId:id, name:name, label:label, first:first, middle:imiddle>=0?clean(dr[imiddle]):"", last:last, suffix:isuffix>=0?clean(dr[isuffix]):"", current:icurD>=0?clean(dr[icurD]):"", status:icurD>=0?clean(dr[icurD]):"", address:rawAddr?(city||st||zip?parsedAddr.street:rawAddr):"", city:city, state:st, zip:zip, phone:iphone>=0?clean(dr[iphone]):"", email:iemail>=0?clean(dr[iemail]):"", dob:idob>=0?clean(dr[idob]):"", yearsOtr:iyor>=0?clean(dr[iyor]):"", cdl:icdl>=0?clean(dr[icdl]):"", cdlState:icdlState>=0?clean(dr[icdlState]):"", cdlExp:icdlExp>=0?clean(dr[icdlExp]):"", medicalExp:imed>=0?clean(dr[imed]):"", ssnLast4:ssnRaw?ssnRaw.slice(-4):""};
             out.driversByName[key(name)]=recD;
             if(id){ out.driversByName[key(id)]=recD; out.driversById[key(id)]=recD; }
             if(label) out.driversByName[key(label)]=recD;
@@ -8124,7 +8143,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
           }
         }
         out.drivers.sort(function(a,b){ return a.label.localeCompare(b.label); });
-        // Use the same Medical Exp / Current? filtered Drivers-tab list in driver cards, too.
+        // Use the same Status/Medical Exp filtered Drivers-tab list in driver cards, too.
         // Merge it with Current Roster assignment details when available, so assigned drivers still auto-fill authority/truck.
         if(S365 && S365.roster){
           var mergedByDriver=Object.assign({}, S365.roster.byDriver||{});
@@ -8959,7 +8978,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     dataPanel.appendChild(el("h3",{text:"Data connections"}));
     dataPanel.appendChild(el("div",{class:"status-line"}, el("b",{text:"Fleet Master Sheet: "}), "Locked to the office workbook"));
     dataPanel.appendChild(el("div",{class:"status-line"}, el("b",{text:"Worksheet: "}), FIXED_MAPPING.worksheet));
-    dataPanel.appendChild(el("div",{class:"status-line"}, el("b",{text:"Driver/authority filters: "}), "Drivers use Medical Exp + Current?; authorities use Insurance Exp + Current?"));
+    dataPanel.appendChild(el("div",{class:"status-line"}, el("b",{text:"Driver/authority filters: "}), "Status dropdown controls inclusion: Current, Returning, Potential, Pending, New, Temp show; Quit/Fired/Old hide. If Status is blank, the dashboard falls back to future expiration dates."));
     dataPanel.appendChild(el("div",{class:"status-line"}, el("b",{text:"Fast start cache: "}), hasFleetLookupData()?fleetDataStatus():"No remembered Fleet data yet"));
     dataPanel.appendChild(el("div",{class:"status-line"}, el("b",{text:"Shared JSON: "}), "Locked to the shared office file"));
     dataPanel.appendChild(el("p",{class:"note",text:"The dashboard loads remembered Fleet data immediately, then refreshes from the live workbook after sign-in. If a generator is open while the refresh finishes, your current form is left alone."}));
