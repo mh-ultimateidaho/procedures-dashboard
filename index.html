@@ -7145,6 +7145,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   var insOverlay=document.getElementById("ins-overlay");
   var insBody=document.getElementById("ins-body");
   var insuranceState={view:"all", search:"", sort:"date", dir:"asc"};
+  var INSURANCE_FOLDER_URL="https://ultimatecorp-my.sharepoint.com/shared?id=%2Fsites%2FUltimateLogisticsLLC%2FShared%20Documents%2FCompliance%2FInsurance&listurl=https%3A%2F%2Fultimatecorp%2Esharepoint%2Ecom%2Fsites%2FUltimateLogisticsLLC%2FShared%20Documents&viewid=a44e9030%2Da3e0%2D4738%2D9c7a%2Dc6af2d6baa51";
   var insuranceEditingKey="";
   var INS_STAGES=["Not started","Shopping Quotes","Quotes in / comparing","Pending FMCSA","Docs pending","Bound","Completed"];
   var INS_BROKERS=["Terri (HUB)","Roxie (AMP)","Bret (Mustard Seed)","OOIDA direct","Other"];
@@ -8053,8 +8054,9 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     var sort=el("select"); [["date","Insurance exp date"],["name","Account name"],["stage","Status"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===(insuranceState.sort||"date")) o.selected=true; sort.appendChild(o); }); sort.addEventListener("change",function(){ insuranceState.sort=sort.value; renderInsurance(); });
     var dir=el("select"); [["asc","Oldest / A-Z"],["desc","Newest / Z-A"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===(insuranceState.dir||"asc")) o.selected=true; dir.appendChild(o); }); dir.addEventListener("change",function(){ insuranceState.dir=dir.value; renderInsurance(); });
     var exportBtn=el("button",{class:"btn small",text:"⬇ Export Recap",onclick:exportInsuranceRecap});
+    var folderBtn=el("button",{class:"btn small",text:"📁 Insurance folder",title:"Open the SharePoint / OneDrive Insurance folder",onclick:function(){ window.open(INSURANCE_FOLDER_URL,"_blank","noopener"); }});
     var importBtn=el("button",{class:"btn small",text:"Import Aug 19 recap",onclick:insImportRecap});
-    toolbar.appendChild(coverField("View",view)); toolbar.appendChild(coverField("Sort by",sort)); toolbar.appendChild(coverField("Direction",dir)); toolbar.appendChild(coverField("Search",search)); toolbar.appendChild(coverField("Export",exportBtn)); toolbar.appendChild(coverField("Seed data",importBtn)); insBody.appendChild(toolbar);
+    toolbar.appendChild(coverField("View",view)); toolbar.appendChild(coverField("Sort by",sort)); toolbar.appendChild(coverField("Direction",dir)); toolbar.appendChild(coverField("Search",search)); toolbar.appendChild(coverField("Export",exportBtn)); toolbar.appendChild(coverField("Folder",folderBtn)); toolbar.appendChild(coverField("Seed data",importBtn)); insBody.appendChild(toolbar);
     var all=insItems(), stageCounts={}; INS_STAGES.forEach(function(s){ stageCounts[s]=0; }); all.forEach(function(it){ var s=insStageOf(it); stageCounts[s]=(stageCounts[s]||0)+1; });
     var notesCount=all.filter(insHasKeyNote).length;
     var pills=[el("span",{class:"exp-pill",text:all.length+" total"})];
