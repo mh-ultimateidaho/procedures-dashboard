@@ -3693,6 +3693,12 @@
   "type": "driver-event",
   "title": "Authority Change",
   "eventType": "authority-change",
+  "toggles": [
+   {
+    "id": "tg-brand-new-authority",
+    "label": "Brand-new authority (show UCR / permit / NM setup steps)"
+   }
+  ],
   "blocks": [
    {
     "label": "Before driver leaves — Majkaela's tasks",
@@ -3704,12 +3710,12 @@
      },
      {
       "text": "UCR for [NEW_AUTH] (if new auth).",
-      "newAuthOnly": true,
+      "toggle": "tg-brand-new-authority",
       "id": "chk-authority-change-b1i2"
      },
      {
       "text": "Permit accounts set-up for [NEW_AUTH] (POAs).",
-      "newAuthOnly": true,
+      "toggle": "tg-brand-new-authority",
       "id": "chk-authority-change-b1i3"
      },
      {
@@ -3761,7 +3767,7 @@
      },
      {
       "text": "Enter NM transaction in QuickBooks.",
-      "newAuthOnly": true,
+      "toggle": "tg-brand-new-authority",
       "id": "chk-authority-change-b2i7"
      },
      {
@@ -4966,13 +4972,42 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   }
 
   /* ---------- card resolution ---------- */
+  var AUTH_NEW_TOGGLE_ID = "tg-brand-new-authority";
+  var AUTH_NEW_TOGGLE_LABEL = "Brand-new authority (show UCR / permit / NM setup steps)";
+  function mergeCardToggles(baseToggles, overrideToggles){
+    var out=[];
+    function add(t){
+      if(!t || !t.id) return;
+      if(out.some(function(x){return x.id===t.id;})) return;
+      out.push(clone(t));
+    }
+    (baseToggles||[]).forEach(add);
+    (overrideToggles||[]).forEach(add);
+    return out.length ? out : undefined;
+  }
+  function normalizeAuthoritySpecialToggle(card){
+    if(!card || card.eventType!=="authority-change") return card;
+    card.toggles = mergeCardToggles([{id:AUTH_NEW_TOGGLE_ID,label:AUTH_NEW_TOGGLE_LABEL}], card.toggles||[]) || [];
+    function walk(list){
+      (list||[]).forEach(function(it){
+        if(!it) return;
+        if(it.newAuthOnly){
+          if(!it.toggle) it.toggle=AUTH_NEW_TOGGLE_ID;
+          delete it.newAuthOnly;
+        }
+      });
+    }
+    walk(card.steps);
+    (card.blocks||[]).forEach(function(b){ walk(b.items); });
+    return card;
+  }
   function isCustom(id){ for(var i=0;i<config.customCards.length;i++) if(config.customCards[i].id===id) return config.customCards[i]; return null; }
   function getEffectiveCard(id){
     var cust=isCustom(id); if(cust) return cust;
     var base=builtinById[id]; if(!base) return null;
     var ov=config.cardOverrides[id];
-    if(ov){ var m=clone(base); if(ov.steps) m.steps=ov.steps; if(ov.blocks) m.blocks=ov.blocks; if(ov.title!=null) m.title=ov.title; if(ov.defaultMode) m.defaultMode=ov.defaultMode; if(ov.toggles) m.toggles=ov.toggles; if(ov.coveringTitle!=null) m.coveringTitle=ov.coveringTitle; if(ov.lastEdited) m.lastEdited=ov.lastEdited; return m; }
-    return base;
+    if(ov){ var m=clone(base); if(ov.steps) m.steps=ov.steps; if(ov.blocks) m.blocks=ov.blocks; if(ov.title!=null) m.title=ov.title; if(ov.defaultMode) m.defaultMode=ov.defaultMode; m.toggles=mergeCardToggles(base.toggles, ov.toggles); if(ov.coveringTitle!=null) m.coveringTitle=ov.coveringTitle; if(ov.lastEdited) m.lastEdited=ov.lastEdited; return normalizeAuthoritySpecialToggle(m); }
+    return normalizeAuthoritySpecialToggle(base);
   }
   function getOriginalCard(id){
     var cust=isCustom(id); if(cust) return cust._orig || cust;
@@ -4983,7 +5018,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     if(modalState && modalState.editMode && modalState.editDraft && modalState.cardId===id) return modalState.editDraft;
     var cust=isCustom(id); if(cust) return cust;
     var base=builtinById[id];
-    if(!config.cardOverrides[id]) config.cardOverrides[id]={steps:clone(base.steps||null), blocks:clone(base.blocks||null), title:base.title};
+    if(!config.cardOverrides[id]) config.cardOverrides[id]={steps:clone(base.steps||null), blocks:clone(base.blocks||null), title:base.title, toggles:clone(base.toggles||null)};
     return config.cardOverrides[id];
   }
   function isEditable(card){ return card.type!=="email"; }
@@ -5014,6 +5049,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       var toggleHidden = false;
       if(it.toggle){
         var on = !!(sess && sess.toggleState && sess.toggleState[it.toggle]);
+        if(it.toggle===AUTH_NEW_TOGGLE_ID && sess && sess.brandNewAuth) on = true;
         toggleHidden = it.toggleNot ? on : !on;
       }
       if(newAuthHidden || toggleHidden) return;
@@ -5382,6 +5418,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       modalState.ctx = clone(session.context)||null;
       modalState.brandNewAuth = !!session.brandNewAuth;
       modalState.toggleState = clone(session.toggleState)||{};
+      if(card.eventType==="authority-change" && session.brandNewAuth && !modalState.toggleState[AUTH_NEW_TOGGLE_ID]) modalState.toggleState[AUTH_NEW_TOGGLE_ID]=true;
       modalState.notes = clone(session.notes)||{};
     }
     overlay.classList.remove("hidden"); overlay.setAttribute("aria-hidden","false");
@@ -5539,10 +5576,6 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
         labeled("New DOT #","new", input("f-newdot"))
       ));
       wrap.appendChild(split);
-      var tgl=el("input",{type:"checkbox", id:"f-brandnew"});
-      tgl.checked=!!modalState.brandNewAuth;
-      tgl.addEventListener("change", function(){ captureContextForm(); captureChecks(); modalState.brandNewAuth=tgl.checked; renderModal(); });
-      wrap.appendChild(el("label",{class:"toggle-row"}, tgl, "Brand-new authority (show UCR / permit / NM setup steps)"));
     }
 
     return wrap;
@@ -6139,7 +6172,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       eventDate: modalState.formValues.eventdate||"",
       context: clone(modalState.ctx),
       formValues: clone(modalState.formValues),
-      brandNewAuth: modalState.brandNewAuth,
+      brandNewAuth: !!(modalState.toggleState && modalState.toggleState[AUTH_NEW_TOGGLE_ID]) || !!modalState.brandNewAuth,
       toggleState: clone(modalState.toggleState),
       notes: clone(modalState.notes),
       checks: clone(modalState.checks),
@@ -8470,7 +8503,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     leaseValues.newCompany=oldCo;
     var unit=leaseValues.oldUnit||"###";
     var p1="Ultimate Logistics, LLC, the owner of Unit# "+unit+", hereby terminates the lease agreement by & between Ultimate Logistics LLC & "+oldCo+", as it pertains to Unit# "+unit+"; "+leaseVehicle("old")+"; "+(leaseValues.oldVin||"VIN#")+".";
-    var pLease="Unit#"+unit+" lease start date: "+leaseDateText(leaseValues.oldLeaseStart,"lease start date")+" – lease end date: "+leaseDateText(leaseValues.oldLeaseEnd,"lease end date");
+    var pLease="Unit#"+unit+" lease start date: "+leaseDateText(leaseValues.oldLeaseStart,"lease start date")+" - lease end date: "+leaseDateText(leaseValues.oldLeaseEnd,"lease end date");
     var p2="Please remove Unit# "+unit+" from the "+oldCo+" insurance policy & replace it with Unit# "+(leaseValues.newUnit||"###")+"; "+leaseVehicle("new")+"; "+(leaseValues.newVin||"VIN#")+". Cover page attached.";
     return {p1:p1,pLease:pLease,p2:p2};
   }
