@@ -8401,12 +8401,9 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   function escHtml(s){ return String(s||"").replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c];}); }
   function safeFilePart(s){ return String(s||"").replace(/[\\/:*?"<>|]+/g," ").replace(/\s+/g," ").trim(); }
   function fileNameCasePart(s){
-    var keep={llc:1,llp:1,inc:1,dot:1,mc:1,cdl:1,ein:1,usa:1,us:1,ooida:1};
-    return safeFilePart(s).toLowerCase().replace(/\b[\w&'.-]+\b/g,function(w){
-      var plain=w.replace(/[^a-z0-9]/g,"");
-      if(keep[plain]) return w.toUpperCase();
-      return w.charAt(0).toUpperCase()+w.slice(1);
-    }).replace(/\bLlc\b/g,"LLC").replace(/\bInc\b/g,"Inc");
+    // Preserve company/authority casing from Fleet Master.
+    // Some authorities intentionally use uppercase acronyms like GLC; only sanitize filename characters.
+    return safeFilePart(s);
   }
   function coverCompanyText(s){ s=String(s||"").trim(); return s || "Company, LLC"; }
 
@@ -8643,6 +8640,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   var packageManualOpen=false;
   var PACKAGE_FIELD_NAMES=["FirstName","MiddleName","LastName","Suffix","DriverAddress","DriverCity","DriverState","DriverZip","DriverPhone","DOB","SSN","DriverEmailaddress","CDLNumber","CDLExpDate","CDLIssueState","YOR","MedicalExpDate","TransitCompanyName","TransitDrugTestDate","TransitDot","TransitMC","TransitEINNumber","DriverCompanyName","DriverCompanyEIN","DriverDOT","DriverMC","TractorUnitNumber","TractorYear","TractorMake","TractorPlate","TractorColor","TractorVin","LeaseStartDate","LeaseEndDate","LeaseNumberofMonths","LeaseBiMonthlyPay","LeaseMonthlyPay","TractorEquipCosts","TractorDownPay","TractorBalloonPay","TractorBalance","TrailerCostPerMonth"];
   var PACKAGE_CURRENCY_FIELDS={LeaseBiMonthlyPay:true,LeaseMonthlyPay:true,TractorEquipCosts:true,TractorDownPay:true,TractorBalloonPay:true,TractorBalance:true,TrailerCostPerMonth:true};
+  var PACKAGE_NO_BOLD_VALUE_FIELDS={DriverAddress:true,DriverCity:true,DriverState:true,DriverZip:true,DriverPhone:true,DOB:true,SSN:true,DriverEmailaddress:true,CDLNumber:true,CDLExpDate:true,CDLIssueState:true,YOR:true,MedicalExpDate:true,TransitDrugTestDate:true,TransitDot:true,TransitMC:true,TransitEINNumber:true,DriverCompanyEIN:true,DriverDOT:true,DriverMC:true,TractorUnitNumber:true,TractorYear:true,TractorMake:true,TractorPlate:true,TractorColor:true,TractorVin:true,LeaseStartDate:true,LeaseEndDate:true,LeaseNumberofMonths:true,LeaseBiMonthlyPay:true,LeaseMonthlyPay:true,TractorEquipCosts:true,TractorDownPay:true,TractorBalloonPay:true,TractorBalance:true,TrailerCostPerMonth:true};
   var PACKAGE_DATE_FIELDS={LeaseStartDate:true,LeaseEndDate:true,DOB:true,CDLExpDate:true,MedicalExpDate:true,TransitDrugTestDate:true};
   var PACKAGE_LEASE_PAYMENT_FIELDS=[["Lease start date","LeaseStartDate"],["Lease end date","LeaseEndDate"],["# of months","LeaseNumberofMonths"],["Bi-monthly payment","LeaseBiMonthlyPay"],["Monthly payment","LeaseMonthlyPay"],["Equipment cost","TractorEquipCosts"],["Down payment","TractorDownPay"],["Balloon payment","TractorBalloonPay"],["Equipment balance","TractorBalance"],["Trailer cost per month","TrailerCostPerMonth"]];
   var PACKAGE_TYPES=[
@@ -8971,10 +8969,23 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     return "<w:rPr>"+(primary||fallback)+"</w:rPr>";
   }
   function packageRPrWithoutBold(rPr){
+    // Some templates put bold on the whole paragraph/cell so removing <w:b/> from
+    // the value run is not enough — Word will inherit the paragraph bold anyway.
+    // For value-like fields (dates, IDs, money, VINs, etc.), explicitly turn bold off
+    // on the replacement/result run while leaving font size, centering, and other styling alone.
     var inner=packageRunPrInner(rPr);
-    if(!inner) return rPr||"";
-    inner=inner.replace(/<w:b(?:Cs)?\b[^>]*\/>/g,"");
+    inner=inner.replace(/<w:b(?:Cs)?\b[^>]*\/>/g,"").replace(/<w:b(?:Cs)?\b[^>]*>[\s\S]*?<\/w:b(?:Cs)?>/g,"");
+    if(!/<w:b\b/.test(inner)) inner += '<w:b w:val="0"/>';
+    if(!/<w:bCs\b/.test(inner)) inner += '<w:bCs w:val="0"/>';
     return "<w:rPr>"+inner+"</w:rPr>";
+  }
+  function packageFieldValueShouldNotBold(name){
+    if(PACKAGE_NO_BOLD_VALUE_FIELDS && PACKAGE_NO_BOLD_VALUE_FIELDS[name]) return true;
+    var n=String(name||"");
+    // Future templates may reuse the same data-sheet field style with slightly different
+    // names. Treat operational values as non-bold unless they are actual name/company fields.
+    if(/(FirstName|MiddleName|LastName|Suffix|CompanyName|TransitCompanyName|DriverCompanyName)/i.test(n)) return false;
+    return /(Date|DOB|Exp|DOT|MC|EIN|SSN|Phone|Email|Address|City|State|Zip|CDL|YOR|Unit|Year|Make|Plate|Color|Vin|VIN|Cost|Pay|Payment|Balance|Month|Trailer)/i.test(n);
   }
   function packageFieldNameFromBlock(block){
     var b=String(block||""), m=b.match(/<w:name\b[^>]*w:val="([^"]+)"/);
@@ -9014,7 +9025,9 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
         var block=p.slice(runStart,endRun);
         var name=packageFieldNameFromBlock(block);
         if(name && Object.prototype.hasOwnProperty.call(valueMap,name)){
-          out += packagePlainRun(valueMap[name]||"", packageBestRunPrForField(block,p));
+          var useRPr=packageBestRunPrForField(block,p);
+          if(packageFieldValueShouldNotBold(name)) useRPr=packageRPrWithoutBold(useRPr);
+          out += packagePlainRun(valueMap[name]||"", useRPr);
         }else{
           out += block;
         }
@@ -9073,7 +9086,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       result=result.replace(/(<w:r\b[^>]*>)(<w:rPr>[\s\S]*?<\/w:rPr>)?([\s\S]*?<w:t\b[^>]*>[\s\S]*?<\/w:t>[\s\S]*?)(<\/w:r>)/g,function(mm,rStart,rPr,body,rEnd){
         var useRPr=packageMergeRPrInner(fieldRPr,rPr||"");
         useRPr=keepNoProofFrom(rPr,useRPr);
-        if(PACKAGE_CURRENCY_FIELDS[name] || name==="LeaseNumberofMonths") useRPr=packageRPrWithoutBold(useRPr);
+        if(packageFieldValueShouldNotBold(name)) useRPr=packageRPrWithoutBold(useRPr);
         return rStart+useRPr+body+rEnd;
       });
       return before+result+after;
