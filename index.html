@@ -3693,6 +3693,12 @@
   "type": "driver-event",
   "title": "Authority Change",
   "eventType": "authority-change",
+  "toggles": [
+   {
+    "id": "tg-brand-new-authority",
+    "label": "Brand-new authority (show UCR / permit / NM setup steps)"
+   }
+  ],
   "blocks": [
    {
     "label": "Before driver leaves — Majkaela's tasks",
@@ -3704,12 +3710,12 @@
      },
      {
       "text": "UCR for [NEW_AUTH] (if new auth).",
-      "newAuthOnly": true,
+      "toggle": "tg-brand-new-authority",
       "id": "chk-authority-change-b1i2"
      },
      {
       "text": "Permit accounts set-up for [NEW_AUTH] (POAs).",
-      "newAuthOnly": true,
+      "toggle": "tg-brand-new-authority",
       "id": "chk-authority-change-b1i3"
      },
      {
@@ -3761,7 +3767,7 @@
      },
      {
       "text": "Enter NM transaction in QuickBooks.",
-      "newAuthOnly": true,
+      "toggle": "tg-brand-new-authority",
       "id": "chk-authority-change-b2i7"
      },
      {
@@ -4454,6 +4460,8 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   config.deletedSessions = config.deletedSessions || {};
   config.userPins = config.userPins || {};
   config.expirationNotes = config.expirationNotes || {};
+  config.expirationReviewFlags = config.expirationReviewFlags || {};
+  config.manualExpirationItems = Array.isArray(config.manualExpirationItems) ? config.manualExpirationItems : [];
 
   // Recents stay personal. Pins are saved per signed-in user in the shared JSON.
   // In-progress sessions sync through SharePoint when signed in.
@@ -4966,13 +4974,42 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   }
 
   /* ---------- card resolution ---------- */
+  var AUTH_NEW_TOGGLE_ID = "tg-brand-new-authority";
+  var AUTH_NEW_TOGGLE_LABEL = "Brand-new authority (show UCR / permit / NM setup steps)";
+  function mergeCardToggles(baseToggles, overrideToggles){
+    var out=[];
+    function add(t){
+      if(!t || !t.id) return;
+      if(out.some(function(x){return x.id===t.id;})) return;
+      out.push(clone(t));
+    }
+    (baseToggles||[]).forEach(add);
+    (overrideToggles||[]).forEach(add);
+    return out.length ? out : undefined;
+  }
+  function normalizeAuthoritySpecialToggle(card){
+    if(!card || card.eventType!=="authority-change") return card;
+    card.toggles = mergeCardToggles([{id:AUTH_NEW_TOGGLE_ID,label:AUTH_NEW_TOGGLE_LABEL}], card.toggles||[]) || [];
+    function walk(list){
+      (list||[]).forEach(function(it){
+        if(!it) return;
+        if(it.newAuthOnly){
+          if(!it.toggle) it.toggle=AUTH_NEW_TOGGLE_ID;
+          delete it.newAuthOnly;
+        }
+      });
+    }
+    walk(card.steps);
+    (card.blocks||[]).forEach(function(b){ walk(b.items); });
+    return card;
+  }
   function isCustom(id){ for(var i=0;i<config.customCards.length;i++) if(config.customCards[i].id===id) return config.customCards[i]; return null; }
   function getEffectiveCard(id){
     var cust=isCustom(id); if(cust) return cust;
     var base=builtinById[id]; if(!base) return null;
     var ov=config.cardOverrides[id];
-    if(ov){ var m=clone(base); if(ov.steps) m.steps=ov.steps; if(ov.blocks) m.blocks=ov.blocks; if(ov.title!=null) m.title=ov.title; if(ov.defaultMode) m.defaultMode=ov.defaultMode; if(ov.toggles) m.toggles=ov.toggles; if(ov.coveringTitle!=null) m.coveringTitle=ov.coveringTitle; if(ov.lastEdited) m.lastEdited=ov.lastEdited; return m; }
-    return base;
+    if(ov){ var m=clone(base); if(ov.steps) m.steps=ov.steps; if(ov.blocks) m.blocks=ov.blocks; if(ov.title!=null) m.title=ov.title; if(ov.defaultMode) m.defaultMode=ov.defaultMode; m.toggles=mergeCardToggles(base.toggles, ov.toggles); if(ov.coveringTitle!=null) m.coveringTitle=ov.coveringTitle; if(ov.lastEdited) m.lastEdited=ov.lastEdited; return normalizeAuthoritySpecialToggle(m); }
+    return normalizeAuthoritySpecialToggle(base);
   }
   function getOriginalCard(id){
     var cust=isCustom(id); if(cust) return cust._orig || cust;
@@ -4983,7 +5020,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     if(modalState && modalState.editMode && modalState.editDraft && modalState.cardId===id) return modalState.editDraft;
     var cust=isCustom(id); if(cust) return cust;
     var base=builtinById[id];
-    if(!config.cardOverrides[id]) config.cardOverrides[id]={steps:clone(base.steps||null), blocks:clone(base.blocks||null), title:base.title};
+    if(!config.cardOverrides[id]) config.cardOverrides[id]={steps:clone(base.steps||null), blocks:clone(base.blocks||null), title:base.title, toggles:clone(base.toggles||null)};
     return config.cardOverrides[id];
   }
   function isEditable(card){ return card.type!=="email"; }
@@ -5014,6 +5051,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       var toggleHidden = false;
       if(it.toggle){
         var on = !!(sess && sess.toggleState && sess.toggleState[it.toggle]);
+        if(it.toggle===AUTH_NEW_TOGGLE_ID && sess && sess.brandNewAuth) on = true;
         toggleHidden = it.toggleNot ? on : !on;
       }
       if(newAuthHidden || toggleHidden) return;
@@ -5382,6 +5420,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       modalState.ctx = clone(session.context)||null;
       modalState.brandNewAuth = !!session.brandNewAuth;
       modalState.toggleState = clone(session.toggleState)||{};
+      if(card.eventType==="authority-change" && session.brandNewAuth && !modalState.toggleState[AUTH_NEW_TOGGLE_ID]) modalState.toggleState[AUTH_NEW_TOGGLE_ID]=true;
       modalState.notes = clone(session.notes)||{};
     }
     overlay.classList.remove("hidden"); overlay.setAttribute("aria-hidden","false");
@@ -5539,10 +5578,6 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
         labeled("New DOT #","new", input("f-newdot"))
       ));
       wrap.appendChild(split);
-      var tgl=el("input",{type:"checkbox", id:"f-brandnew"});
-      tgl.checked=!!modalState.brandNewAuth;
-      tgl.addEventListener("change", function(){ captureContextForm(); captureChecks(); modalState.brandNewAuth=tgl.checked; renderModal(); });
-      wrap.appendChild(el("label",{class:"toggle-row"}, tgl, "Brand-new authority (show UCR / permit / NM setup steps)"));
     }
 
     return wrap;
@@ -6139,7 +6174,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       eventDate: modalState.formValues.eventdate||"",
       context: clone(modalState.ctx),
       formValues: clone(modalState.formValues),
-      brandNewAuth: modalState.brandNewAuth,
+      brandNewAuth: !!(modalState.toggleState && modalState.toggleState[AUTH_NEW_TOGGLE_ID]) || !!modalState.brandNewAuth,
       toggleState: clone(modalState.toggleState),
       notes: clone(modalState.notes),
       checks: clone(modalState.checks),
@@ -6830,6 +6865,8 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       if(remote.hiddenCards) config.hiddenCards=remote.hiddenCards;
       if(remote.userPins && typeof remote.userPins==="object") config.userPins=remote.userPins;
       if(remote.expirationNotes && typeof remote.expirationNotes==="object") config.expirationNotes=remote.expirationNotes;
+      if(remote.expirationReviewFlags && typeof remote.expirationReviewFlags==="object") config.expirationReviewFlags=remote.expirationReviewFlags;
+      if(Array.isArray(remote.manualExpirationItems)) config.manualExpirationItems=remote.manualExpirationItems;
       if(remote.deletedSessions) mergeDeletedSessions(remote.deletedSessions);
       if(remote.sessions) mergeSharedSessions(remote.sessions);
       // Fleet workbook/tab/columns are locked in code so old JSON/browser settings cannot break the dashboard.
@@ -6892,7 +6929,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     if(!S365.signedIn) return;        // local-only until signed in
     setSync("saving","Syncing changes…");
     var payload={ version:1, savedAt:new Date().toISOString(), remoteConfigStorage:activeConfigStorage(), remoteConfigPath:activeConfigFile(), remoteConfigSharePointUrl:activeConfigSharePointUrl(),
-      cardOverrides:config.cardOverrides, customCards:config.customCards, hiddenCards:config.hiddenCards, userPins:config.userPins||{}, expirationNotes:config.expirationNotes||{}, mapping:fixedMapping(), fleetUrl:activeFleetUrl(),
+      cardOverrides:config.cardOverrides, customCards:config.customCards, hiddenCards:config.hiddenCards, userPins:config.userPins||{}, expirationNotes:config.expirationNotes||{}, expirationReviewFlags:config.expirationReviewFlags||{}, manualExpirationItems:config.manualExpirationItems||[], mapping:fixedMapping(), fleetUrl:activeFleetUrl(),
       sessions:pruneDeletedSessions(state.sessions), deletedSessions:config.deletedSessions||{} };
     configPath(null, null, true).then(function(contentUrl){ return graph(contentUrl, { method:"PUT", body:JSON.stringify(payload,null,2), headers:{"Content-Type":"application/json"} }, "saving JSON"); })
       .then(function(){ S365.remote.present=true; S365.remote.storage=activeConfigStorage(); S365.remote.path=activeConfigFile(); setSync("ok","Up to date ✓","Shared edits and Fleet data check finished."); })
@@ -7137,7 +7174,10 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   var expOverlay=document.getElementById("exp-overlay");
   var expBody=document.getElementById("exp-body");
   var expirationState={category:"all", view:"attention", search:"", sort:"date", dir:"asc"};
+  var expirationSearchTimer=null;
   var expirationEditingKey="";
+  var expirationManualFormOpen=false;
+  var expirationManualEditingId="";
   var expirationImportBusy=false;
   var EXP_NOTE_TYPES=["Info","Emailed","Waiting","Follow-up","Temp / exception","Done"];
 
@@ -7311,7 +7351,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   function closeInsurance(){ insOverlay.classList.add("hidden"); insOverlay.setAttribute("aria-hidden","true"); document.body.style.overflow=""; insuranceEditingKey=""; }
 
   function openExpirations(){ expOverlay.classList.remove("hidden"); expOverlay.setAttribute("aria-hidden","false"); document.body.style.overflow="hidden"; renderExpirations(); }
-  function closeExpirations(){ expOverlay.classList.add("hidden"); expOverlay.setAttribute("aria-hidden","true"); document.body.style.overflow=""; expirationEditingKey=""; }
+  function closeExpirations(){ expOverlay.classList.add("hidden"); expOverlay.setAttribute("aria-hidden","true"); document.body.style.overflow=""; expirationEditingKey=""; expirationManualFormOpen=false; expirationManualEditingId=""; }
   function expClean(v){ return String(v==null?"":v).trim(); }
   function expNorm(v){ return expClean(v).toLowerCase().replace(/[^a-z0-9]+/g," ").replace(/\s+/g," ").trim(); }
   function expIsYes(v){ var x=expNorm(v); return x==="yes" || x==="y" || x==="true" || x==="active" || x==="current" || x==="1"; }
@@ -7389,6 +7429,59 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     var iso=expDateISO(dateVal);
     return {key:category.toLowerCase()+"|"+expNorm(stableId||item)+"|"+expNorm(field), category:category, stableId:stableId||item, item:item||"", field:field, detail:detail||field, dateISO:iso, dateRaw:dateVal, meta:meta||{}};
   }
+  function expManualStore(){ config.manualExpirationItems=Array.isArray(config.manualExpirationItems)?config.manualExpirationItems:[]; return config.manualExpirationItems; }
+  function expManualKey(id){ return "manual|"+expNorm(id||""); }
+  function expManualItems(){
+    return expManualStore().filter(function(m){ return m && expClean(m.item); }).map(function(m){
+      var category=expClean(m.category)||"Other", detail=expClean(m.detail)||"Manual item", id=expClean(m.id)||uid("manualexp");
+      if(!m.id) m.id=id;
+      return {key:expManualKey(id), category:category, stableId:id, item:expClean(m.item), field:detail, detail:detail, dateISO:expDateISO(m.dateISO||m.dateRaw||m.dueDate), dateRaw:m.dateISO||m.dateRaw||m.dueDate||"", meta:{manual:true, manualId:id, source:"Manual"}};
+    });
+  }
+  function expAllItems(){
+    var base=(S365.expirationItems||[]).filter(function(it){ return !(it && it.meta && it.meta.manual); });
+    return base.concat(expManualItems()).sort(expSort);
+  }
+  function expFindManual(id){ id=String(id||""); return expManualStore().filter(function(m){ return String(m.id||"")===id; })[0]||null; }
+  function expOpenManualNew(){ expirationManualEditingId=""; expirationManualFormOpen=true; expirationEditingKey=""; renderExpirations(); }
+  function expOpenManualEdit(item){ expirationManualEditingId=item && item.meta ? item.meta.manualId : ""; expirationManualFormOpen=true; expirationEditingKey=""; renderExpirations(); }
+  function expSaveManualItem(data){
+    data=data||{}; var item=expClean(data.item), detail=expClean(data.detail)||"Manual follow-up", category=expClean(data.category)||"Other", dateISO=expDateISO(data.dateISO);
+    if(!item){ window.alert("Add a name/item for the manual expiration first."); return; }
+    var store=expManualStore(), now=new Date().toISOString(), existing=expirationManualEditingId?expFindManual(expirationManualEditingId):null;
+    if(existing){ existing.item=item; existing.detail=detail; existing.category=category; existing.dateISO=dateISO; existing.updatedAt=now; existing.updatedBy=expAccountName(); }
+    else { existing={id:uid("manualexp"), item:item, detail:detail, category:category, dateISO:dateISO, createdAt:now, updatedAt:now, updatedBy:expAccountName()}; store.push(existing); }
+    var noteText=expClean(data.note);
+    if(noteText){
+      var manualItem={key:expManualKey(existing.id), dateISO:dateISO};
+      var b=expBucket(manualItem.key), prev=b.active||{};
+      b.active={id:prev.id||uid("expnote"), type:expInferType(noteText), text:noteText, createdAt:prev.createdAt||now, updatedAt:now, updatedBy:expAccountName(), dateISO:dateISO||"", dateLabel:expPrettyDate(dateISO)};
+    }
+    expirationManualFormOpen=false; expirationManualEditingId=""; flushConfig(); renderExpirations();
+  }
+  function expDeleteManualItem(item){
+    if(!item || !item.meta || !item.meta.manualId) return;
+    if(!window.confirm("Delete this manual expiration item? Any note/review flag attached to this manual item will also be removed.")) return;
+    var id=String(item.meta.manualId);
+    config.manualExpirationItems=expManualStore().filter(function(m){ return String(m.id||"")!==id; });
+    var k=expManualKey(id); if(config.expirationNotes) delete config.expirationNotes[k]; if(config.expirationReviewFlags) delete config.expirationReviewFlags[k];
+    flushConfig(); renderExpirations();
+  }
+  function renderManualExpForm(){
+    var editing=expirationManualEditingId?expFindManual(expirationManualEditingId):null;
+    var box=el("div",{class:"pkg-panel"});
+    box.appendChild(el("h3",{text:editing?"Edit manual expiration":"Add manual expiration"}));
+    box.appendChild(el("p",{class:"note",text:"Use this for things that are not tracked in Fleet Master, like manual annual MVR pulls or one-off compliance reminders. These save to the shared dashboard data."}));
+    var category=el("select"); ["Driver","Authority","Truck","Trailer","Other"].forEach(function(c){ var o=el("option",{value:c,text:c}); if((editing&&editing.category||"Driver")===c)o.selected=true; category.appendChild(o); });
+    var item=el("input",{type:"text",placeholder:"Example: John Means annual MVR pull"}); item.value=(editing&&editing.item)||"";
+    var detail=el("input",{type:"text",placeholder:"Example: Annual MVR pull"}); detail.value=(editing&&editing.detail)||"Annual MVR pull";
+    var due=el("input",{type:"date"}); due.value=expDateISO(editing&&editing.dateISO)||"";
+    var note=el("textarea",{class:"ins-textarea short",placeholder:"Optional starting note, e.g. Cannot schedule automatically — pull manually."});
+    var grid=el("div",{class:"pkg-grid"}, coverField("Category",category), coverField("Item / who",item), coverField("Type / reminder",detail), coverField("Due date",due));
+    box.appendChild(grid); box.appendChild(coverField("Optional note",note));
+    box.appendChild(el("div",{class:"settings-actions"}, el("button",{class:"btn primary small",text:editing?"Save manual item":"Add manual item",onclick:function(){ expSaveManualItem({category:category.value,item:item.value,detail:detail.value,dateISO:due.value,note:note.value}); }}), el("button",{class:"btn small",text:"Cancel",onclick:function(){ expirationManualFormOpen=false; expirationManualEditingId=""; renderExpirations(); }})));
+    return box;
+  }
   function loadExpirationItems(){
     function readMaybe(tab){ return readSheet(tab).catch(function(){ return []; }); }
     return Promise.all([readMaybe("Drivers"), readMaybe("Authorities"), readMaybe("Trucks"), readMaybe("Trailers")]).then(function(all){
@@ -7410,8 +7503,8 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
         var lh=tlVals[0]||[], lu=expHeaderIndex(lh,["Trailer #","Trailer#","Unit #","Unit#","Trailer"]), lin=expHeaderIndex(lh,["In Service?","In Service"]), la=expHeaderIndex(lh,["Annual Inspection","Annual Inspection Exp","Inspection Exp"]), lv=expHeaderIndex(lh,["VIN","VIN #"]), lp=expHeaderIndex(lh,["Plate","Plate #"]);
         for(var tl=1;tl<tlVals.length;tl++){ var lrow=tlVals[tl]||[]; if(lin>=0 && !expIsYes(lrow[lin])) continue; var unitL=lu>=0?expClean(lrow[lu]):""; if(!unitL) continue; items.push(makeExpItem("Trailer",unitL,"Trailer "+unitL,"Annual Inspection","Annual Inspection",la>=0?lrow[la]:"",{unit:unitL,vin:lv>=0?expClean(lrow[lv]):"",plate:lp>=0?expClean(lrow[lp]):""})); }
       }
-      S365.expirationItems=items.sort(expSort);
-    }).catch(function(e){ console.warn("loadExpirationItems", e); S365.expirationItems=S365.expirationItems||[]; });
+      S365.expirationItems=items.concat(expManualItems()).sort(expSort);
+    }).catch(function(e){ console.warn("loadExpirationItems", e); S365.expirationItems=expManualItems().sort(expSort); });
   }
   function expAccountName(){ return (S365&&S365.account&&(S365.account.name||S365.account.username)) || "Dashboard user"; }
   function expNoteStore(){ config.expirationNotes=config.expirationNotes||{}; return config.expirationNotes; }
@@ -7490,7 +7583,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     return true;
   }
   function expFilteredItems(){
-    var items=(S365.expirationItems||[]).slice(), q=expNorm(expirationState.search||""), cat=expirationState.category||"all";
+    var items=expAllItems(), q=expNorm(expirationState.search||""), cat=expirationState.category||"all";
     return items.filter(function(it){
       if(cat!=="all" && it.category!==cat) return false;
       if(!expMatchesView(it, expirationState.view||"attention")) return false;
@@ -7535,6 +7628,10 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     }
     if(rev) actions.push(el("button",{class:"btn small",text:"Reviewed",onclick:function(){ expMarkReviewed(item); }}));
     else actions.push(el("button",{class:"btn small",text:"Mark review",onclick:function(){ expMarkForReview(item); }}));
+    if(item.meta && item.meta.manual){
+      actions.push(el("button",{class:"btn small",text:"Edit item",onclick:function(){ expOpenManualEdit(item); }}));
+      actions.push(el("button",{class:"btn danger small",text:"Delete item",onclick:function(){ expDeleteManualItem(item); }}));
+    }
     main.appendChild(el("div",{class:"exp-cell actions exp-note-actions"}, actions));
     row.appendChild(main);
     if(rev){ row.appendChild(el("div",{class:"exp-row-expanded"}, el("div",{class:"exp-review-note",text:expReviewReason(item)}))); }
@@ -7551,22 +7648,25 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     }
     return row;
   }
-  function renderExpirations(){
+  function renderExpirations(opts){
+    opts=opts||{};
     expBody.textContent="";
     if(!hasFleetLookupData()) expBody.appendChild(el("div",{class:"warn-note",text:"Fleet Master data is not loaded yet. Sign in or wait for remembered data/live refresh."}));
-    else expBody.appendChild(el("p",{class:"note",text:"This pulls dates from Drivers, Authorities, Trucks, and Trailers — not from the old Expirations tab. Notes are shared, and dates are grouped as Expiring ≤3 days, Due soon ≤15 days, Upcoming ≤30 days."}));
+    else expBody.appendChild(el("p",{class:"note",text:"This pulls dates from Drivers, Authorities, Trucks, and Trailers, plus any manual items added here. Notes are shared, and dates are grouped as Expiring ≤3 days, Due soon ≤15 days, Upcoming ≤30 days."}));
     var toolbar=el("div",{class:"exp-toolbar"});
-    var cat=el("select"); [["all","All categories"],["Driver","Drivers"],["Authority","Authorities"],["Truck","Trucks"],["Trailer","Trailers"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===expirationState.category)o.selected=true; cat.appendChild(o); }); cat.addEventListener("change",function(){ expirationState.category=cat.value; renderExpirations(); });
+    var cat=el("select"); [["all","All categories"],["Driver","Drivers"],["Authority","Authorities"],["Truck","Trucks"],["Trailer","Trailers"],["Other","Other / manual"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===expirationState.category)o.selected=true; cat.appendChild(o); }); cat.addEventListener("change",function(){ expirationState.category=cat.value; renderExpirations(); });
     var view=el("select"); [["attention","Needs attention"],["all","All current items"],["expired","Expired"],["expiring","Expiring — 3 days"],["due","Due soon — 15 days"],["upcoming","Upcoming — 30 days"],["notes","Has active notes"],["review","Needs review"],["temp","Temp / exception"],["archived","Archived notes"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===expirationState.view)o.selected=true; view.appendChild(o); }); view.addEventListener("change",function(){ expirationState.view=view.value; renderExpirations(); });
-    var search=el("input",{type:"search",placeholder:"Search driver, truck, note…"}); search.value=expirationState.search||""; search.addEventListener("input",function(){ expirationState.search=search.value; renderExpirations(); });
+    var search=el("input",{id:"exp-search-input",type:"search",placeholder:"Search driver, truck, note…"}); search.value=expirationState.search||""; search.addEventListener("input",function(){ var pos=search.selectionStart||search.value.length; expirationState.search=search.value; if(expirationSearchTimer) clearTimeout(expirationSearchTimer); expirationSearchTimer=setTimeout(function(){ expirationSearchTimer=null; renderExpirations({focusSearch:true, searchPos:pos}); },120); });
     var sort=el("select"); [["date","Expiration date"],["item","Item"],["category","Category"],["type","Type"],["status","Status"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===(expirationState.sort||"date")) o.selected=true; sort.appendChild(o); }); sort.addEventListener("change",function(){ expirationState.sort=sort.value; renderExpirations(); });
     var dir=el("select"); [["asc","Oldest / A-Z"],["desc","Newest / Z-A"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===(expirationState.dir||"asc")) o.selected=true; dir.appendChild(o); }); dir.addEventListener("change",function(){ expirationState.dir=dir.value; renderExpirations(); });
     toolbar.appendChild(coverField("Category",cat)); toolbar.appendChild(coverField("View",view)); toolbar.appendChild(coverField("Sort by",sort)); toolbar.appendChild(coverField("Direction",dir)); toolbar.appendChild(coverField("Search",search)); expBody.appendChild(toolbar);
-    var actions=el("div",{class:"settings-actions"}, el("button",{class:"btn small",text:expirationImportBusy?"Importing…":"Import old Excel notes",onclick:function(){ importExcelExpirationNotes(); }}), el("button",{class:"btn small",text:"Refresh Fleet data",onclick:function(){ if(!S365.signedIn){ window.alert("Sign in first so the dashboard can refresh Fleet Master."); return; } setSync("saving","Looking for changes…"); reconnectM365().then(function(){ setSync("ok","Up to date ✓"); renderExpirations(); }).catch(function(e){ setSync("err",chipErr(e),String(e)); }); }}));
+    var actions=el("div",{class:"settings-actions"}, el("button",{class:"btn small",text:"+ Add manual item",onclick:function(){ expOpenManualNew(); }}), el("button",{class:"btn small",text:expirationImportBusy?"Importing…":"Import old Excel notes",onclick:function(){ importExcelExpirationNotes(); }}), el("button",{class:"btn small",text:"Refresh Fleet data",onclick:function(){ if(!S365.signedIn){ window.alert("Sign in first so the dashboard can refresh Fleet Master."); return; } setSync("saving","Looking for changes…"); reconnectM365().then(function(){ setSync("ok","Up to date ✓"); renderExpirations(); }).catch(function(e){ setSync("err",chipErr(e),String(e)); }); }}));
     expBody.appendChild(actions);
-    var all=(S365.expirationItems||[]), counts=expSummaryCounts(all), filtered=expFilteredItems();
+    if(expirationManualFormOpen) expBody.appendChild(renderManualExpForm());
+    var all=expAllItems(), counts=expSummaryCounts(all), filtered=expFilteredItems();
     expBody.appendChild(el("div",{class:"exp-summary"}, el("span",{class:"exp-pill",text:filtered.length+" shown"}), el("span",{class:"exp-pill",text:counts.expired+" expired"}), el("span",{class:"exp-pill",text:counts.expiring+" expiring"}), el("span",{class:"exp-pill",text:counts.due+" due soon"}), el("span",{class:"exp-pill",text:counts.upcoming+" upcoming"}), el("span",{class:"exp-pill",text:counts.missing+" missing date"}), el("span",{class:"exp-pill",text:counts.review+" needs review"}), el("span",{class:"exp-pill",text:counts.notes+" with notes"})));
     var list=el("div",{class:"exp-list"}); if(!filtered.length) list.appendChild(el("div",{class:"exp-empty",text:"No expiration items match this view."})); else { list.appendChild(renderExpTableHead()); filtered.forEach(function(it){ list.appendChild(renderExpCard(it)); }); } expBody.appendChild(list);
+    if(opts.focusSearch){ setTimeout(function(){ var si=document.getElementById("exp-search-input"); if(si){ try{ si.focus({preventScroll:true}); }catch(e){ si.focus(); } try{ var p=opts.searchPos==null?si.value.length:opts.searchPos; si.setSelectionRange(p,p); }catch(e){} } },0); }
   }
   function expLooseDetail(detail){ var d=expNorm(detail); if(d.indexOf("cdl")===0) return "cdl"; if(d.indexOf("medical")>=0) return "medical"; if(d.indexOf("annual")>=0 || d.indexOf("inspection")>=0) return "annual inspection"; if(d.indexOf("insurance")>=0) return "insurance"; return d; }
   function expLooseKey(category,item,detail){ return expNorm(category)+"|"+expNorm(item)+"|"+expLooseDetail(detail); }
@@ -7575,7 +7675,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     if(!S365.signedIn || !S365.item){ window.alert("Sign in and let Fleet Master connect first. This only imports old notes once; the tracker itself does not depend on the Expirations tab."); return; }
     expirationImportBusy=true; renderExpirations();
     readSheet("Expirations").then(function(vals){
-      var map={}; (S365.expirationItems||[]).forEach(function(it){ map[expLooseKey(it.category,it.item,it.detail)]=it; });
+      var map={}; expAllItems().forEach(function(it){ map[expLooseKey(it.category,it.item,it.detail)]=it; });
       if(!vals || !vals.length) throw new Error("The old Expirations tab was empty or missing.");
       var h=vals[0]||[], ic=expHeaderIndex(h,["Category"]), ii=expHeaderIndex(h,["Item"]), id=expHeaderIndex(h,["Detail"]), ix=expHeaderIndex(h,["Expiry Date","Expiration Date","Exp Date"]), inn=expHeaderIndex(h,["Notes","Note"]);
       if(ic<0 || ii<0 || id<0 || inn<0) throw new Error("Could not find Category, Item, Detail, and Notes columns on the old Expirations tab.");
@@ -8301,18 +8401,12 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   function escHtml(s){ return String(s||"").replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c];}); }
   function safeFilePart(s){ return String(s||"").replace(/[\\/:*?"<>|]+/g," ").replace(/\s+/g," ").trim(); }
   function fileNameCasePart(s){
-    var raw=safeFilePart(s||"");
-    if(!raw) return "Company";
-    // If the sheet/source already has mixed case, leave it alone. If it is all caps,
-    // make the downloaded PDF name easier to read: BANNON TRUCKING, LLC -> Bannon Trucking, LLC.
-    if(/[a-z]/.test(raw)) return raw;
-    var acr={"LLC":1,"L.L.C":1,"INC":1,"INC.":1,"CO":1,"CO.":1,"CORP":1,"CORP.":1,"LTD":1,"LTD.":1,"LP":1,"L.P":1,"LLP":1,"L.L.P":1,"MC":1,"DOT":1,"DBA":1,"OOIDA":1};
-    return raw.toLowerCase().replace(/[A-Za-z0-9]+(?:['’][A-Za-z0-9]+)?/g,function(w){
-      var up=w.toUpperCase();
-      if(acr[up]) return up.replace(/^L\.L\.C$/, "LLC").replace(/^L\.L\.P$/, "LLP").replace(/^L\.P$/, "LP");
-      if(w.length===1 && /[a-z]/.test(w)) return up;
+    var keep={llc:1,llp:1,inc:1,dot:1,mc:1,cdl:1,ein:1,usa:1,us:1,ooida:1};
+    return safeFilePart(s).toLowerCase().replace(/\b[\w&'.-]+\b/g,function(w){
+      var plain=w.replace(/[^a-z0-9]/g,"");
+      if(keep[plain]) return w.toUpperCase();
       return w.charAt(0).toUpperCase()+w.slice(1);
-    });
+    }).replace(/\bLlc\b/g,"LLC").replace(/\bInc\b/g,"Inc");
   }
   function coverCompanyText(s){ s=String(s||"").trim(); return s || "Company, LLC"; }
 
@@ -8484,7 +8578,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     leaseValues.newCompany=oldCo;
     var unit=leaseValues.oldUnit||"###";
     var p1="Ultimate Logistics, LLC, the owner of Unit# "+unit+", hereby terminates the lease agreement by & between Ultimate Logistics LLC & "+oldCo+", as it pertains to Unit# "+unit+"; "+leaseVehicle("old")+"; "+(leaseValues.oldVin||"VIN#")+".";
-    var pLease="Unit#"+unit+" lease start date: "+leaseDateText(leaseValues.oldLeaseStart,"lease start date")+" – lease end date: "+leaseDateText(leaseValues.oldLeaseEnd,"lease end date");
+    var pLease="Unit#"+unit+" lease start date: "+leaseDateText(leaseValues.oldLeaseStart,"lease start date")+" - lease end date: "+leaseDateText(leaseValues.oldLeaseEnd,"lease end date");
     var p2="Please remove Unit# "+unit+" from the "+oldCo+" insurance policy & replace it with Unit# "+(leaseValues.newUnit||"###")+"; "+leaseVehicle("new")+"; "+(leaseValues.newVin||"VIN#")+". Cover page attached.";
     return {p1:p1,pLease:pLease,p2:p2};
   }
@@ -8548,6 +8642,8 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   var packageBody=document.getElementById("package-body");
   var packageManualOpen=false;
   var PACKAGE_FIELD_NAMES=["FirstName","MiddleName","LastName","Suffix","DriverAddress","DriverCity","DriverState","DriverZip","DriverPhone","DOB","SSN","DriverEmailaddress","CDLNumber","CDLExpDate","CDLIssueState","YOR","MedicalExpDate","TransitCompanyName","TransitDrugTestDate","TransitDot","TransitMC","TransitEINNumber","DriverCompanyName","DriverCompanyEIN","DriverDOT","DriverMC","TractorUnitNumber","TractorYear","TractorMake","TractorPlate","TractorColor","TractorVin","LeaseStartDate","LeaseEndDate","LeaseNumberofMonths","LeaseBiMonthlyPay","LeaseMonthlyPay","TractorEquipCosts","TractorDownPay","TractorBalloonPay","TractorBalance","TrailerCostPerMonth"];
+  var PACKAGE_CURRENCY_FIELDS={LeaseBiMonthlyPay:true,LeaseMonthlyPay:true,TractorEquipCosts:true,TractorDownPay:true,TractorBalloonPay:true,TractorBalance:true,TrailerCostPerMonth:true};
+  var PACKAGE_LEASE_PAYMENT_FIELDS=[["Lease start date","LeaseStartDate"],["Lease end date","LeaseEndDate"],["# of months","LeaseNumberofMonths"],["Bi-monthly payment","LeaseBiMonthlyPay"],["Monthly payment","LeaseMonthlyPay"],["Equipment cost","TractorEquipCosts"],["Down payment","TractorDownPay"],["Balloon payment","TractorBalloonPay"],["Equipment balance","TractorBalance"],["Trailer cost per month","TrailerCostPerMonth"]];
   var PACKAGE_TYPES=[
     {id:"newDriver", label:"New Driver", hint:"Commercial package, LLC operating agreement, and two-page lease."},
     {id:"changingTrucks", label:"Changing Trucks", hint:"Tractor docs and two-page lease for a truck change."},
@@ -8673,6 +8769,11 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   function packageInputField(label,key,type,wide){
     var inp=el("input",{type:type||"text",id:"pkg-"+key}); inp.value=packageValues[key]||"";
     inp.addEventListener("input",function(){ packageValues[key]=inp.value; });
+    if(PACKAGE_CURRENCY_FIELDS[key]){
+      inp.addEventListener("blur",function(){ var v=formatPackageCurrency(inp.value); if(v){ inp.value=v; packageValues[key]=v; } });
+    }else if(key==="LeaseNumberofMonths"){
+      inp.addEventListener("blur",function(){ var v=formatPackageDecimal(inp.value,2); if(v){ inp.value=v; packageValues[key]=v; } });
+    }
     return coverField(label, inp, wide?"wide":"");
   }
   function packageSelectField(label,key,arr,getValue,getLabel,apply){
@@ -8699,6 +8800,13 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     });
     return list;
   }
+  function renderLeasePaymentPanel(){
+    var panel=el("div",{class:"pkg-panel"}, el("h3",{text:"Lease / payments"}), el("p",{class:"note",text:"Fill these for lease docs and tractor docs. These values are manual and are formatted in the generated Word files."}));
+    var grid=el("div",{class:"pkg-grid"});
+    PACKAGE_LEASE_PAYMENT_FIELDS.forEach(function(f){ grid.appendChild(packageInputField(f[0],f[1])); });
+    panel.appendChild(grid);
+    return panel;
+  }
   function renderDriverPackage(){
     packageBody.textContent="";
     packageBody.appendChild(el("p",{class:"note",text:"Generate Word package documents from Fleet Master plus manual fields. Pick a package type, choose the docs, and download either one .docx or a ZIP of the selected docs. Full SSN stays manual and is not saved."}));
@@ -8719,6 +8827,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       el("span",{class:"pkg-pill",text:"Driver: "+([packageValues.FirstName,packageValues.LastName].filter(Boolean).join(" ")||"—")}),
       el("span",{class:"pkg-pill",text:"Truck: "+(packageValues.TractorUnitNumber||"—")})
     ));
+    packageBody.appendChild(renderLeasePaymentPanel());
     packageBody.appendChild(renderTemplateChoices());
     packageBody.appendChild(el("div",{class:"pkg-sensitive"}, el("p",{class:"note",text:"Full SSN stays manual and is not saved. DOB, cell, email, and address can auto-fill from the Drivers tab when those columns exist."})));
     packageBody.appendChild(el("div",{class:"manual-toggle"}, el("button",{class:"btn small",text:(packageManualOpen?"Hide details / Manual Fields":"Show details / Manual Fields"),onclick:function(){ capturePackageFields(); packageManualOpen=!packageManualOpen; renderDriverPackage(); }})));
@@ -8729,7 +8838,6 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       section("CDL / medical", [["CDL #","CDLNumber"],["CDL expiration","CDLExpDate"],["Issuing state","CDLIssueState"],["Years OTR","YOR"],["Medical exp date","MedicalExpDate"]]);
       section("Transit company / Driver LLC", [["Transit company name","TransitCompanyName"],["Drug testing policy date","TransitDrugTestDate"],["Transit DOT #","TransitDot"],["Transit MC #","TransitMC"],["Transit EIN","TransitEINNumber"],["Driver company name","DriverCompanyName"],["Driver company EIN","DriverCompanyEIN"],["Driver DOT #","DriverDOT"],["Driver MC #","DriverMC"]]);
       section("Tractor", [["Unit #","TractorUnitNumber"],["Year","TractorYear"],["Make","TractorMake"],["Plate #","TractorPlate"],["Color","TractorColor"],["VIN #","TractorVin","text",true]]);
-      section("Lease / payments", [["Lease start date","LeaseStartDate"],["Lease end date","LeaseEndDate"],["# of months","LeaseNumberofMonths"],["Bi-monthly payment","LeaseBiMonthlyPay"],["Monthly payment","LeaseMonthlyPay"],["Equipment cost","TractorEquipCosts"],["Down payment","TractorDownPay"],["Balloon payment","TractorBalloonPay"],["Equipment balance","TractorBalance"],["Trailer cost per month","TrailerCostPerMonth"]]);
       packageBody.appendChild(manual);
     }
     packageBody.appendChild(el("div",{class:"pkg-actions"}, el("button",{class:"btn primary",text:"Download selected Word docs",onclick:function(){ capturePackageFields(); downloadDriverPackageDocx(); }})));
@@ -8746,6 +8854,34 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   function formatPackagePhone(v){ var d=digitsOnly(v); if(d.length===11 && d.charAt(0)==="1") d=d.slice(1); return d.length===10 ? "("+d.slice(0,3)+") "+d.slice(3,6)+"-"+d.slice(6) : String(v||""); }
   function formatPackageSsn(v){ var d=digitsOnly(v); return d.length===9 ? d.slice(0,3)+"-"+d.slice(3,5)+"-"+d.slice(5) : String(v||""); }
   function formatPackageEin(v){ var d=digitsOnly(v); return d.length===9 ? d.slice(0,2)+"-"+d.slice(2) : String(v||""); }
+  function packageNumberFromMoney(v){
+    var s=String(v==null?"":v).trim();
+    if(!s) return null;
+    var neg=/^\s*\(/.test(s)||/^\s*-/.test(s);
+    s=s.replace(/[^0-9.\-]/g,"");
+    if(!s || s==="." || s==="-" || s==="-.") return null;
+    var n=Number(s);
+    if(!isFinite(n)) return null;
+    return neg ? -Math.abs(n) : n;
+  }
+  function formatPackageCurrency(v){
+    var raw=String(v==null?"":v).trim();
+    if(!raw) return "";
+    var approx=/^\s*~/.test(raw);
+    var n=packageNumberFromMoney(raw);
+    if(n==null) return raw;
+    var abs=Math.abs(n);
+    var parts=abs.toFixed(2).split(".");
+    parts[0]=parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,",");
+    return (approx?"~":"")+(n<0?"-":"")+"$"+parts[0]+"."+parts[1];
+  }
+  function formatPackageDecimal(v,places){
+    var raw=String(v==null?"":v).trim();
+    if(!raw) return "";
+    var n=packageNumberFromMoney(raw);
+    if(n==null) return raw;
+    return n.toFixed(places==null?2:places);
+  }
   function packageFieldFormatsFromXml(txt){
     var out={};
     txt.replace(/<w:name[^>]*w:val="([^"]+)"[\s\S]*?<w:textInput>([\s\S]*?)<\/w:textInput>/g,function(m,name,body){
@@ -8759,6 +8895,8 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     var v=plainTextForXml(value);
     var fmt=String((formats&&formats[name])||"");
     if(!v) return "";
+    if(PACKAGE_CURRENCY_FIELDS[name]) return formatPackageCurrency(v);
+    if(name==="LeaseNumberofMonths") return formatPackageDecimal(v,2);
     if(/UPPERCASE/i.test(fmt)) v=v.toUpperCase();
     else if(/TITLE CASE/i.test(fmt)) v=titleCasePackageValue(v);
     if(/M\/d\/yyyy|date/i.test(fmt)){ v=packageDate(v)||v; }
