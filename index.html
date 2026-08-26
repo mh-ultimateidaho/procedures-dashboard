@@ -8643,6 +8643,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   var packageManualOpen=false;
   var PACKAGE_FIELD_NAMES=["FirstName","MiddleName","LastName","Suffix","DriverAddress","DriverCity","DriverState","DriverZip","DriverPhone","DOB","SSN","DriverEmailaddress","CDLNumber","CDLExpDate","CDLIssueState","YOR","MedicalExpDate","TransitCompanyName","TransitDrugTestDate","TransitDot","TransitMC","TransitEINNumber","DriverCompanyName","DriverCompanyEIN","DriverDOT","DriverMC","TractorUnitNumber","TractorYear","TractorMake","TractorPlate","TractorColor","TractorVin","LeaseStartDate","LeaseEndDate","LeaseNumberofMonths","LeaseBiMonthlyPay","LeaseMonthlyPay","TractorEquipCosts","TractorDownPay","TractorBalloonPay","TractorBalance","TrailerCostPerMonth"];
   var PACKAGE_CURRENCY_FIELDS={LeaseBiMonthlyPay:true,LeaseMonthlyPay:true,TractorEquipCosts:true,TractorDownPay:true,TractorBalloonPay:true,TractorBalance:true,TrailerCostPerMonth:true};
+  var PACKAGE_DATE_FIELDS={LeaseStartDate:true,LeaseEndDate:true,DOB:true,CDLExpDate:true,MedicalExpDate:true,TransitDrugTestDate:true};
   var PACKAGE_LEASE_PAYMENT_FIELDS=[["Lease start date","LeaseStartDate"],["Lease end date","LeaseEndDate"],["# of months","LeaseNumberofMonths"],["Bi-monthly payment","LeaseBiMonthlyPay"],["Monthly payment","LeaseMonthlyPay"],["Equipment cost","TractorEquipCosts"],["Down payment","TractorDownPay"],["Balloon payment","TractorBalloonPay"],["Equipment balance","TractorBalance"],["Trailer cost per month","TrailerCostPerMonth"]];
   var PACKAGE_TYPES=[
     {id:"newDriver", label:"New Driver", hint:"Commercial package, LLC operating agreement, and two-page lease."},
@@ -8682,7 +8683,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   }
   function closeDriverPackage(){ packageOverlay.classList.add("hidden"); packageOverlay.setAttribute("aria-hidden","true"); document.body.style.overflow=""; packageValues=blankPackageValues(); packageManualOpen=false; if(packageBody) packageBody.textContent=""; }
   function resetPackageValues(){ packageValues=blankPackageValues(); packageManualOpen=false; }
-  function packageDate(v){ var iso=expDateISO(v); if(!iso) return String(v||"").trim(); var p=iso.split("-"); return Number(p[1])+"/"+Number(p[2])+"/"+p[0]; }
+  function packageDate(v){ var raw=String(v==null?"":v).trim(); var iso=expDateISO(raw); if(!iso) return raw; var p=iso.split("-"); return Number(p[1])+"/"+Number(p[2])+"/"+p[0]; }
   function splitPersonName(name){
     name=firstLastFromLastFirst(stripTruckSuffixFromDriverLabel(name||"")); var parts=name.split(/\s+/).filter(Boolean);
     if(!parts.length) return {first:"", middle:"", last:""};
@@ -8771,6 +8772,8 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     inp.addEventListener("input",function(){ packageValues[key]=inp.value; });
     if(PACKAGE_CURRENCY_FIELDS[key]){
       inp.addEventListener("blur",function(){ var v=formatPackageCurrency(inp.value); if(v){ inp.value=v; packageValues[key]=v; } });
+    }else if(PACKAGE_DATE_FIELDS[key]){
+      inp.addEventListener("blur",function(){ var v=packageDate(inp.value); if(v){ inp.value=v; packageValues[key]=v; } });
     }else if(key==="LeaseNumberofMonths"){
       inp.addEventListener("blur",function(){ var v=formatPackageDecimal(inp.value,2); if(v){ inp.value=v; packageValues[key]=v; } });
     }
@@ -8897,6 +8900,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     if(!v) return "";
     if(PACKAGE_CURRENCY_FIELDS[name]) return formatPackageCurrency(v);
     if(name==="LeaseNumberofMonths") return formatPackageDecimal(v,2);
+    if(PACKAGE_DATE_FIELDS[name]) v=packageDate(v)||v;
     if(/UPPERCASE/i.test(fmt)) v=v.toUpperCase();
     else if(/TITLE CASE/i.test(fmt)) v=titleCasePackageValue(v);
     if(/M\/d\/yyyy|date/i.test(fmt)){ v=packageDate(v)||v; }
@@ -8965,6 +8969,12 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       });
     }
     return "<w:rPr>"+(primary||fallback)+"</w:rPr>";
+  }
+  function packageRPrWithoutBold(rPr){
+    var inner=packageRunPrInner(rPr);
+    if(!inner) return rPr||"";
+    inner=inner.replace(/<w:b(?:Cs)?\b[^>]*\/>/g,"");
+    return "<w:rPr>"+inner+"</w:rPr>";
   }
   function packageFieldNameFromBlock(block){
     var b=String(block||""), m=b.match(/<w:name\b[^>]*w:val="([^"]+)"/);
@@ -9063,6 +9073,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       result=result.replace(/(<w:r\b[^>]*>)(<w:rPr>[\s\S]*?<\/w:rPr>)?([\s\S]*?<w:t\b[^>]*>[\s\S]*?<\/w:t>[\s\S]*?)(<\/w:r>)/g,function(mm,rStart,rPr,body,rEnd){
         var useRPr=packageMergeRPrInner(fieldRPr,rPr||"");
         useRPr=keepNoProofFrom(rPr,useRPr);
+        if(PACKAGE_CURRENCY_FIELDS[name] || name==="LeaseNumberofMonths") useRPr=packageRPrWithoutBold(useRPr);
         return rStart+useRPr+body+rEnd;
       });
       return before+result+after;
