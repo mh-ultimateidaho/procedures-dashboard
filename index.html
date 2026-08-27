@@ -8844,7 +8844,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   var PACKAGE_NO_BOLD_VALUE_FIELDS={DriverAddress:true,DriverCity:true,DriverState:true,DriverZip:true,DriverPhone:true,DOB:true,SSN:true,DriverEmailaddress:true,CDLNumber:true,CDLExpDate:true,CDLIssueState:true,YOR:true,MedicalExpDate:true,TransitDrugTestDate:true,TransitDot:true,TransitMC:true,TransitEINNumber:true,DriverCompanyEIN:true,DriverDOT:true,DriverMC:true,TractorUnitNumber:true,TractorYear:true,TractorMake:true,TractorPlate:true,TractorColor:true,TractorVin:true,LeaseStartDate:true,LeaseEndDate:true,LeaseNumberofMonths:true,LeaseBiMonthlyPay:true,LeaseMonthlyPay:true,TractorEquipCosts:true,TractorDownPay:true,TractorBalloonPay:true,TractorBalance:true,TrailerCostPerMonth:true};
   var PACKAGE_DATE_FIELDS={LeaseStartDate:true,LeaseEndDate:true,DOB:true,CDLExpDate:true,MedicalExpDate:true,TransitDrugTestDate:true};
   var PACKAGE_LEASE_PAYMENT_FIELDS=[["Lease start date","LeaseStartDate"],["Lease end date","LeaseEndDate"],["# of months","LeaseNumberofMonths"],["Bi-monthly payment","LeaseBiMonthlyPay"],["Monthly payment","LeaseMonthlyPay"],["Equipment cost","TractorEquipCosts"],["Down payment","TractorDownPay"],["Balloon payment","TractorBalloonPay"],["Equipment balance","TractorBalance"],["Trailer cost per month","TrailerCostPerMonth"]];
-  var PACKAGE_TOP_MANUAL_FIELDS=[["Full SSN","SSN","password"]];
+  var PACKAGE_TOP_MANUAL_FIELDS=[["Full SSN","SSN","text"]];
   var PACKAGE_DEFAULT_ZERO_FIELDS={TractorDownPay:true,TractorBalloonPay:true,TractorBalance:true,TrailerCostPerMonth:true};
   var PACKAGE_OPTIONAL_EMPTY_FIELDS={MiddleName:true,Suffix:true};
   var PACKAGE_FIELD_LABELS={FirstName:"First name",MiddleName:"Middle name",LastName:"Last name",Suffix:"Suffix",DriverAddress:"Address",DriverCity:"City",DriverState:"State",DriverZip:"Zip",DriverPhone:"Phone",DOB:"Date of birth",SSN:"Full SSN",DriverEmailaddress:"Email",CDLNumber:"CDL #",CDLExpDate:"CDL expiration",CDLIssueState:"CDL issuing state",YOR:"Years OTR",MedicalExpDate:"Medical exp date",TransitCompanyName:"Transit company",TransitDrugTestDate:"Drug testing policy date",TransitDot:"Transit DOT #",TransitMC:"Transit MC #",TransitEINNumber:"Transit EIN",DriverCompanyName:"Driver company",DriverCompanyEIN:"Driver company EIN",DriverDOT:"Driver DOT #",DriverMC:"Driver MC #",TractorUnitNumber:"Unit #",TractorYear:"Tractor year",TractorMake:"Tractor make",TractorPlate:"Plate #",TractorColor:"Color",TractorVin:"VIN #",LeaseStartDate:"Lease start date",LeaseEndDate:"Lease end date",LeaseNumberofMonths:"# of months",LeaseBiMonthlyPay:"Bi-monthly payment",LeaseMonthlyPay:"Monthly payment",TractorEquipCosts:"Equipment cost",TractorDownPay:"Down payment",TractorBalloonPay:"Balloon payment",TractorBalance:"Equipment balance",TrailerCostPerMonth:"Trailer cost per month"};
@@ -8983,6 +8983,8 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       inp.addEventListener("blur",function(){ var v=packageDate(inp.value); if(v){ inp.value=v; packageValues[key]=v; } });
     }else if(key==="LeaseNumberofMonths"){
       inp.addEventListener("blur",function(){ var v=formatPackageDecimal(inp.value,2); if(v){ inp.value=v; packageValues[key]=v; } });
+    }else if(key==="SSN"){
+      inp.addEventListener("blur",function(){ var v=formatPackageSsn(inp.value); if(v){ inp.value=v; packageValues[key]=v; } });
     }
     return coverField(label, inp, wide?"wide":"");
   }
@@ -9011,7 +9013,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     return list;
   }
   function renderLeasePaymentPanel(){
-    var panel=el("div",{class:"pkg-panel"}, el("h3",{text:"Required manual info"}), el("p",{class:"note",text:"Full SSN and lease/payment fields stay manual. Full SSN is not saved; zero-payment fields default to $0.00 but can be changed."}));
+    var panel=el("div",{class:"pkg-panel"}, el("h3",{text:"Required manual info"}), el("p",{class:"note",text:"SSN and lease/payment fields stay manual. SSN clears after closing; zero-payment fields default to $0.00 but can be changed."}));
     var grid=el("div",{class:"pkg-grid"});
     PACKAGE_TOP_MANUAL_FIELDS.forEach(function(f){ grid.appendChild(packageInputField(f[0],f[1],f[2]||"text",f[3])); });
     PACKAGE_LEASE_PAYMENT_FIELDS.forEach(function(f){ grid.appendChild(packageInputField(f[0],f[1])); });
@@ -9043,7 +9045,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     ));
     packageBody.appendChild(renderLeasePaymentPanel());
     packageBody.appendChild(renderTemplateChoices());
-    packageBody.appendChild(el("div",{class:"pkg-sensitive"}, el("p",{class:"note",text:"Transit company auto-fills from the selected driver/current assignment. Driver company is chosen separately because it may not match the current transit company. Full SSN is shown above because it cannot auto-fill and is not saved. DOB, cell, email, address, and OTR can auto-fill from the Drivers tab when those columns exist."})));
+    packageBody.appendChild(el("div",{class:"pkg-sensitive"}, el("p",{class:"note",text:"Transit company auto-fills from the selected driver/current assignment. Driver company is chosen separately because it may not match the current transit company. SSN is shown above because it cannot auto-fill and clears after closing. DOB, cell, email, address, and OTR can auto-fill from the Drivers tab when those columns exist."})));
     packageBody.appendChild(el("div",{class:"manual-toggle"}, el("button",{class:"btn small",text:(packageManualOpen?"Hide details / Manual Fields":"Show details / Manual Fields"),onclick:function(){ capturePackageFields(); packageManualOpen=!packageManualOpen; renderDriverPackage(); }})));
     if(packageManualOpen){
       var manual=el("div",{class:"manual-fields"});
