@@ -8867,7 +8867,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
 
   function defaultPackageTemplateIds(type){ return PACKAGE_TEMPLATES.filter(function(t){return t.type===type;}).map(function(t){return t.id;}); }
   function blankPackageValues(){
-    var v={packageType:"newDriver", driverPick:"", authorityPick:"", truckPick:"", selectedTemplates:defaultPackageTemplateIds("newDriver")};
+    var v={packageType:"newDriver", driverPick:"", authorityPick:"", driverCompanyPick:"", truckPick:"", selectedTemplates:defaultPackageTemplateIds("newDriver")};
     PACKAGE_FIELD_NAMES.forEach(function(k){ v[k]=""; });
     Object.keys(PACKAGE_DEFAULT_ZERO_FIELDS||{}).forEach(function(k){ v[k]="$0.00"; });
     return v;
@@ -8923,10 +8923,13 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     packageValues.TransitMC=a.mc||packageValues.TransitMC;
     packageValues.TransitEINNumber=a.ein||packageValues.TransitEINNumber;
     packageValues.TransitDrugTestDate=packageDate(a.drugTestDate||a.policyDate)||packageValues.TransitDrugTestDate;
-    packageValues.DriverCompanyName=packageValues.DriverCompanyName||name;
-    packageValues.DriverDOT=packageValues.DriverDOT||a.dot||"";
-    packageValues.DriverMC=packageValues.DriverMC||a.mc||"";
-    packageValues.DriverCompanyEIN=packageValues.DriverCompanyEIN||a.ein||"";
+  }
+  function applyPackageDriverCompany(a){
+    a=a||{}; var name=a.authority||a.name||packageValues.driverCompanyPick||""; packageValues.driverCompanyPick=name||packageValues.driverCompanyPick;
+    packageValues.DriverCompanyName=name||packageValues.DriverCompanyName;
+    packageValues.DriverDOT=a.dot||packageValues.DriverDOT;
+    packageValues.DriverMC=a.mc||packageValues.DriverMC;
+    packageValues.DriverCompanyEIN=a.ein||packageValues.DriverCompanyEIN;
   }
   function applyPackageTruck(t){
     t=t||{}; packageValues.truckPick=t.unit||packageValues.truckPick;
@@ -8966,7 +8969,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   }
   function capturePackageFields(){
     function gv(id){ var e=document.getElementById("pkg-"+id); return e?e.value.trim():""; }
-    ["driverPick","authorityPick","truckPick","packageType"].forEach(function(k){ var v=gv(k); if(v || document.getElementById("pkg-"+k)) packageValues[k]=v; });
+    ["driverPick","authorityPick","driverCompanyPick","truckPick","packageType"].forEach(function(k){ var v=gv(k); if(v || document.getElementById("pkg-"+k)) packageValues[k]=v; });
     var selected=[]; document.querySelectorAll("input.pkg-template-choice").forEach(function(cb){ if(cb.checked) selected.push(cb.value); });
     if(document.querySelector("input.pkg-template-choice")) packageValues.selectedTemplates=selected;
     PACKAGE_FIELD_NAMES.forEach(function(k){ var v=gv(k); if(v || document.getElementById("pkg-"+k)) packageValues[k]=v; });
@@ -9027,17 +9030,20 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     var top=el("div",{class:"pkg-grid"});
     top.appendChild(renderPackageTypePicker());
     top.appendChild(packageSelectField("Driver from Drivers tab", "driverPick", drivers, function(r){return r.key;}, function(r){return r.display||r.label||r.name;}, function(r){ applyPackageDriver(r); }));
-    top.appendChild(packageSelectField("Authority / company", "authorityPick", look.authorities||[], function(a){return a.authority;}, function(a){return a.authority;}, function(a){ applyPackageAuthority(a); }));
+    top.appendChild(packageSelectField("Transit company", "authorityPick", look.authorities||[], function(a){return a.authority;}, function(a){return a.authority;}, function(a){ applyPackageAuthority(a); }));
+    top.appendChild(packageSelectField("Driver company", "driverCompanyPick", look.authorities||[], function(a){return a.authority;}, function(a){return a.authority;}, function(a){ applyPackageDriverCompany(a); }));
     top.appendChild(packageSelectField("Truck #", "truckPick", look.tractors||[], function(t){return t.unit;}, function(t){return t.unit;}, function(t){ applyPackageTruck(t); }));
     packageBody.appendChild(top);
     packageBody.appendChild(el("div",{class:"pkg-summary"},
       el("span",{class:"pkg-pill",text:"Package: "+((PACKAGE_TYPES.filter(function(t){return t.id===packageValues.packageType;})[0]||{}).label||"—")}),
       el("span",{class:"pkg-pill",text:"Driver: "+([packageValues.FirstName,packageValues.LastName].filter(Boolean).join(" ")||"—")}),
+      el("span",{class:"pkg-pill",text:"Transit: "+(packageValues.TransitCompanyName||"—")}),
+      el("span",{class:"pkg-pill",text:"Driver co: "+(packageValues.DriverCompanyName||"—")}),
       el("span",{class:"pkg-pill",text:"Truck: "+(packageValues.TractorUnitNumber||"—")})
     ));
     packageBody.appendChild(renderLeasePaymentPanel());
     packageBody.appendChild(renderTemplateChoices());
-    packageBody.appendChild(el("div",{class:"pkg-sensitive"}, el("p",{class:"note",text:"Full SSN is shown above because it cannot auto-fill and is not saved. DOB, cell, email, address, and OTR can auto-fill from the Drivers tab when those columns exist."})));
+    packageBody.appendChild(el("div",{class:"pkg-sensitive"}, el("p",{class:"note",text:"Transit company auto-fills from the selected driver/current assignment. Driver company is chosen separately because it may not match the current transit company. Full SSN is shown above because it cannot auto-fill and is not saved. DOB, cell, email, address, and OTR can auto-fill from the Drivers tab when those columns exist."})));
     packageBody.appendChild(el("div",{class:"manual-toggle"}, el("button",{class:"btn small",text:(packageManualOpen?"Hide details / Manual Fields":"Show details / Manual Fields"),onclick:function(){ capturePackageFields(); packageManualOpen=!packageManualOpen; renderDriverPackage(); }})));
     if(packageManualOpen){
       var manual=el("div",{class:"manual-fields"});
