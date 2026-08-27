@@ -301,6 +301,9 @@
   .content-block.drag-over-top{box-shadow:inset 0 3px 0 var(--accent)}
   .content-block.drag-over-bot{box-shadow:inset 0 -3px 0 var(--accent)}
   .block-handle{cursor:grab;color:rgba(255,255,255,.9);font-size:15px;padding:0 5px 0 0;user-select:none;touch-action:none;display:inline-block;vertical-align:baseline}
+  .color-palette{display:flex;gap:7px;flex-wrap:wrap;margin-top:7px}
+  .color-swatch{width:28px;height:28px;border-radius:8px;border:2px solid #fff;box-shadow:0 0 0 1px var(--line-strong);padding:0;cursor:pointer}
+  .color-swatch.on{box-shadow:0 0 0 3px var(--accent-soft),0 0 0 1px var(--accent) inset;transform:translateY(-1px)}
   .add-item{margin:6px 4px 0}
 
   .disclosure{border:1px solid var(--line);border-radius:9px;margin-bottom:18px;overflow:hidden}
@@ -5763,13 +5766,6 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     // KJ/Amie/covering sections are regular editable sections now: no special dropdown/group.
     if(card.blocks && card.blocks.length){
       card.blocks.forEach(function(b){ host.appendChild(renderBlock(card,b)); });
-      if(modalState.editMode){
-        host.appendChild(el("div",{class:"block-add-row"},
-          el("button",{class:"btn small",text:"+ Add section",onclick:function(){ addBlock(card.id,false); }})
-        ));
-      }
-    }else if(modalState.editMode){
-      host.appendChild(el("div",{class:"block-add-row"}, el("button",{class:"btn small",text:"+ Add section",onclick:function(){ addBlock(card.id,false); }})));
     }
     return host;
   }
@@ -5777,8 +5773,9 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   function renderBlock(card, block){
     var wrap=el("div",{class:"content-block"});
     wrap.setAttribute("data-block-id", block.id||"");
-    var kindClass="ob-"+(block.kind||"custom");
-    var lbl=el("div",{class:"owner-label "+kindClass});
+    if(block && block.color){ wrap.style.setProperty("--ob", block.color); }
+    var kindClass=block && block.color ? "" : "ob-"+(block.kind||"custom");
+    var lbl=el("div",{class:"owner-label"+(kindClass?" "+kindClass:"")});
     if(modalState.editMode){
       var bh=el("span",{class:"block-handle", title:"Drag section to reorder", text:"⠿"});
       lbl.appendChild(bh);
@@ -5787,12 +5784,12 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     lbl.appendChild(document.createTextNode(block.label||"Tasks"));
     if(modalState.editMode){
       lbl.appendChild(el("span",{class:"block-toolbar"},
-        el("button",{class:"mini",title:"Edit section title/color",text:"✎",onclick:function(e){ e.stopPropagation(); editBlockMeta(card.id, block.id); }}),
+        el("button",{class:"mini",title:"Edit section title/color",text:"✎",onclick:function(e){ e.stopPropagation(); editBlockMeta(card.id, block.id, e.currentTarget); }}),
         el("button",{class:"mini del",title:"Delete section",text:"✕",onclick:function(e){ e.stopPropagation(); deleteBlock(card.id, block.id); }})
       ));
     }
     wrap.appendChild(lbl);
-    var body=el("div",{class:"owner-body "+kindClass});
+    var body=el("div",{class:"owner-body"+(kindClass?" "+kindClass:"")});
     body.appendChild(renderList(card, block.id, block.items||[], {ordered:false, checkbox:true}));
     wrap.appendChild(body);
     return wrap;
@@ -5803,37 +5800,85 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     for(var i=0;i<card.blocks.length;i++){ if(card.blocks[i].id===blockId) return card.blocks[i]; }
     return null;
   }
-  function blockKindPrompt(current){
-    var k=window.prompt("Section color/type: before, norush, kj, amie, or custom", current||"custom");
-    if(k==null) return null;
-    k=String(k).trim().toLowerCase();
-    if(!k) k="custom";
-    if(!({before:1,norush:1,kj:1,amie:1,custom:1})[k]){
-      window.alert("Please use one of: before, norush, kj, amie, custom.");
-      return null;
+  var SECTION_PALETTE=[
+    "#1f8a4c", "#5b6577", "#7c5cff", "#0891b2", "#1f4ea1",
+    "#b7791f", "#c0392b", "#be185d", "#475569"
+  ];
+  function legacyBlockColor(kind){
+    return ({before:"#1f8a4c", norush:"#5b6577", kj:"#7c5cff", amie:"#0891b2", custom:"#475569"})[kind||"custom"] || "#475569";
+  }
+  function normalizeHexColor(c){
+    c=String(c||"").trim();
+    if(/^#[0-9a-f]{6}$/i.test(c)) return c.toLowerCase();
+    return "";
+  }
+  function closestPaletteColor(c){
+    c=normalizeHexColor(c); if(!c) return SECTION_PALETTE[8];
+    var lo=c.toLowerCase();
+    for(var i=0;i<SECTION_PALETTE.length;i++){ if(SECTION_PALETTE[i].toLowerCase()===lo) return SECTION_PALETTE[i]; }
+    return c;
+  }
+  function kindForPaletteColor(c, fallback){
+    c=String(c||"").toLowerCase();
+    if(c==="#1f8a4c") return "before";
+    if(c==="#5b6577") return "norush";
+    if(c==="#7c5cff") return "kj";
+    if(c==="#0891b2") return "amie";
+    return fallback||"custom";
+  }
+  function editBlockMeta(cardId, blockId, anchorBtn){
+    openBlockMetaPopup(cardId, blockId, anchorBtn);
+  }
+  function addBlock(cardId){
+    openBlockMetaPopup(cardId, null, null);
+  }
+  function openBlockMetaPopup(cardId, blockId, anchorBtn){
+    captureContextForm(); captureChecks();
+    if(popup) closePopup();
+    var mut=getMutableCard(cardId);
+    var b=blockId ? blockById(mut, blockId) : null;
+    var selected=closestPaletteColor((b && b.color) || legacyBlockColor(b && b.kind));
+    popup=el("div",{class:"popup"});
+    popup.appendChild(el("label",{style:"font-size:11px;font-weight:700;color:var(--muted)",text:"Section title"}));
+    var title=el("input",{type:"text",placeholder:"Section title"});
+    title.value=(b && b.label) || "New section";
+    popup.appendChild(title);
+    popup.appendChild(el("div",{class:"field"}, el("label",{text:"Section color"})));
+    var palette=el("div",{class:"color-palette"});
+    function repaintSwatches(){
+      palette.querySelectorAll(".color-swatch").forEach(function(btn){ btn.classList.toggle("on", btn.getAttribute("data-color").toLowerCase()===String(selected).toLowerCase()); });
     }
-    return k;
-  }
-  function editBlockMeta(cardId, blockId){
-    captureContextForm(); captureChecks();
-    var mut=getMutableCard(cardId); var b=blockById(mut, blockId); if(!b) return;
-    var label=window.prompt("Section title", b.label||"Tasks");
-    if(label==null) return;
-    var kind=blockKindPrompt(b.kind||"custom");
-    if(kind==null) return;
-    b.label=String(label).trim()||"Tasks";
-    b.kind=kind;
-    persistCardEdit(cardId); reRenderModalPreserving();
-  }
-  function addBlock(cardId, covering){
-    captureContextForm(); captureChecks();
-    var mut=getMutableCard(cardId); if(!mut.blocks) mut.blocks=[];
-    var label=window.prompt("New section title", "New section");
-    if(label==null) return;
-    var kind=blockKindPrompt("custom");
-    if(kind==null) return;
-    mut.blocks.push({id:uid("blk"), label:String(label).trim()||"Tasks", kind:kind, items:[]});
-    persistCardEdit(cardId); reRenderModalPreserving();
+    SECTION_PALETTE.forEach(function(c){
+      var sw=el("button",{class:"color-swatch",type:"button",title:c});
+      sw.setAttribute("data-color", c);
+      sw.style.background=c;
+      if(c.toLowerCase()===String(selected).toLowerCase()) sw.classList.add("on");
+      sw.addEventListener("click", function(ev){ ev.preventDefault(); selected=c; repaintSwatches(); });
+      palette.appendChild(sw);
+    });
+    popup.appendChild(palette);
+    function commitBlockEdit(){
+      var label=String(title.value||"").trim()||"Tasks";
+      var cur=getMutableCard(cardId); if(!cur.blocks) cur.blocks=[];
+      var target=blockId ? blockById(cur, blockId) : null;
+      if(!target){ target={id:uid("blk"), label:label, kind:"custom", color:selected, items:[]}; cur.blocks.push(target); }
+      target.label=label;
+      target.color=selected;
+      target.kind=kindForPaletteColor(selected, target.kind||"custom");
+      popup._committed=true;
+      persistCardEdit(cardId);
+    }
+    popup._commit=function(){ if(blockId){ commitBlockEdit(); reRenderModalPreserving(); } };
+    popup.appendChild(el("div",{class:"pop-actions"},
+      el("button",{class:"btn small primary",text:"Save",onclick:function(){ commitBlockEdit(); closePopup({discard:true}); reRenderModalPreserving(); }}),
+      el("button",{class:"btn small",text:"Cancel",onclick:function(){ closePopup({discard:true}); }})
+    ));
+    document.body.appendChild(popup);
+    var r=anchorBtn ? anchorBtn.getBoundingClientRect() : null;
+    var top=r ? Math.min(r.bottom+6, window.innerHeight-popup.offsetHeight-12) : Math.max(8, Math.min(window.innerHeight-popup.offsetHeight-12, 88));
+    var left=r ? Math.min(r.left, window.innerWidth-popup.offsetWidth-12) : Math.max(8, Math.min(window.innerWidth-popup.offsetWidth-12, 48));
+    popup.style.top=Math.max(8,top)+"px"; popup.style.left=Math.max(8,left)+"px";
+    setTimeout(function(){ document.addEventListener("mousedown", popupOutside, true); title.focus(); title.select(); },0);
   }
   function deleteBlock(cardId, blockId){
     var mut=getMutableCard(cardId); if(!mut.blocks) return;
@@ -5868,6 +5913,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   function renderList(card, listKey, items, opts){
     var ctx=modalState.ctx;
     var list = (listKey==="steps") ? el("ol",{class:"steps"}) : el("div",{class:"steps"});
+    list.setAttribute("data-list", listKey);
 
     items.forEach(function(it){
       // conditional visibility: new-auth-only + custom special-instruction toggles (normal or inverted)
@@ -6014,14 +6060,19 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   /* ----- drag & drop ----- */
   var dragInfo=null;
   function attachDrag(row, handle, card, listKey, itemId){
-    handle.addEventListener("mousedown", function(){ row.setAttribute("draggable","true"); });
-    handle.addEventListener("touchstart", function(){ row.setAttribute("draggable","true"); });
+    // Keep draggable set in edit mode. Setting it only on mousedown is flaky in
+    // some browsers/modals and caused drags to never actually start.
+    row.setAttribute("draggable","true");
+    handle.setAttribute("draggable","true");
+    handle.addEventListener("mousedown", function(e){ e.stopPropagation(); });
+    handle.addEventListener("pointerdown", function(e){ if(e.pointerType!=="mouse") startPointerItemDrag(e, row, card, listKey, itemId); });
     row.addEventListener("dragstart", function(e){
+      e.stopPropagation();
       dragInfo={kind:"item", cardId:card.id, listKey:listKey, id:itemId};
       row.classList.add("drag-ghost");
       try{ e.dataTransfer.effectAllowed="move"; e.dataTransfer.setData("text/plain", itemId); }catch(_){}
     });
-    row.addEventListener("dragend", function(){ row.classList.remove("drag-ghost"); row.removeAttribute("draggable"); clearDragMarks(); dragInfo=null; });
+    row.addEventListener("dragend", function(){ row.classList.remove("drag-ghost"); clearDragMarks(); dragInfo=null; });
     row.addEventListener("dragover", function(e){
       if(!dragInfo || dragInfo.kind!=="item" || dragInfo.cardId!==card.id) return;
       e.preventDefault();
@@ -6060,14 +6111,18 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     });
   }
   function attachBlockDrag(blockEl, handle, card, blockId){
-    handle.addEventListener("mousedown", function(){ blockEl.setAttribute("draggable","true"); });
-    handle.addEventListener("touchstart", function(){ blockEl.setAttribute("draggable","true"); });
+    // Same idea as item rows: leave draggable on while editing so section drags
+    // reliably start from the handle instead of silently doing nothing.
+    blockEl.setAttribute("draggable","true");
+    handle.setAttribute("draggable","true");
+    handle.addEventListener("mousedown", function(e){ e.stopPropagation(); });
+    handle.addEventListener("pointerdown", function(e){ if(e.pointerType!=="mouse") startPointerBlockDrag(e, blockEl, card, blockId); });
     blockEl.addEventListener("dragstart", function(e){
       dragInfo={kind:"block", cardId:card.id, blockId:blockId};
       blockEl.classList.add("drag-ghost");
       try{ e.dataTransfer.effectAllowed="move"; e.dataTransfer.setData("text/plain", blockId); }catch(_){}
     });
-    blockEl.addEventListener("dragend", function(){ blockEl.classList.remove("drag-ghost"); blockEl.removeAttribute("draggable"); clearDragMarks(); dragInfo=null; });
+    blockEl.addEventListener("dragend", function(){ blockEl.classList.remove("drag-ghost"); clearDragMarks(); dragInfo=null; });
     blockEl.addEventListener("dragover", function(e){
       if(!dragInfo || dragInfo.kind!=="block" || dragInfo.cardId!==card.id) return;
       e.preventDefault();
@@ -6089,6 +6144,89 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   function clearDragMarks(){
     if(!mBody) return;
     mBody.querySelectorAll(".drag-over-top,.drag-over-bot,.drop-zone-active").forEach(function(r){ r.classList.remove("drag-over-top","drag-over-bot","drop-zone-active"); });
+  }
+  function startPointerItemDrag(e, row, card, listKey, itemId){
+    // Touch/iPad fallback: native HTML drag/drop is flaky on touch screens.
+    e.preventDefault(); e.stopPropagation();
+    var state={moved:false, row:null, list:null, after:false, sx:e.clientX, sy:e.clientY};
+    function markAt(ev){
+      var dx=Math.abs(ev.clientX-state.sx), dy=Math.abs(ev.clientY-state.sy);
+      if(!state.moved && dx+dy<8) return;
+      state.moved=true; row.classList.add("drag-ghost");
+      clearDragMarks();
+      var target=document.elementFromPoint(ev.clientX, ev.clientY);
+      var targetRow=target && target.closest ? target.closest('.row[data-id][data-list]') : null;
+      if(targetRow && mBody && mBody.contains(targetRow)){
+        var rect=targetRow.getBoundingClientRect();
+        state.after=(ev.clientY-rect.top)>rect.height/2;
+        state.row=targetRow; state.list=null;
+        targetRow.classList.add(state.after?"drag-over-bot":"drag-over-top");
+        return;
+      }
+      var targetList=target && target.closest ? target.closest('.steps[data-list]') : null;
+      if(targetList && mBody && mBody.contains(targetList)){
+        state.row=null; state.list=targetList; state.after=true;
+        targetList.classList.add("drop-zone-active");
+      }
+    }
+    function finish(ev){
+      document.removeEventListener("pointermove", markAt, true);
+      document.removeEventListener("pointerup", finish, true);
+      document.removeEventListener("pointercancel", finish, true);
+      if(state.moved){
+        markAt(ev);
+        var mut=getMutableCard(card.id), changed=false;
+        if(state.row){
+          var toList=state.row.getAttribute("data-list"), toId=state.row.getAttribute("data-id");
+          if(toList && toId && (toList!==listKey || toId!==itemId)){ changed=moveItemBetween(mut, listKey, toList, itemId, toId, state.after); }
+        }else if(state.list){
+          var lk=state.list.getAttribute("data-list");
+          if(lk){ changed=moveItemBetween(mut, listKey, lk, itemId, null, true); }
+        }
+        if(changed){ persistCardEdit(card.id); }
+      }
+      row.classList.remove("drag-ghost"); clearDragMarks(); reRenderModalPreserving();
+    }
+    document.addEventListener("pointermove", markAt, true);
+    document.addEventListener("pointerup", finish, true);
+    document.addEventListener("pointercancel", finish, true);
+  }
+  function startPointerBlockDrag(e, blockEl, card, blockId){
+    e.preventDefault(); e.stopPropagation();
+    var state={moved:false, block:null, after:false, sx:e.clientX, sy:e.clientY};
+    function markAt(ev){
+      var dx=Math.abs(ev.clientX-state.sx), dy=Math.abs(ev.clientY-state.sy);
+      if(!state.moved && dx+dy<8) return;
+      state.moved=true; blockEl.classList.add("drag-ghost");
+      clearDragMarks();
+      var target=document.elementFromPoint(ev.clientX, ev.clientY);
+      var targetBlock=target && target.closest ? target.closest('.content-block[data-block-id]') : null;
+      if(targetBlock && targetBlock!==blockEl && mBody && mBody.contains(targetBlock)){
+        var rect=targetBlock.getBoundingClientRect();
+        state.after=(ev.clientY-rect.top)>rect.height/2;
+        state.block=targetBlock;
+        targetBlock.classList.add(state.after?"drag-over-bot":"drag-over-top");
+      }
+    }
+    function finish(ev){
+      document.removeEventListener("pointermove", markAt, true);
+      document.removeEventListener("pointerup", finish, true);
+      document.removeEventListener("pointercancel", finish, true);
+      if(state.moved){
+        markAt(ev);
+        if(state.block){
+          var toId=state.block.getAttribute("data-block-id");
+          if(toId && toId!==blockId){
+            var mut=getMutableCard(card.id);
+            if(moveBlockWithin(mut, blockId, toId, state.after)){ persistCardEdit(card.id); }
+          }
+        }
+      }
+      blockEl.classList.remove("drag-ghost"); clearDragMarks(); reRenderModalPreserving();
+    }
+    document.addEventListener("pointermove", markAt, true);
+    document.addEventListener("pointerup", finish, true);
+    document.addEventListener("pointercancel", finish, true);
   }
 
   /* ----- edit popup ----- */
@@ -6262,6 +6400,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     });
     if(modalState.editMode){
       bar.appendChild(el("button",{class:"btn small", text:"+ Add special-instruction checkbox", onclick:function(){ addToggle(card.id); }}));
+      bar.appendChild(el("button",{class:"btn small", text:"+ Add section", onclick:function(){ addBlock(card.id); }}));
     }
     return bar;
   }
@@ -7228,6 +7367,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   var insOverlay=document.getElementById("ins-overlay");
   var insBody=document.getElementById("ins-body");
   var insuranceState={view:"all", search:"", sort:"date", dir:"asc"};
+  var insuranceSearchTimer=null;
   var INSURANCE_FOLDER_URL="https://ultimatecorp-my.sharepoint.com/shared?id=%2Fsites%2FUltimateLogisticsLLC%2FShared%20Documents%2FCompliance%2FInsurance&listurl=https%3A%2F%2Fultimatecorp%2Esharepoint%2Ecom%2Fsites%2FUltimateLogisticsLLC%2FShared%20Documents&viewid=a44e9030%2Da3e0%2D4738%2D9c7a%2Dc6af2d6baa51";
   var insuranceEditingKey="";
   var INS_STAGES=["Not started","Shopping Quotes","Quotes in / comparing","Pending FMCSA","Docs pending","Bound","Completed"];
@@ -8186,14 +8326,15 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
   }
-  function renderInsurance(){
+  function renderInsurance(opts){
+    opts=opts||{};
     insApplyRecapSeed(false);
     insBody.textContent="";
     if(!hasFleetLookupData()) insBody.appendChild(el("div",{class:"warn-note",text:"Fleet Master data is not loaded yet. Sign in or wait for remembered data/live refresh. Recap rows from the attached document can still display while Fleet loads."}));
     else insBody.appendChild(el("p",{class:"note",text:"One row per authority. Expiration dates come from Fleet Master automatically; tracking fields are for status, quotes, and key notes."}));
     var toolbar=el("div",{class:"exp-toolbar"});
     var view=el("select"); [["all","All authorities"],["open","Not bound/completed"],["notes","With key notes"]].concat(INS_STAGES.map(function(s){return [s,s];})).forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===insuranceState.view) o.selected=true; view.appendChild(o); }); view.addEventListener("change",function(){ insuranceState.view=view.value; renderInsurance(); });
-    var search=el("input",{type:"search",placeholder:"Search account, quote, note…"}); search.value=insuranceState.search||""; search.addEventListener("input",function(){ insuranceState.search=search.value; renderInsurance(); });
+    var search=el("input",{id:"ins-search-input",type:"search",placeholder:"Search account, quote, note…"}); search.value=insuranceState.search||""; search.addEventListener("input",function(){ var pos=search.selectionStart||search.value.length; insuranceState.search=search.value; if(insuranceSearchTimer) clearTimeout(insuranceSearchTimer); insuranceSearchTimer=setTimeout(function(){ insuranceSearchTimer=null; renderInsurance({focusSearch:true, searchPos:pos}); },120); });
     var sort=el("select"); [["date","Insurance exp date"],["name","Account name"],["stage","Status"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===(insuranceState.sort||"date")) o.selected=true; sort.appendChild(o); }); sort.addEventListener("change",function(){ insuranceState.sort=sort.value; renderInsurance(); });
     var dir=el("select"); [["asc","Oldest / A-Z"],["desc","Newest / Z-A"]].forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===(insuranceState.dir||"asc")) o.selected=true; dir.appendChild(o); }); dir.addEventListener("change",function(){ insuranceState.dir=dir.value; renderInsurance(); });
     var exportBtn=el("button",{class:"btn small",text:"⬇ Export Recap",onclick:exportInsuranceRecap});
@@ -8209,6 +8350,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     if(!filtered.length) list.appendChild(el("div",{class:"exp-empty",text:"No insurance rows match this view."}));
     else { list.appendChild(renderInsTableHead()); filtered.forEach(function(it){ list.appendChild(renderInsCard(it)); }); }
     insBody.appendChild(list);
+    if(opts.focusSearch){ setTimeout(function(){ var si=document.getElementById("ins-search-input"); if(si){ try{ si.focus({preventScroll:true}); }catch(e){ si.focus(); } try{ var p=opts.searchPos==null?si.value.length:opts.searchPos; si.setSelectionRange(p,p); }catch(e){} } },0); }
   }
 
   /* ----- cover page generator ----- */
