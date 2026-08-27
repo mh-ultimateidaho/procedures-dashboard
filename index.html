@@ -5406,7 +5406,11 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   var mBadge=document.getElementById("m-badge");
   var modalState=null;
 
-  function openCard(id, session){
+  function openCard(id, session, skipSharedCheck){
+    if(session && !skipSharedCheck){
+      withSharedEditCheck("opening this saved checklist", function(){ openCard(id, session, true); });
+      return;
+    }
     var card=getEffectiveCard(id); if(!card) return;
     modalState={
       cardId:id,
@@ -5511,7 +5515,9 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
         if(modalState.editMode){
           closePopup(); captureContextForm(); captureChecks(); commitEditDraft(); modalState.editMode=false; modalState.editDraft=null; renderModal();
         }else{
-          captureContextForm(); captureChecks(); modalState.editDraft=clone(getEffectiveCard(modalState.cardId)); modalState.editMode=true; renderModal();
+          withSharedEditCheck("editing this card", function(){
+            captureContextForm(); captureChecks(); modalState.editDraft=clone(getEffectiveCard(modalState.cardId)); modalState.editMode=true; renderModal();
+          });
         }
       }});
       mActions.appendChild(editBtn);
@@ -6710,7 +6716,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   var S365 = { msal:null, account:null, signedIn:false, item:null, driveId:null,
                roster:null, worksheets:[], coverLookups:null, expirationItems:[],
                fleetCacheAt:0, fleetLiveAt:0, fleetSource:"none", refreshingFleet:false,
-               remote:{eTag:null, by:null, at:null, savedAt:null, path:null, storage:null, present:false, conflict:false, checkingSave:false} };
+               remote:{eTag:null, by:null, at:null, savedAt:null, path:null, storage:null, present:false, conflict:false, checkingSave:false, checkingEdit:false, basePayload:null} };
 
   var FLEET_CACHE_KEY = "ultimateProceduresFleetMasterCacheV3";
   var FLEET_CACHE_WARN_DAYS = 7;
@@ -7098,7 +7104,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       if(data && data.__notfound) return false;
       var remote = (typeof data==="string") ? JSON.parse(data) : data;
       applyRemoteConfig(remote);
-      S365.remote.present=true; S365.remote.conflict=false; S365.remote.path=normalizeConfigPath(path); S365.remote.storage=storage; S365.remote.savedAt=(remote&&remote.savedAt)||null;
+      S365.remote.present=true; S365.remote.conflict=false; S365.remote.path=normalizeConfigPath(path); S365.remote.storage=storage; S365.remote.savedAt=(remote&&remote.savedAt)||null; S365.remote.basePayload=clone(remote||{});
       refreshSharedStatus("ok");
       configPath(path, storage, false).then(function(metaUrl){ return graph(metaUrl+"?$select=eTag,lastModifiedDateTime,lastModifiedBy", null, "reading JSON info"); }).then(function(meta){
         if(meta && !meta.__notfound){ S365.remote.eTag=meta.eTag; S365.remote.at=meta.lastModifiedDateTime;
@@ -7139,50 +7145,192 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       return (typeof data==="string") ? JSON.parse(data) : data;
     });
   }
-  function checkRemoteConfigBeforeSave(){
-    if(!S365.signedIn || !S365.remote.present || !S365.remote.savedAt) return Promise.resolve(true);
-    if(S365.remote.checkingSave) return Promise.resolve(false);
+  function sharedConfigPayload(savedAt){
+    return { version:1, savedAt:savedAt||new Date().toISOString(), remoteConfigStorage:activeConfigStorage(), remoteConfigPath:activeConfigFile(), remoteConfigSharePointUrl:activeConfigSharePointUrl(),
+      cardOverrides:clone(config.cardOverrides||{}), customCards:clone(config.customCards||[]), hiddenCards:clone(config.hiddenCards||[]), userPins:clone(config.userPins||{}), expirationNotes:clone(config.expirationNotes||{}), expirationReviewFlags:clone(config.expirationReviewFlags||{}), manualExpirationItems:clone(config.manualExpirationItems||[]), mapping:fixedMapping(), fleetUrl:activeFleetUrl(),
+      sessions:clone(pruneDeletedSessions(state.sessions)), deletedSessions:clone(config.deletedSessions||{}) };
+  }
+  function jsonSame(a,b){ try{ return JSON.stringify(a===undefined?null:a)===JSON.stringify(b===undefined?null:b); }catch(e){ return false; } }
+  function ownHas(o,k){ return !!(o && Object.prototype.hasOwnProperty.call(o,k)); }
+  function unionKeys(){
+    var out={}, args=arguments;
+    for(var i=0;i<args.length;i++){ var o=args[i]||{}; Object.keys(o).forEach(function(k){ out[k]=true; }); }
+    return Object.keys(out);
+  }
+  function indexById(arr){
+    var out={};
+    (Array.isArray(arr)?arr:[]).forEach(function(x,idx){
+      if(!x) return;
+      var id=String(x.id||x.key||("__idx_"+idx));
+      out[id]=x;
+    });
+    return out;
+  }
+  function mergeRecordFields(base, remote, local, conflicts, label){
+    var out=clone(remote||{}), keys=unionKeys(base,remote,local);
+    keys.forEach(function(k){
+      var b=base?base[k]:undefined, r=remote?remote[k]:undefined, l=local?local[k]:undefined;
+      var lc=!jsonSame(l,b), rc=!jsonSame(r,b);
+      if(!lc){ if(ownHas(remote,k)) out[k]=clone(r); else delete out[k]; }
+      else if(!rc){ if(ownHas(local,k)) out[k]=clone(l); else delete out[k]; }
+      else if(jsonSame(l,r)){ out[k]=clone(l); }
+      else { out[k]=clone(l); conflicts.push(label+" → "+k); }
+    });
+    return out;
+  }
+  function mergeMapByKey(base, remote, local, conflicts, label, itemMerger){
+    var out=clone(remote||{}), keys=unionKeys(base,remote,local);
+    keys.forEach(function(k){
+      var hb=ownHas(base,k), hr=ownHas(remote,k), hl=ownHas(local,k);
+      var b=hb?base[k]:undefined, r=hr?remote[k]:undefined, l=hl?local[k]:undefined;
+      var lc=!jsonSame(l,b) || (hl!==hb), rc=!jsonSame(r,b) || (hr!==hb);
+      if(!lc){ if(hr) out[k]=clone(r); else delete out[k]; }
+      else if(!rc){ if(hl) out[k]=clone(l); else delete out[k]; }
+      else if(jsonSame(l,r)){ if(hl) out[k]=clone(l); else delete out[k]; }
+      else if(itemMerger && hl && hr){ out[k]=itemMerger(b,r,l,conflicts,label+" → "+k); }
+      else { if(hl) out[k]=clone(l); else delete out[k]; conflicts.push(label+" → "+k); }
+    });
+    return out;
+  }
+  function mergeArrayById(baseArr, remoteArr, localArr, conflicts, label, itemMerger){
+    var b=indexById(baseArr), r=indexById(remoteArr), l=indexById(localArr), outMap={}, keys=unionKeys(b,r,l);
+    keys.forEach(function(k){
+      var hb=ownHas(b,k), hr=ownHas(r,k), hl=ownHas(l,k), bv=hb?b[k]:undefined, rv=hr?r[k]:undefined, lv=hl?l[k]:undefined;
+      var lc=!jsonSame(lv,bv) || (hl!==hb), rc=!jsonSame(rv,bv) || (hr!==hb);
+      if(!lc){ if(hr) outMap[k]=clone(rv); }
+      else if(!rc){ if(hl) outMap[k]=clone(lv); }
+      else if(jsonSame(lv,rv)){ if(hl) outMap[k]=clone(lv); }
+      else if(itemMerger && hl && hr){ outMap[k]=itemMerger(bv,rv,lv,conflicts,label+" → "+k); }
+      else { if(hl) outMap[k]=clone(lv); conflicts.push(label+" → "+k); }
+    });
+    return Object.keys(outMap).map(function(k){ return outMap[k]; });
+  }
+  function mergeSessionItem(base, remote, local, conflicts, label){
+    var out=mergeRecordFields(base||{}, remote||{}, local||{}, conflicts, label);
+    out.context=mergeRecordFields((base&&base.context)||{}, (remote&&remote.context)||{}, (local&&local.context)||{}, conflicts, label+" context");
+    out.formValues=mergeRecordFields((base&&base.formValues)||{}, (remote&&remote.formValues)||{}, (local&&local.formValues)||{}, conflicts, label+" form fields");
+    out.toggleState=mergeRecordFields((base&&base.toggleState)||{}, (remote&&remote.toggleState)||{}, (local&&local.toggleState)||{}, conflicts, label+" toggles");
+    out.notes=mergeRecordFields((base&&base.notes)||{}, (remote&&remote.notes)||{}, (local&&local.notes)||{}, conflicts, label+" notes");
+    out.checks=mergeRecordFields((base&&base.checks)||{}, (remote&&remote.checks)||{}, (local&&local.checks)||{}, conflicts, label+" checkboxes");
+    var checked=0, total=Number(out.total)||0;
+    Object.keys(out.checks||{}).forEach(function(k){ if(out.checks[k]) checked++; });
+    if(total<checked) total=checked;
+    out.total=total; out.checked=checked;
+    out.updatedAt=Math.max(Number(remote&&remote.updatedAt)||0, Number(local&&local.updatedAt)||0, Date.now());
+    out.savedAt=Number(local&&local.savedAt)||Number(remote&&remote.savedAt)||Date.now();
+    return out;
+  }
+  function mergeSharedPayloads(base, remote, local){
+    base=base||{}; remote=remote||{}; local=local||{};
+    var conflicts=[];
+    var merged=clone(remote||{});
+    merged.version=1;
+    merged.savedAt=local.savedAt||new Date().toISOString();
+    merged.remoteConfigStorage=activeConfigStorage();
+    merged.remoteConfigPath=activeConfigFile();
+    merged.remoteConfigSharePointUrl=activeConfigSharePointUrl();
+    merged.mapping=fixedMapping();
+    merged.fleetUrl=activeFleetUrl();
+    merged.deletedSessions=mergeMapByKey(base.deletedSessions||{}, remote.deletedSessions||{}, local.deletedSessions||{}, conflicts, "Deleted saved cards");
+    merged.cardOverrides=mergeMapByKey(base.cardOverrides||{}, remote.cardOverrides||{}, local.cardOverrides||{}, conflicts, "Procedure/card edits", mergeRecordFields);
+    merged.customCards=mergeArrayById(base.customCards||[], remote.customCards||[], local.customCards||[], conflicts, "Custom cards", mergeRecordFields);
+    if(jsonSame(local.hiddenCards||[], base.hiddenCards||[])) merged.hiddenCards=clone(remote.hiddenCards||[]);
+    else if(jsonSame(remote.hiddenCards||[], base.hiddenCards||[])) merged.hiddenCards=clone(local.hiddenCards||[]);
+    else { var hidden={}; (remote.hiddenCards||[]).concat(local.hiddenCards||[]).forEach(function(id){ if(id) hidden[id]=true; }); merged.hiddenCards=Object.keys(hidden); conflicts.push("Hidden/restored cards"); }
+    merged.userPins=mergeMapByKey(base.userPins||{}, remote.userPins||{}, local.userPins||{}, conflicts, "Pinned cards", function(b,r,l,c,label){ return mergeRecordFields(b||{},r||{},l||{},c,label); });
+    merged.expirationNotes=mergeMapByKey(base.expirationNotes||{}, remote.expirationNotes||{}, local.expirationNotes||{}, conflicts, "Expiration/insurance notes", mergeRecordFields);
+    merged.expirationReviewFlags=mergeMapByKey(base.expirationReviewFlags||{}, remote.expirationReviewFlags||{}, local.expirationReviewFlags||{}, conflicts, "Expiration review flags");
+    merged.manualExpirationItems=mergeArrayById(base.manualExpirationItems||[], remote.manualExpirationItems||[], local.manualExpirationItems||[], conflicts, "Manual expiration items", mergeRecordFields);
+    merged.sessions=mergeArrayById(base.sessions||[], remote.sessions||[], local.sessions||[], conflicts, "Saved checklist sessions", mergeSessionItem);
+    // Respect deletions from either side.
+    var deleted=merged.deletedSessions||{};
+    merged.sessions=(merged.sessions||[]).filter(function(s){ return s && !deleted[s.id]; });
+    return {payload:merged, conflicts:conflicts};
+  }
+  function applyMergedPayloadLocally(payload){
+    if(!payload) return;
+    if(payload.cardOverrides) config.cardOverrides=clone(payload.cardOverrides);
+    if(payload.customCards) config.customCards=clone(payload.customCards);
+    if(payload.hiddenCards) config.hiddenCards=clone(payload.hiddenCards);
+    if(payload.userPins) config.userPins=clone(payload.userPins);
+    if(payload.expirationNotes) config.expirationNotes=clone(payload.expirationNotes);
+    if(payload.expirationReviewFlags) config.expirationReviewFlags=clone(payload.expirationReviewFlags);
+    if(Array.isArray(payload.manualExpirationItems)) config.manualExpirationItems=clone(payload.manualExpirationItems);
+    if(payload.deletedSessions) config.deletedSessions=clone(payload.deletedSessions);
+    if(Array.isArray(payload.sessions)) state.sessions=clone(payload.sessions);
+    config.mapping=fixedMapping(); config.fleetUrl=SP.fleetUrl; loadPinsForCurrentUser();
+    try{ localStorage.setItem(CFG_KEY, JSON.stringify(config)); localStorage.setItem(STATE_KEY, JSON.stringify(state)); }catch(e){}
+  }
+  function preparePayloadForRemoteSave(){
+    if(!S365.signedIn) return Promise.resolve(null);
+    if(S365.remote.checkingSave) return Promise.resolve(null);
+    var local=sharedConfigPayload(new Date().toISOString());
+    if(!S365.remote.present || !S365.remote.savedAt) return Promise.resolve(local);
     S365.remote.checkingSave=true;
-    setSync("saving","Checking shared edits…","Making sure no one else saved changes since this dashboard loaded.");
+    setSync("saving","Checking shared edits…","Looking for newer shared JSON before saving.");
     return readCurrentRemotePayloadForSave().then(function(remote){
       S365.remote.checkingSave=false;
-      if(!remote || !remote.savedAt) return true;
-      if(String(remote.savedAt) !== String(S365.remote.savedAt)){
-        S365.remote.conflict=true;
-        var who="";
-        if(remote.updatedBy) who=" by "+remote.updatedBy;
-        var msg="Someone else saved shared dashboard edits"+who+" since this page loaded.\n\n"+
-          "Remote version: "+sharedStampLabel(remote.savedAt)+"\n"+
-          "Your loaded version: "+sharedStampLabel(S365.remote.savedAt)+"\n\n"+
-          "To avoid overwriting their changes, this save was stopped. Reload shared edits now?";
-        var reload=window.confirm(msg);
-        refreshSharedStatus("err","Shared edits changed elsewhere","Save stopped because the SharePoint JSON changed after this dashboard loaded.");
-        if(reload){
-          return loadRemoteConfig().then(function(){ rerenderAll(); if(document.getElementById("settings-overlay") && !document.getElementById("settings-overlay").classList.contains("hidden")) renderSettings(); refreshSharedStatus("ok"); return false; });
-        }
-        return false;
+      if(!remote || !remote.savedAt || String(remote.savedAt)===String(S365.remote.savedAt)) return local;
+      S365.remote.conflict=true;
+      var merged=mergeSharedPayloads(S365.remote.basePayload||{}, remote||{}, local||{});
+      var msg="Someone else saved shared edits since this page loaded.\n\n"+
+        "Remote version: "+sharedStampLabel(remote.savedAt)+"\n"+
+        "Your loaded version: "+sharedStampLabel(S365.remote.savedAt)+"\n\n"+
+        "The dashboard will merge their newer changes with yours, then save both.";
+      if(merged.conflicts && merged.conflicts.length){
+        var sample=merged.conflicts.slice(0,8).join("\n• ");
+        msg += "\n\nA few same-item conflicts were detected. If you continue, your current on-screen version wins for those exact fields:\n\n• "+sample+(merged.conflicts.length>8?"\n• …plus "+(merged.conflicts.length-8)+" more":"");
       }
-      return true;
+      msg += "\n\nContinue with Merge & save?";
+      if(!window.confirm(msg)){
+        refreshSharedStatus("err","Merge paused","Your changes are still on screen. Nothing was overwritten.");
+        return null;
+      }
+      applyMergedPayloadLocally(merged.payload);
+      setSync("saving","Merging shared edits…","Remote changes were loaded and your changes are being saved on top.");
+      return merged.payload;
     }).catch(function(e){
       S365.remote.checkingSave=false;
-      var proceed=window.confirm("I couldn't check whether someone else saved shared edits first.\n\nTo be safe, click Cancel and reload shared edits. Click OK only if you still want to try syncing your changes.\n\n"+String(e));
-      if(!proceed){ setSync("err","Shared check failed",String(e)); }
-      return proceed;
+      var proceed=window.confirm("I couldn't check whether someone else saved shared edits first.\n\nClick Cancel to keep your work on screen without syncing. Click OK only if you still want to try syncing your changes.\n\n"+String(e));
+      if(!proceed){ setSync("err","Shared check failed",String(e)); return null; }
+      return local;
     });
   }
   function pushRemoteConfig(){
     if(!S365.signedIn) return Promise.resolve(false);        // local-only until signed in
-    return checkRemoteConfigBeforeSave().then(function(ok){
-      if(!ok) return false;
+    return preparePayloadForRemoteSave().then(function(payload){
+      if(!payload) return false;
       setSync("saving","Syncing shared edits…");
-      var savedAt=new Date().toISOString();
-      var payload={ version:1, savedAt:savedAt, remoteConfigStorage:activeConfigStorage(), remoteConfigPath:activeConfigFile(), remoteConfigSharePointUrl:activeConfigSharePointUrl(),
-        cardOverrides:config.cardOverrides, customCards:config.customCards, hiddenCards:config.hiddenCards, userPins:config.userPins||{}, expirationNotes:config.expirationNotes||{}, expirationReviewFlags:config.expirationReviewFlags||{}, manualExpirationItems:config.manualExpirationItems||[], mapping:fixedMapping(), fleetUrl:activeFleetUrl(),
-        sessions:pruneDeletedSessions(state.sessions), deletedSessions:config.deletedSessions||{} };
       return configPath(null, null, true).then(function(contentUrl){ return graph(contentUrl, { method:"PUT", body:JSON.stringify(payload,null,2), headers:{"Content-Type":"application/json"} }, "saving JSON"); })
-        .then(function(){ S365.remote.present=true; S365.remote.conflict=false; S365.remote.storage=activeConfigStorage(); S365.remote.path=activeConfigFile(); S365.remote.savedAt=savedAt; S365.remote.by=(S365.account&&(S365.account.name||S365.account.username))||S365.remote.by; refreshSharedStatus("ok"); return true; })
+        .then(function(){ S365.remote.present=true; S365.remote.conflict=false; S365.remote.storage=activeConfigStorage(); S365.remote.path=activeConfigFile(); S365.remote.savedAt=payload.savedAt; S365.remote.basePayload=clone(payload); S365.remote.by=(S365.account&&(S365.account.name||S365.account.username))||S365.remote.by; refreshSharedStatus("ok"); return true; })
         .catch(function(e){ setSync("err", chipErr(e), String(e)); return false; });
     });
+  }
+  function checkRemoteConfigBeforeEdit(actionLabel){
+    if(!S365.signedIn || !S365.remote.present || !S365.remote.savedAt || S365.remote.checkingEdit) return Promise.resolve(true);
+    S365.remote.checkingEdit=true;
+    setSync("saving","Checking shared edits…","Checking before "+(actionLabel||"editing")+".");
+    return readCurrentRemotePayloadForSave().then(function(remote){
+      S365.remote.checkingEdit=false;
+      if(!remote || !remote.savedAt || String(remote.savedAt)===String(S365.remote.savedAt)){ refreshSharedStatus("ok"); return true; }
+      S365.remote.conflict=true;
+      refreshSharedStatus("err","Shared edits changed elsewhere","Reload shared edits before starting more work, or continue and merge when saving.");
+      var reload=window.confirm("Someone else saved shared edits since this page loaded.\n\nBefore "+(actionLabel||"editing")+", reload their changes now?\n\nOK = reload first\nCancel = keep working here and merge when you save");
+      if(!reload) return true;
+      applyRemoteConfig(remote);
+      S365.remote.present=true; S365.remote.conflict=false; S365.remote.savedAt=remote.savedAt||null; S365.remote.basePayload=clone(remote||{});
+      refreshSharedStatus("ok"); rerenderAll();
+      if(modalState && overlay && !overlay.classList.contains("hidden")) renderModal();
+      if(document.getElementById("settings-overlay") && !document.getElementById("settings-overlay").classList.contains("hidden")) renderSettings();
+      return false;
+    }).catch(function(e){
+      S365.remote.checkingEdit=false;
+      console.warn("checkRemoteConfigBeforeEdit",e);
+      return true;
+    });
+  }
+  function withSharedEditCheck(actionLabel, fn){
+    return checkRemoteConfigBeforeEdit(actionLabel).then(function(ok){ if(ok && typeof fn==="function") return fn(); return false; });
   }
 
 
@@ -7694,8 +7842,8 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     return base.concat(expManualItems()).sort(expSort);
   }
   function expFindManual(id){ id=String(id||""); return expManualStore().filter(function(m){ return String(m.id||"")===id; })[0]||null; }
-  function expOpenManualNew(){ expirationManualEditingId=""; expirationManualFormOpen=true; expirationEditingKey=""; renderExpirations(); }
-  function expOpenManualEdit(item){ expirationManualEditingId=item && item.meta ? item.meta.manualId : ""; expirationManualFormOpen=true; expirationEditingKey=""; renderExpirations(); }
+  function expOpenManualNew(){ withSharedEditCheck("adding a manual expiration", function(){ expirationManualEditingId=""; expirationManualFormOpen=true; expirationEditingKey=""; renderExpirations(); }); }
+  function expOpenManualEdit(item){ withSharedEditCheck("editing a manual expiration", function(){ expirationManualEditingId=item && item.meta ? item.meta.manualId : ""; expirationManualFormOpen=true; expirationEditingKey=""; renderExpirations(); }); }
   function expSaveManualItem(data){
     data=data||{}; var item=expClean(data.item), detail=expClean(data.detail)||"Manual follow-up", category=expClean(data.category)||"Other", dateISO=expDateISO(data.dateISO);
     if(!item){ window.alert("Add a name/item for the manual expiration first."); return; }
@@ -7871,11 +8019,11 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     main.appendChild(el("div",{class:"exp-cell note"}, renderExpNotePreview(note)));
     var actions=[];
     if(note){
-      actions.push(el("button",{class:"btn small",text:"Edit",onclick:function(){ expirationEditingKey=item.key; renderExpirations(); }}));
+      actions.push(el("button",{class:"btn small",text:"Edit",onclick:function(){ withSharedEditCheck("editing an expiration note", function(){ expirationEditingKey=item.key; renderExpirations(); }); }}));
       actions.push(el("button",{class:"btn small",text:"Archive",onclick:function(){ expArchiveActive(item); }}));
       actions.push(el("button",{class:"btn danger small",text:"Delete",onclick:function(){ if(window.confirm("Delete this expiration note?")) expDeleteActive(item); }}));
     }else{
-      actions.push(el("button",{class:"btn small",text:"Add note",onclick:function(){ expirationEditingKey=item.key; renderExpirations(); }}));
+      actions.push(el("button",{class:"btn small",text:"Add note",onclick:function(){ withSharedEditCheck("editing an expiration note", function(){ expirationEditingKey=item.key; renderExpirations(); }); }}));
     }
     if(rev) actions.push(el("button",{class:"btn small",text:"Reviewed",onclick:function(){ expMarkReviewed(item); }}));
     else actions.push(el("button",{class:"btn small",text:"Mark review",onclick:function(){ expMarkForReview(item); }}));
@@ -8313,7 +8461,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     main.appendChild(el("div",{class:"exp-cell quote"}, quoteParts.length?quoteParts.map(insQuoteNode):el("div",{class:"exp-muted",text:"—"})));
     var key=insKeyNoteTextOf(note);
     main.appendChild(el("div",{class:"exp-cell note"}, key?el("div",{class:"ins-key",text:key}):el("div",{class:"exp-muted",text:"—"})));
-    var actions=[el("button",{class:"btn small",text:note?"Edit":"Start tracking",onclick:function(){ insuranceEditingKey=item.key; renderInsurance(); }})];
+    var actions=[el("button",{class:"btn small",text:note?"Edit":"Start tracking",onclick:function(){ withSharedEditCheck("editing insurance tracking", function(){ insuranceEditingKey=item.key; renderInsurance(); }); }})];
     if(note) actions.push(el("button",{class:"btn danger small",text:"Clear",onclick:function(){ insClearNote(item); }}));
     main.appendChild(el("div",{class:"exp-cell actions exp-note-actions"}, actions));
     row.appendChild(main);
