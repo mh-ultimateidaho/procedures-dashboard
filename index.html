@@ -4244,8 +4244,8 @@
     </div>
     <div class="auth-wrap">
       <div class="top-status" aria-label="Data and sync status">
-        <span id="data-status" class="data-chip local" title="Fleet Master data available for generators">No Fleet data yet</span>
-        <span id="sync-status" class="sync-chip local" title="Shared dashboard sync status">Not checking yet</span>
+        <span id="data-status" class="data-chip local" title="Fleet Master data available for generators">Fleet data: not loaded</span>
+        <span id="sync-status" class="sync-chip local" title="Shared dashboard edits sync status">Shared edits: not checked</span>
       </div>
       <button id="lookup-btn" class="btn small" title="Fleet Master info snapshot">🚚 Fleet Info</button>
       <button id="exp-btn" class="btn small" title="Expiration tracker">⏰ Expirations</button>
@@ -6710,7 +6710,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   var S365 = { msal:null, account:null, signedIn:false, item:null, driveId:null,
                roster:null, worksheets:[], coverLookups:null, expirationItems:[],
                fleetCacheAt:0, fleetLiveAt:0, fleetSource:"none", refreshingFleet:false,
-               remote:{eTag:null, by:null, at:null, present:false} };
+               remote:{eTag:null, by:null, at:null, savedAt:null, path:null, storage:null, present:false, conflict:false, checkingSave:false} };
 
   var FLEET_CACHE_KEY = "ultimateProceduresFleetMasterCacheV3";
   var FLEET_CACHE_WARN_DAYS = 7;
@@ -6761,10 +6761,10 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     return "No Fleet Master data loaded yet";
   }
   function fleetDataChipText(){
-    if(S365.fleetLiveAt) return "Using data from " + fleetStampLabel(S365.fleetLiveAt);
-    if(S365.fleetCacheAt) return "Using data from " + fleetStampLabel(S365.fleetCacheAt);
-    if(hasFleetLookupData()) return "Using remembered Fleet data";
-    return S365.refreshingFleet ? "Loading Fleet data…" : "No Fleet data yet";
+    if(S365.fleetLiveAt) return "Fleet data from " + fleetStampLabel(S365.fleetLiveAt);
+    if(S365.fleetCacheAt) return "Fleet data from " + fleetStampLabel(S365.fleetCacheAt);
+    if(hasFleetLookupData()) return "Fleet data remembered";
+    return S365.refreshingFleet ? "Loading Fleet data…" : "Fleet data: not loaded";
   }
   function fleetDataChipKind(){
     if(!hasFleetLookupData()) return S365.refreshingFleet ? "saving" : "local";
@@ -6780,6 +6780,31 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     var detail=fleetDataStatus();
     if(S365.refreshingFleet) detail += ". You can keep working while the dashboard looks for changes.";
     c.title=detail;
+  }
+  function sharedStampLabel(ts){
+    if(!ts) return "not loaded";
+    try{ return new Date(ts).toLocaleString([], {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"}); }
+    catch(e){ return "saved earlier"; }
+  }
+  function sharedStatusDetail(){
+    if(!S365.signedIn) return "Sign in to load and sync shared dashboard edits.";
+    if(S365.remote.conflict) return "Someone else saved shared edits after this dashboard loaded. Reload shared edits before syncing.";
+    if(!S365.remote.present) return "Shared dashboard edits have not been confirmed this session.";
+    var bits=["Shared dashboard edits loaded from "+(S365.remote.path||activeConfigFile())];
+    if(S365.remote.savedAt) bits.push("saved "+sharedStampLabel(S365.remote.savedAt));
+    if(S365.remote.by) bits.push("last edit by "+S365.remote.by);
+    return bits.join(" · ");
+  }
+  function sharedStatusText(){
+    if(!S365.signedIn) return "Shared edits: sign in";
+    if(S365.remote.conflict) return "Shared edits changed elsewhere";
+    if(!S365.remote.present) return "Shared edits: not loaded";
+    return "Shared edits from " + sharedStampLabel(S365.remote.savedAt || S365.remote.at);
+  }
+  function refreshSharedStatus(kind, text, detail){
+    var c=document.getElementById("sync-status");
+    if(c){ c.className="sync-chip "+(kind|| (S365.remote.conflict?"err":(S365.remote.present?"ok":"local"))); c.textContent=text||sharedStatusText(); c.title=detail||sharedStatusDetail(); }
+    refreshDataStatus();
   }
   function loadFleetCache(){
     try{
@@ -6880,7 +6905,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     btn.textContent="Sign out ("+(S365.account.name||S365.account.username||"")+")";
     setSync("saving", hasFleetLookupData()?"Looking for changes…":"Connecting to Fleet…", hasFleetLookupData()?"You can keep using remembered Fleet data while this checks for updates.":"Connecting to load Fleet Master data.");
     reconnectM365()
-      .then(function(){ setSync("ok","Up to date ✓","Shared edits and Fleet data check finished."); rerenderAll(); if(typeof renderExpirations==="function" && document.getElementById("exp-overlay") && !document.getElementById("exp-overlay").classList.contains("hidden") && !expirationEditingKey){ renderExpirations(); } })
+      .then(function(){ refreshSharedStatus("ok"); rerenderAll(); if(typeof renderExpirations==="function" && document.getElementById("exp-overlay") && !document.getElementById("exp-overlay").classList.contains("hidden") && !expirationEditingKey){ renderExpirations(); } })
       .catch(function(e){
         console.warn("M365 connect error", e);
         setSync("err", chipErr(e), String(e));
@@ -7073,10 +7098,11 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       if(data && data.__notfound) return false;
       var remote = (typeof data==="string") ? JSON.parse(data) : data;
       applyRemoteConfig(remote);
-      S365.remote.present=true; S365.remote.path=normalizeConfigPath(path); S365.remote.storage=storage;
+      S365.remote.present=true; S365.remote.conflict=false; S365.remote.path=normalizeConfigPath(path); S365.remote.storage=storage; S365.remote.savedAt=(remote&&remote.savedAt)||null;
+      refreshSharedStatus("ok");
       configPath(path, storage, false).then(function(metaUrl){ return graph(metaUrl+"?$select=eTag,lastModifiedDateTime,lastModifiedBy", null, "reading JSON info"); }).then(function(meta){
         if(meta && !meta.__notfound){ S365.remote.eTag=meta.eTag; S365.remote.at=meta.lastModifiedDateTime;
-          S365.remote.by=meta.lastModifiedBy && meta.lastModifiedBy.user && meta.lastModifiedBy.user.displayName; }
+          S365.remote.by=meta.lastModifiedBy && meta.lastModifiedBy.user && meta.lastModifiedBy.user.displayName; refreshSharedStatus("ok"); }
       }).catch(function(){});
       return true;
     });
@@ -7107,16 +7133,58 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       return tryNext();
     }).catch(function(e){ console.warn("loadRemoteConfig", e); });
   }
-  function pushRemoteConfig(){
-    if(!S365.signedIn) return;        // local-only until signed in
-    setSync("saving","Syncing changes…");
-    var payload={ version:1, savedAt:new Date().toISOString(), remoteConfigStorage:activeConfigStorage(), remoteConfigPath:activeConfigFile(), remoteConfigSharePointUrl:activeConfigSharePointUrl(),
-      cardOverrides:config.cardOverrides, customCards:config.customCards, hiddenCards:config.hiddenCards, userPins:config.userPins||{}, expirationNotes:config.expirationNotes||{}, expirationReviewFlags:config.expirationReviewFlags||{}, manualExpirationItems:config.manualExpirationItems||[], mapping:fixedMapping(), fleetUrl:activeFleetUrl(),
-      sessions:pruneDeletedSessions(state.sessions), deletedSessions:config.deletedSessions||{} };
-    configPath(null, null, true).then(function(contentUrl){ return graph(contentUrl, { method:"PUT", body:JSON.stringify(payload,null,2), headers:{"Content-Type":"application/json"} }, "saving JSON"); })
-      .then(function(){ S365.remote.present=true; S365.remote.storage=activeConfigStorage(); S365.remote.path=activeConfigFile(); setSync("ok","Up to date ✓","Shared edits and Fleet data check finished."); })
-      .catch(function(e){ setSync("err", chipErr(e), String(e)); });
+  function readCurrentRemotePayloadForSave(){
+    return configPath(null, null, true).then(function(contentUrl){ return graph(contentUrl, null, "checking shared JSON before save"); }).then(function(data){
+      if(data && data.__notfound) return null;
+      return (typeof data==="string") ? JSON.parse(data) : data;
+    });
   }
+  function checkRemoteConfigBeforeSave(){
+    if(!S365.signedIn || !S365.remote.present || !S365.remote.savedAt) return Promise.resolve(true);
+    if(S365.remote.checkingSave) return Promise.resolve(false);
+    S365.remote.checkingSave=true;
+    setSync("saving","Checking shared edits…","Making sure no one else saved changes since this dashboard loaded.");
+    return readCurrentRemotePayloadForSave().then(function(remote){
+      S365.remote.checkingSave=false;
+      if(!remote || !remote.savedAt) return true;
+      if(String(remote.savedAt) !== String(S365.remote.savedAt)){
+        S365.remote.conflict=true;
+        var who="";
+        if(remote.updatedBy) who=" by "+remote.updatedBy;
+        var msg="Someone else saved shared dashboard edits"+who+" since this page loaded.\n\n"+
+          "Remote version: "+sharedStampLabel(remote.savedAt)+"\n"+
+          "Your loaded version: "+sharedStampLabel(S365.remote.savedAt)+"\n\n"+
+          "To avoid overwriting their changes, this save was stopped. Reload shared edits now?";
+        var reload=window.confirm(msg);
+        refreshSharedStatus("err","Shared edits changed elsewhere","Save stopped because the SharePoint JSON changed after this dashboard loaded.");
+        if(reload){
+          return loadRemoteConfig().then(function(){ rerenderAll(); if(document.getElementById("settings-overlay") && !document.getElementById("settings-overlay").classList.contains("hidden")) renderSettings(); refreshSharedStatus("ok"); return false; });
+        }
+        return false;
+      }
+      return true;
+    }).catch(function(e){
+      S365.remote.checkingSave=false;
+      var proceed=window.confirm("I couldn't check whether someone else saved shared edits first.\n\nTo be safe, click Cancel and reload shared edits. Click OK only if you still want to try syncing your changes.\n\n"+String(e));
+      if(!proceed){ setSync("err","Shared check failed",String(e)); }
+      return proceed;
+    });
+  }
+  function pushRemoteConfig(){
+    if(!S365.signedIn) return Promise.resolve(false);        // local-only until signed in
+    return checkRemoteConfigBeforeSave().then(function(ok){
+      if(!ok) return false;
+      setSync("saving","Syncing shared edits…");
+      var savedAt=new Date().toISOString();
+      var payload={ version:1, savedAt:savedAt, remoteConfigStorage:activeConfigStorage(), remoteConfigPath:activeConfigFile(), remoteConfigSharePointUrl:activeConfigSharePointUrl(),
+        cardOverrides:config.cardOverrides, customCards:config.customCards, hiddenCards:config.hiddenCards, userPins:config.userPins||{}, expirationNotes:config.expirationNotes||{}, expirationReviewFlags:config.expirationReviewFlags||{}, manualExpirationItems:config.manualExpirationItems||[], mapping:fixedMapping(), fleetUrl:activeFleetUrl(),
+        sessions:pruneDeletedSessions(state.sessions), deletedSessions:config.deletedSessions||{} };
+      return configPath(null, null, true).then(function(contentUrl){ return graph(contentUrl, { method:"PUT", body:JSON.stringify(payload,null,2), headers:{"Content-Type":"application/json"} }, "saving JSON"); })
+        .then(function(){ S365.remote.present=true; S365.remote.conflict=false; S365.remote.storage=activeConfigStorage(); S365.remote.path=activeConfigFile(); S365.remote.savedAt=savedAt; S365.remote.by=(S365.account&&(S365.account.name||S365.account.username))||S365.remote.by; refreshSharedStatus("ok"); return true; })
+        .catch(function(e){ setSync("err", chipErr(e), String(e)); return false; });
+    });
+  }
+
 
 
 
@@ -9479,7 +9547,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       st.appendChild(el("div",{}, el("b",{text:"Signed in: "}), (S365.account.username||S365.account.name||"")));
       st.appendChild(el("div",{}, el("b",{text:"Fleet Master: "}), S365.item?"connected":(hasFleetLookupData()?"refreshing / using remembered data":"not found")));
       st.appendChild(el("div",{}, el("b",{text:"Fleet data: "}), fleetDataStatus()));
-      st.appendChild(el("div",{}, el("b",{text:"Shared edits: "}), S365.remote.present?("synced"+(S365.remote.by?(" · last edit by "+S365.remote.by):"")):"not created yet (saves on first edit)"));
+      st.appendChild(el("div",{}, el("b",{text:"Shared edits: "}), S365.remote.present?("loaded from "+sharedStampLabel(S365.remote.savedAt||S365.remote.at)+(S365.remote.by?(" · last edit by "+S365.remote.by):"")):"not loaded yet (saves on first edit)"));
       st.appendChild(el("div",{}, el("b",{text:"Your pins: "}), String((state.pins||[]).length)+" saved for "+(S365.account.username||S365.account.name||"this sign-in")));
     } else {
       st.appendChild(el("div",{text:hasFleetLookupData()?"Not signed in. " + fleetDataStatus() + ". Sign in to refresh Fleet Master data and sync shared dashboard edits.":"Not signed in. Use Sign in (top right) to load Fleet Master data and sync shared dashboard edits."}));
@@ -9501,9 +9569,9 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     actionPanel.appendChild(el("h3",{text:"Useful actions"}));
     actionPanel.appendChild(el("p",{class:"note",text:"Use these when data looks stale, someone edited shared cards, or your personal pins need a reset. Refreshing Fleet Master updates the saved fast-start data too."}));
     var actions=el("div",{class:"settings-actions"});
-    actions.appendChild(el("button",{class:"btn",text:"Refresh Fleet Master data", onclick:function(){ setSync("saving","Looking for changes…","Refreshing Fleet Master data in the background."); reconnectM365().then(function(){ setSync("ok","Up to date ✓","Shared edits and Fleet data check finished."); rerenderAll(); renderSettings(); }).catch(function(e){ setSync("err", chipErr(e), String(e)); renderSettings(); }); }}));
-    actions.appendChild(el("button",{class:"btn",text:"Reload shared edits", onclick:function(){ setSync("saving","Looking for changes…","Reloading shared edits and refreshing Fleet data."); reconnectM365().then(function(){ setSync("ok","Up to date ✓","Shared edits and Fleet data check finished."); rerenderAll(); renderSettings(); }).catch(function(e){ setSync("err", chipErr(e), String(e)); renderSettings(); }); }}));
-    actions.appendChild(el("button",{class:"btn",text:"Sync my changes now", onclick:function(){ setSync("saving","Syncing changes…"); pushRemoteConfig(); setTimeout(renderSettings, 700); }}));
+    actions.appendChild(el("button",{class:"btn",text:"Refresh Fleet Master data", onclick:function(){ setSync("saving","Looking for changes…","Refreshing Fleet Master data in the background."); reconnectM365().then(function(){ refreshSharedStatus("ok"); rerenderAll(); renderSettings(); }).catch(function(e){ setSync("err", chipErr(e), String(e)); renderSettings(); }); }}));
+    actions.appendChild(el("button",{class:"btn",text:"Reload shared edits", onclick:function(){ setSync("saving","Looking for changes…","Reloading shared edits and refreshing Fleet data."); reconnectM365().then(function(){ refreshSharedStatus("ok"); rerenderAll(); renderSettings(); }).catch(function(e){ setSync("err", chipErr(e), String(e)); renderSettings(); }); }}));
+    actions.appendChild(el("button",{class:"btn",text:"Sync my changes now", onclick:function(){ setSync("saving","Syncing shared edits…"); pushRemoteConfig().then(function(){ setTimeout(renderSettings, 300); }); }}));
     actions.appendChild(el("button",{class:"btn danger",text:"Clear my pins", onclick:function(){ if(!confirm("Clear only your pinned cards? This will not affect anyone else.")) return; state.pins=[]; savePinsForCurrentUser(); rerenderAll(); renderSettings(); }}));
     actionPanel.appendChild(actions);
     body.appendChild(actionPanel);
