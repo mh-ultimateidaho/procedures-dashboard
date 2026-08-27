@@ -8449,7 +8449,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       }
       if(drVals.length){
         var dh=drVals[0]||[], iid=hidx(dh,["Driver ID","DriverID","ID"]), iname=hidx(dh,["Driver Name","Full Name","Name"]), ifirst=hidx(dh,["First","First Name"]), imiddle=hidx(dh,["Middle","Middle Name"]), ilast=hidx(dh,["Last","Last Name"]), isuffix=hidx(dh,["Suffix"]), icurD=hidx(dh,["Status","Current?","Current"]),
-          iaddr=hidx(dh,["Address","Driver Address","Street Address"]), icity=hidx(dh,["City","Driver City"]), istate=hidx(dh,["State","Driver State"]), izip=hidx(dh,["Zip","Zip Code","Postal Code"]), iphone=hidx(dh,["Cell","Cell Phone","Mobile","Mobile Phone","Phone","Phone Number","Driver Phone"]), iemail=hidx(dh,["Email","Email Address","Driver Email"]), idob=hidx(dh,["DOB","Date of Birth","Birth Date","Driver DOB"]), iyor=hidx(dh,["Years of OTR","Years OTR","OTR Years","YOR"]),
+          iaddr=hidx(dh,["Address","Driver Address","Street Address"]), icity=hidx(dh,["City","Driver City"]), istate=hidx(dh,["State","Driver State"]), izip=hidx(dh,["Zip","Zip Code","Postal Code"]), iphone=hidx(dh,["Cell","Cell Phone","Mobile","Mobile Phone","Phone","Phone Number","Driver Phone"]), iemail=hidx(dh,["Email","Email Address","Driver Email"]), idob=hidx(dh,["DOB","Date of Birth","Birth Date","Driver DOB"]), iyor=hidx(dh,["OTR","Years of OTR","Years OTR","OTR Years","YOR","Years of O.T.R.","O.T.R."]),
           icdl=hidx(dh,["CDL #","CDL#","CDL Number","License #"]), icdlState=hidx(dh,["CDL State","State"]), icdlExp=hidx(dh,["CDL Exp","CDL Expiration","CDL Exp.","CDL Exp Date","CDL Expiration Date"]), imed=hidx(dh,["Medical Exp","Medical Expiration","Medical Exp.","Medical Exp Date","Medical Expiration Date","Med Exp","Med. Exp"]), issn=hidx(dh,["SSN Last 4","SSN Last4","Last 4","SSN"]);
         for(var d=1;d<drVals.length;d++){
           var dr=drVals[d]||[]; if(dashboardIsPlaceholderRow.apply(null,dr)) continue;
@@ -8844,6 +8844,10 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   var PACKAGE_NO_BOLD_VALUE_FIELDS={DriverAddress:true,DriverCity:true,DriverState:true,DriverZip:true,DriverPhone:true,DOB:true,SSN:true,DriverEmailaddress:true,CDLNumber:true,CDLExpDate:true,CDLIssueState:true,YOR:true,MedicalExpDate:true,TransitDrugTestDate:true,TransitDot:true,TransitMC:true,TransitEINNumber:true,DriverCompanyEIN:true,DriverDOT:true,DriverMC:true,TractorUnitNumber:true,TractorYear:true,TractorMake:true,TractorPlate:true,TractorColor:true,TractorVin:true,LeaseStartDate:true,LeaseEndDate:true,LeaseNumberofMonths:true,LeaseBiMonthlyPay:true,LeaseMonthlyPay:true,TractorEquipCosts:true,TractorDownPay:true,TractorBalloonPay:true,TractorBalance:true,TrailerCostPerMonth:true};
   var PACKAGE_DATE_FIELDS={LeaseStartDate:true,LeaseEndDate:true,DOB:true,CDLExpDate:true,MedicalExpDate:true,TransitDrugTestDate:true};
   var PACKAGE_LEASE_PAYMENT_FIELDS=[["Lease start date","LeaseStartDate"],["Lease end date","LeaseEndDate"],["# of months","LeaseNumberofMonths"],["Bi-monthly payment","LeaseBiMonthlyPay"],["Monthly payment","LeaseMonthlyPay"],["Equipment cost","TractorEquipCosts"],["Down payment","TractorDownPay"],["Balloon payment","TractorBalloonPay"],["Equipment balance","TractorBalance"],["Trailer cost per month","TrailerCostPerMonth"]];
+  var PACKAGE_TOP_MANUAL_FIELDS=[["Full SSN","SSN","password"]];
+  var PACKAGE_DEFAULT_ZERO_FIELDS={TractorDownPay:true,TractorBalloonPay:true,TractorBalance:true,TrailerCostPerMonth:true};
+  var PACKAGE_OPTIONAL_EMPTY_FIELDS={MiddleName:true,Suffix:true};
+  var PACKAGE_FIELD_LABELS={FirstName:"First name",MiddleName:"Middle name",LastName:"Last name",Suffix:"Suffix",DriverAddress:"Address",DriverCity:"City",DriverState:"State",DriverZip:"Zip",DriverPhone:"Phone",DOB:"Date of birth",SSN:"Full SSN",DriverEmailaddress:"Email",CDLNumber:"CDL #",CDLExpDate:"CDL expiration",CDLIssueState:"CDL issuing state",YOR:"Years OTR",MedicalExpDate:"Medical exp date",TransitCompanyName:"Transit company",TransitDrugTestDate:"Drug testing policy date",TransitDot:"Transit DOT #",TransitMC:"Transit MC #",TransitEINNumber:"Transit EIN",DriverCompanyName:"Driver company",DriverCompanyEIN:"Driver company EIN",DriverDOT:"Driver DOT #",DriverMC:"Driver MC #",TractorUnitNumber:"Unit #",TractorYear:"Tractor year",TractorMake:"Tractor make",TractorPlate:"Plate #",TractorColor:"Color",TractorVin:"VIN #",LeaseStartDate:"Lease start date",LeaseEndDate:"Lease end date",LeaseNumberofMonths:"# of months",LeaseBiMonthlyPay:"Bi-monthly payment",LeaseMonthlyPay:"Monthly payment",TractorEquipCosts:"Equipment cost",TractorDownPay:"Down payment",TractorBalloonPay:"Balloon payment",TractorBalance:"Equipment balance",TrailerCostPerMonth:"Trailer cost per month"};
   var PACKAGE_TYPES=[
     {id:"newDriver", label:"New Driver", hint:"Commercial package, LLC operating agreement, and two-page lease."},
     {id:"changingTrucks", label:"Changing Trucks", hint:"Tractor docs and two-page lease for a truck change."},
@@ -8865,6 +8869,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   function blankPackageValues(){
     var v={packageType:"newDriver", driverPick:"", authorityPick:"", truckPick:"", selectedTemplates:defaultPackageTemplateIds("newDriver")};
     PACKAGE_FIELD_NAMES.forEach(function(k){ v[k]=""; });
+    Object.keys(PACKAGE_DEFAULT_ZERO_FIELDS||{}).forEach(function(k){ v[k]="$0.00"; });
     return v;
   }
   function openDriverPackage(){
@@ -9003,15 +9008,16 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     return list;
   }
   function renderLeasePaymentPanel(){
-    var panel=el("div",{class:"pkg-panel"}, el("h3",{text:"Lease / payments"}), el("p",{class:"note",text:"Fill these for lease docs and tractor docs. These values are manual and are formatted in the generated Word files."}));
+    var panel=el("div",{class:"pkg-panel"}, el("h3",{text:"Required manual info"}), el("p",{class:"note",text:"Full SSN and lease/payment fields stay manual. Full SSN is not saved; zero-payment fields default to $0.00 but can be changed."}));
     var grid=el("div",{class:"pkg-grid"});
+    PACKAGE_TOP_MANUAL_FIELDS.forEach(function(f){ grid.appendChild(packageInputField(f[0],f[1],f[2]||"text",f[3])); });
     PACKAGE_LEASE_PAYMENT_FIELDS.forEach(function(f){ grid.appendChild(packageInputField(f[0],f[1])); });
     panel.appendChild(grid);
     return panel;
   }
   function renderDriverPackage(){
     packageBody.textContent="";
-    packageBody.appendChild(el("p",{class:"note",text:"Generate Word package documents from Fleet Master plus manual fields. Pick a package type, choose the docs, and download either one .docx or a ZIP of the selected docs. Full SSN stays manual and is not saved."}));
+    packageBody.appendChild(el("p",{class:"note",text:"Generate Word package documents from Fleet Master plus manual fields. Pick a package type, choose the docs, fill the required manual info, and download either one .docx or a ZIP of the selected docs."}));
     var look=(S365&&S365.coverLookups)||{};
     var driverDetails=(look.drivers||[]).map(function(d){
       var assign=assignmentForDriverDetail(d)||{};
@@ -9031,12 +9037,12 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     ));
     packageBody.appendChild(renderLeasePaymentPanel());
     packageBody.appendChild(renderTemplateChoices());
-    packageBody.appendChild(el("div",{class:"pkg-sensitive"}, el("p",{class:"note",text:"Full SSN stays manual and is not saved. DOB, cell, email, and address can auto-fill from the Drivers tab when those columns exist."})));
+    packageBody.appendChild(el("div",{class:"pkg-sensitive"}, el("p",{class:"note",text:"Full SSN is shown above because it cannot auto-fill and is not saved. DOB, cell, email, address, and OTR can auto-fill from the Drivers tab when those columns exist."})));
     packageBody.appendChild(el("div",{class:"manual-toggle"}, el("button",{class:"btn small",text:(packageManualOpen?"Hide details / Manual Fields":"Show details / Manual Fields"),onclick:function(){ capturePackageFields(); packageManualOpen=!packageManualOpen; renderDriverPackage(); }})));
     if(packageManualOpen){
       var manual=el("div",{class:"manual-fields"});
       function section(title,fields){ var panel=el("div",{class:"pkg-panel"},el("h3",{text:title})); var grid=el("div",{class:"pkg-grid"}); fields.forEach(function(f){ grid.appendChild(packageInputField(f[0],f[1],f[2]||"text",f[3])); }); panel.appendChild(grid); manual.appendChild(panel); }
-      section("Driver", [["First name","FirstName"],["Middle name","MiddleName"],["Last name","LastName"],["Suffix","Suffix"],["Address","DriverAddress","text",true],["City","DriverCity"],["State","DriverState"],["Zip","DriverZip"],["Phone","DriverPhone"],["Email","DriverEmailaddress"],["Date of birth","DOB","text"],["Full SSN","SSN","password"]]);
+      section("Driver", [["First name","FirstName"],["Middle name","MiddleName"],["Last name","LastName"],["Suffix","Suffix"],["Address","DriverAddress","text",true],["City","DriverCity"],["State","DriverState"],["Zip","DriverZip"],["Phone","DriverPhone"],["Email","DriverEmailaddress"],["Date of birth","DOB","text"]]);
       section("CDL / medical", [["CDL #","CDLNumber"],["CDL expiration","CDLExpDate"],["Issuing state","CDLIssueState"],["Years OTR","YOR"],["Medical exp date","MedicalExpDate"]]);
       section("Transit company / Driver LLC", [["Transit company name","TransitCompanyName"],["Drug testing policy date","TransitDrugTestDate"],["Transit DOT #","TransitDot"],["Transit MC #","TransitMC"],["Transit EIN","TransitEINNumber"],["Driver company name","DriverCompanyName"],["Driver company EIN","DriverCompanyEIN"],["Driver DOT #","DriverDOT"],["Driver MC #","DriverMC"]]);
       section("Tractor", [["Unit #","TractorUnitNumber"],["Year","TractorYear"],["Make","TractorMake"],["Plate #","TractorPlate"],["Color","TractorColor"],["VIN #","TractorVin","text",true]]);
@@ -9357,6 +9363,57 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     var ids=packageValues.selectedTemplates||[];
     return PACKAGE_TEMPLATES.filter(function(t){ return ids.indexOf(t.id)>=0; });
   }
+  function packageRequiredFieldLabel(name){ return (PACKAGE_FIELD_LABELS&&PACKAGE_FIELD_LABELS[name]) || name; }
+  function packageTemplateRawXml(t){
+    var node=document.getElementById(t.scriptId), b64=node?node.textContent.trim():"";
+    if(!b64) return Promise.resolve("");
+    return JSZip.loadAsync(b64ToUint8(b64)).then(function(zip){
+      var jobs=[];
+      zip.forEach(function(path,file){
+        if(!file.dir && path.indexOf("word/")===0 && /\.xml$/.test(path)){ jobs.push(file.async("string")); }
+      });
+      return Promise.all(jobs).then(function(parts){ return parts.join("\n"); });
+    }).catch(function(){ return ""; });
+  }
+  function packageFieldsUsedByTemplate(t){
+    return packageTemplateRawXml(t).then(function(xml){
+      var used={};
+      String(xml||"").replace(/\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g,function(m,key){
+        var canonical=packageCanonicalFieldName(key);
+        if(canonical) used[canonical]=true;
+        return m;
+      });
+      String(xml||"").replace(/<w:name\b[^>]*w:val="([^"]+)"/g,function(m,name){
+        var canonical=packageCanonicalFieldName(name);
+        if(canonical) used[canonical]=true;
+        return m;
+      });
+      String(xml||"").replace(/<w:instrText\b[^>]*>[\s\S]*?\bREF\s+([A-Za-z0-9_]+)/g,function(m,name){
+        var canonical=packageCanonicalFieldName(name);
+        if(canonical) used[canonical]=true;
+        return m;
+      });
+      return used;
+    });
+  }
+  function warnMissingPackageFields(selected,values){
+    selected=selected||[];
+    values=values||{};
+    if(typeof JSZip==="undefined") return Promise.resolve(true);
+    return Promise.all(selected.map(packageFieldsUsedByTemplate)).then(function(list){
+      var used={}, missing=[];
+      list.forEach(function(map){ Object.keys(map||{}).forEach(function(k){ used[k]=true; }); });
+      PACKAGE_FIELD_NAMES.forEach(function(k){
+        if(!used[k] || (PACKAGE_OPTIONAL_EMPTY_FIELDS&&PACKAGE_OPTIONAL_EMPTY_FIELDS[k])) return;
+        var v=String(values[k]==null?"":values[k]).trim();
+        if(!v) missing.push(packageRequiredFieldLabel(k));
+      });
+      if(!missing.length) return true;
+      missing=missing.filter(function(v,i,a){ return a.indexOf(v)===i; });
+      var maxShow=18, shown=missing.slice(0,maxShow), more=missing.length>maxShow ? "\n…plus "+(missing.length-maxShow)+" more" : "";
+      return window.confirm("Heads up: these generated-document fields are blank:\n\n• "+shown.join("\n• ")+more+"\n\nContinue generating anyway?");
+    });
+  }
   function makeFilledPackageDoc(t,values){
     var node=document.getElementById(t.scriptId), b64=node?node.textContent.trim():"";
     if(!b64) return Promise.reject(new Error("Missing template: "+t.label));
@@ -9379,23 +9436,26 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     var selected=selectedPackageTemplates();
     if(!selected.length){ window.alert("Pick at least one document to generate."); return; }
     var values={}; PACKAGE_FIELD_NAMES.forEach(function(k){ values[k]=packageValues[k]||""; });
-    var baseName=safeFilePart(packageBaseFileName());
-    if(selected.length===1){
-      var one=selected[0];
-      makeFilledPackageDoc(one,values).then(function(blob){
-        saveBlob(blob, baseName+" "+one.fileName);
-        setSync("ok","Generated ✓",one.label+" downloaded.");
-      }).catch(function(e){ console.error(e); window.alert("I couldn’t generate the Word package: "+e); });
-      return;
-    }
-    var outZip=new JSZip();
-    Promise.all(selected.map(function(t){
-      return makeFilledPackageDoc(t,values).then(function(blob){ outZip.file(baseName+" "+t.fileName, blob); });
-    })).then(function(){ return outZip.generateAsync({type:"blob",mimeType:"application/zip"}); }).then(function(blob){
-      var pkgLabel=(PACKAGE_TYPES.filter(function(t){return t.id===packageValues.packageType;})[0]||{}).label||"Driver Package";
-      saveBlob(blob, baseName+" "+safeFilePart(pkgLabel)+" Docs.zip");
-      setSync("ok","Generated ✓","Driver package ZIP downloaded.");
-    }).catch(function(e){ console.error(e); window.alert("I couldn’t generate the Word package ZIP: "+e); });
+    warnMissingPackageFields(selected,values).then(function(ok){
+      if(!ok) return;
+      var baseName=safeFilePart(packageBaseFileName());
+      if(selected.length===1){
+        var one=selected[0];
+        makeFilledPackageDoc(one,values).then(function(blob){
+          saveBlob(blob, baseName+" "+one.fileName);
+          setSync("ok","Generated ✓",one.label+" downloaded.");
+        }).catch(function(e){ console.error(e); window.alert("I couldn’t generate the Word package: "+e); });
+        return;
+      }
+      var outZip=new JSZip();
+      Promise.all(selected.map(function(t){
+        return makeFilledPackageDoc(t,values).then(function(blob){ outZip.file(baseName+" "+t.fileName, blob); });
+      })).then(function(){ return outZip.generateAsync({type:"blob",mimeType:"application/zip"}); }).then(function(blob){
+        var pkgLabel=(PACKAGE_TYPES.filter(function(t){return t.id===packageValues.packageType;})[0]||{}).label||"Driver Package";
+        saveBlob(blob, baseName+" "+safeFilePart(pkgLabel)+" Docs.zip");
+        setSync("ok","Generated ✓","Driver package ZIP downloaded.");
+      }).catch(function(e){ console.error(e); window.alert("I couldn’t generate the Word package ZIP: "+e); });
+    }).catch(function(e){ console.error(e); window.alert("I couldn’t check for blank fields: "+e); });
   }
 
   /* ----- settings modal ----- */
