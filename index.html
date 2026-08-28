@@ -7746,7 +7746,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   }
 ];
 
-  function openInsurance(){ insOverlay.classList.remove("hidden"); insOverlay.setAttribute("aria-hidden","false"); document.body.style.overflow="hidden"; insApplyRecapSeed(false); renderInsurance(); }
+  function openInsurance(){ insOverlay.classList.remove("hidden"); insOverlay.setAttribute("aria-hidden","false"); document.body.style.overflow="hidden"; renderInsurance(); }
   function closeInsurance(){ insOverlay.classList.add("hidden"); insOverlay.setAttribute("aria-hidden","true"); document.body.style.overflow=""; insuranceEditingKey=""; }
 
   function openExpirations(){ expOverlay.classList.remove("hidden"); expOverlay.setAttribute("aria-hidden","false"); document.body.style.overflow="hidden"; renderExpirations(); }
@@ -8161,19 +8161,19 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   }
   function insHasTracking(note){ return !!(note && (expClean(note.stage) || expClean(note.quotesText) || expClean(note.keyNote) || expClean(note.text) || (note.quotes&&note.quotes.length) || (note.log&&note.log.length))); }
   function insApplyRecapSeed(overwrite){
+    // Manual import only. Do NOT silently restore the old Aug 19 recap data on open/render.
+    // This prevents blank insurance rows that were intentionally cleared from being re-filled later.
+    if(!overwrite) return false;
     var items=(S365.expirationItems||[]).filter(function(it){return it.category==="Authority";}), changed=false;
-    var before=JSON.stringify(config.expirationNotes||{}), shouldSeed=overwrite || config.insuranceSeedVersion!==INS_RECAP_SEED_VERSION;
     insMigrateSeedBuckets(items);
-    if(JSON.stringify(config.expirationNotes||{})!==before) changed=true;
-    if(shouldSeed){
-      (INS_RECAP_SEED||[]).forEach(function(seed){
-        var item=insFindItemForSeed(seed,items) || {key:insSeedKey(seed), item:seed.account, dateISO:insDateFromAccountNote(seed.accountNote), meta:{synthetic:true, accountNote:seed.accountNote||""}};
-        var b=expBucket(item.key), prev=b.active||null;
-        if(overwrite || !insHasTracking(prev)){ b.active=insSeedNote(seed,item,prev); changed=true; }
-      });
-      if(config.insuranceSeedVersion!==INS_RECAP_SEED_VERSION){ config.insuranceSeedVersion=INS_RECAP_SEED_VERSION; changed=true; }
-    }
+    (INS_RECAP_SEED||[]).forEach(function(seed){
+      var item=insFindItemForSeed(seed,items) || {key:insSeedKey(seed), item:seed.account, dateISO:insDateFromAccountNote(seed.accountNote), meta:{synthetic:true, accountNote:seed.accountNote||""}};
+      var b=expBucket(item.key), prev=b.active||null;
+      b.active=insSeedNote(seed,item,prev); changed=true;
+    });
+    config.insuranceSeedVersion=INS_RECAP_SEED_VERSION;
     if(changed) flushConfig();
+    return changed;
   }
   function insImportRecap(){
     if(!window.confirm("Load the attached Aug 19 insurance recap into the dashboard tracker? This will refresh the matching insurance rows with the recap's status, quotes, and key notes.")) return;
@@ -8192,6 +8192,8 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     var items=base.slice();
     (INS_RECAP_SEED||[]).forEach(function(seed){
       if(insFindItemForSeed(seed,base)) return;
+      var bucket=(config.expirationNotes||{})[insSeedKey(seed)];
+      if(!bucket || (!bucket.active && !(bucket.archived&&bucket.archived.length))) return;
       items.push(makeExpItem("Authority",seed.account,seed.account,"Insurance","Insurance",insDateFromAccountNote(seed.accountNote),{synthetic:true,accountNote:seed.accountNote||""}));
     });
     return items;
@@ -8544,9 +8546,8 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   }
   function renderInsurance(opts){
     opts=opts||{};
-    insApplyRecapSeed(false);
     insBody.textContent="";
-    if(!hasFleetLookupData()) insBody.appendChild(el("div",{class:"warn-note",text:"Fleet Master data is not loaded yet. Sign in or wait for remembered data/live refresh. Recap rows from the attached document can still display while Fleet loads."}));
+    if(!hasFleetLookupData()) insBody.appendChild(el("div",{class:"warn-note",text:"Fleet Master data is not loaded yet. Sign in or wait for remembered data/live refresh. Saved insurance tracking can still display while Fleet loads."}));
     else insBody.appendChild(el("p",{class:"note",text:"One row per authority. Expiration dates come from Fleet Master automatically; tracking fields are for status, quotes, and key notes."}));
     var toolbar=el("div",{class:"exp-toolbar"});
     var view=el("select"); [["all","All authorities"],["open","Not bound/completed"],["notes","With key notes"]].concat(INS_STAGES.map(function(s){return [s,s];})).forEach(function(p){ var o=el("option",{value:p[0],text:p[1]}); if(p[0]===insuranceState.view) o.selected=true; view.appendChild(o); }); view.addEventListener("change",function(){ insuranceState.view=view.value; renderInsurance(); });
