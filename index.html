@@ -7534,7 +7534,13 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     return window.confirm("This "+docName+" is missing: "+missing.join(", ")+".\n\nGenerate anyway?");
   }
   function coverRequiredFields(){ return [["Company / LLC",coverValues.authority],["Carrier responsible for safety",coverValues.safetyCompany||coverValues.authority],["EIN",coverValues.ein],["MC #",coverValues.mc],["U.S. DOT #",coverValues.dot],["Unit #",coverValues.unit],["Year",coverValues.year],["Make / Type",coverValues.make],["Plate",coverValues.plate],["VIN #",coverValues.vin],["Color",coverValues.color],["Driver",coverValues.driver]]; }
-  function leaseRequiredFields(){ leaseValues.newCompany=leaseValues.oldCompany||leaseValues.newCompany||""; return [["Company / authority",leaseValues.oldCompany],["Terminated unit #",leaseValues.oldUnit],["Terminated year",leaseValues.oldYear],["Terminated make / type",leaseValues.oldMake],["Terminated VIN #",leaseValues.oldVin],["Lease start date",leaseValues.oldLeaseStart],["Lease end date",leaseValues.oldLeaseEnd],["Added unit #",leaseValues.newUnit],["Added year",leaseValues.newYear],["Added make / type",leaseValues.newMake],["Added VIN #",leaseValues.newVin]]; }
+  function leaseIsTruckOnly(){ return (leaseValues&&leaseValues.mode)==="truckOnly"; }
+  function leaseRequiredFields(){
+    leaseValues.newCompany=leaseValues.oldCompany||leaseValues.newCompany||"";
+    var base=[["Company / authority",leaseValues.oldCompany],["Terminated unit #",leaseValues.oldUnit],["Terminated year",leaseValues.oldYear],["Terminated make / type",leaseValues.oldMake],["Terminated VIN #",leaseValues.oldVin],["Lease start date",leaseValues.oldLeaseStart],["Lease end date",leaseValues.oldLeaseEnd]];
+    if(!leaseIsTruckOnly()) base=base.concat([["Added unit #",leaseValues.newUnit],["Added year",leaseValues.newYear],["Added make / type",leaseValues.newMake],["Added VIN #",leaseValues.newVin]]);
+    return base;
+  }
 
   function runDashboardHealthCheck(){
     var res=[];
@@ -8875,9 +8881,9 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   var leaseBody=document.getElementById("lease-body");
   var coverManualOpen=false;
   var leaseManualOpen=false;
-  var leaseValues={oldAuthorityPick:"", oldTruckPick:"", newAuthorityPick:"", newTruckPick:"", oldCompany:"", oldUnit:"", oldYear:"", oldMake:"", oldModel:"", oldVin:"", oldLeaseStart:"", oldLeaseEnd:"", newCompany:"", newUnit:"", newYear:"", newMake:"", newModel:"", newVin:""};
+  var leaseValues={mode:"replace", oldAuthorityPick:"", oldTruckPick:"", newAuthorityPick:"", newTruckPick:"", oldCompany:"", oldUnit:"", oldYear:"", oldMake:"", oldModel:"", oldVin:"", oldLeaseStart:"", oldLeaseEnd:"", newCompany:"", newUnit:"", newYear:"", newMake:"", newModel:"", newVin:""};
 
-  function resetLeaseValues(){ leaseValues={oldAuthorityPick:"", oldTruckPick:"", newAuthorityPick:"", newTruckPick:"", oldCompany:"", oldUnit:"", oldYear:"", oldMake:"", oldModel:"", oldVin:"", oldLeaseStart:"", oldLeaseEnd:"", newCompany:"", newUnit:"", newYear:"", newMake:"", newModel:"", newVin:""}; }
+  function resetLeaseValues(){ leaseValues={mode:"replace", oldAuthorityPick:"", oldTruckPick:"", newAuthorityPick:"", newTruckPick:"", oldCompany:"", oldUnit:"", oldYear:"", oldMake:"", oldModel:"", oldVin:"", oldLeaseStart:"", oldLeaseEnd:"", newCompany:"", newUnit:"", newYear:"", newMake:"", newModel:"", newVin:""}; }
   function leaseDateFromEventDate(d){
     if(!d) return "";
     var raw=String(d).trim();
@@ -8909,7 +8915,13 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
 
   function renderLeaseTermination(){
     leaseBody.textContent="";
-    leaseBody.appendChild(el("p",{class:"note",text:"Pick the company/authority once, choose the terminated truck and added truck, then add the lease dates. Value and loss payee are intentionally not included."}));
+    leaseBody.appendChild(el("p",{class:"note",text:"Pick the company/authority, choose the terminated truck, then choose whether this document removes only that truck or replaces it with another unit. Add the lease dates. Value and loss payee are intentionally not included."}));
+    var modeGrid=el("div",{class:"lease-grid"});
+    var modeSel=el("select",{id:"lease-mode"});
+    [["replace","Remove truck and replace with added truck"],["truckOnly","Remove truck only"]].forEach(function(opt){ var o=el("option",{value:opt[0],text:opt[1]}); if((leaseValues.mode||"replace")===opt[0]) o.selected=true; modeSel.appendChild(o); });
+    modeSel.addEventListener("change",function(){ captureLeaseFields(); leaseValues.mode=modeSel.value||"replace"; renderLeaseTermination(); });
+    modeGrid.appendChild(coverField("Lease termination type", modeSel));
+    leaseBody.appendChild(modeGrid);
     var look=(S365&&S365.coverLookups)||{};
     var grid=el("div",{class:"lease-grid"});
     if(look.authorities && look.authorities.length){
@@ -8917,7 +8929,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     }
     if(look.tractors && look.tractors.length){
       grid.appendChild(leaseSelectField("Terminated truck #", "oldTruckPick", look.tractors, function(t){ return t.unit; }, function(t){ return t.unit; }, function(t){ applyLeaseTruck("old", t); }));
-      grid.appendChild(leaseSelectField("Added truck #", "newTruckPick", look.tractors, function(t){ return t.unit; }, function(t){ return t.unit; }, function(t){ applyLeaseTruck("new", t); }));
+      if(!leaseIsTruckOnly()) grid.appendChild(leaseSelectField("Added truck #", "newTruckPick", look.tractors, function(t){ return t.unit; }, function(t){ return t.unit; }, function(t){ applyLeaseTruck("new", t); }));
     }
     [["oldLeaseStart","Lease start date"],["oldLeaseEnd","Lease end date"]].forEach(function(p){
       var id="lease-"+p[0], inp=el("input",{type:"text",id:id,placeholder:"m/d/yyyy"}); inp.value=leaseValues[p[0]]||"";
@@ -8927,9 +8939,11 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     leaseBody.appendChild(grid);
     leaseBody.appendChild(el("div",{class:"manual-toggle"}, el("button",{class:"btn small",text:(leaseManualOpen?"Hide details / Manual Fields":"Show details / Manual Fields"),onclick:function(){ captureLeaseFields(); leaseManualOpen=!leaseManualOpen; renderLeaseTermination(); }})));
     if(leaseManualOpen){
-      var manual=el("div",{class:"manual-fields"}, el("p",{class:"note",text:"These are optional overrides for the PDF. Company applies to both the removed and added unit."}));
+      var manual=el("div",{class:"manual-fields"}, el("p",{class:"note",text:leaseIsTruckOnly()?"These are optional overrides for the PDF. Truck-only documents only need the removed unit details.":"These are optional overrides for the PDF. Company applies to both the removed and added unit."}));
       var mgrid=el("div",{class:"lease-grid"});
-      [["oldCompany","Company / authority"],["oldUnit","Terminated unit #"],["oldYear","Terminated year"],["oldMake","Terminated make / type"],["oldModel","Terminated model"],["oldVin","Terminated VIN #"],["newUnit","Added unit #"],["newYear","Added year"],["newMake","Added make / type"],["newModel","Added model"],["newVin","Added VIN #"]].forEach(function(p){
+      var leaseManualFields=[["oldCompany","Company / authority"],["oldUnit","Terminated unit #"],["oldYear","Terminated year"],["oldMake","Terminated make / type"],["oldModel","Terminated model"],["oldVin","Terminated VIN #"]];
+      if(!leaseIsTruckOnly()) leaseManualFields=leaseManualFields.concat([["newUnit","Added unit #"],["newYear","Added year"],["newMake","Added make / type"],["newModel","Added model"],["newVin","Added VIN #"]]);
+      leaseManualFields.forEach(function(p){
         var id="lease-"+p[0], inp=el("input",{type:"text",id:id}); inp.value=leaseValues[p[0]]||"";
         inp.addEventListener("input",function(){ leaseValues[p[0]]=inp.value; if(p[0]==="oldCompany") leaseValues.newCompany=inp.value; updateLeasePreview(); });
         mgrid.appendChild(coverField(p[1], inp));
@@ -8953,16 +8967,17 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   }
   function captureLeaseFields(){
     function gv(id){ var e=document.getElementById("lease-"+id); return e?e.value.trim():""; }
+    var modeEl=document.getElementById("lease-mode"); if(modeEl) leaseValues.mode=modeEl.value||"replace";
     ["oldCompany","oldUnit","oldYear","oldMake","oldModel","oldVin","oldLeaseStart","oldLeaseEnd","newUnit","newYear","newMake","newModel","newVin"].forEach(function(k){ var v=gv(k); if(v || document.getElementById("lease-"+k)) leaseValues[k]=v; });
     leaseValues.newCompany=leaseValues.oldCompany||leaseValues.newCompany||"";
   }
   function autofillLeaseDetails(alertIfMissing){
     var look=(S365&&S365.coverLookups)||{}, tr=look.tractorsByUnit||{};
-    var oldT=tr[String(leaseValues.oldUnit||leaseValues.oldTruckPick||"").trim().toLowerCase()], newT=tr[String(leaseValues.newUnit||leaseValues.newTruckPick||"").trim().toLowerCase()];
+    var oldT=tr[String(leaseValues.oldUnit||leaseValues.oldTruckPick||"").trim().toLowerCase()], newT=tr[String(leaseValues.newUnit||leaseValues.newTruckPick||"").trim().toLowerCase()], needsNew=!leaseIsTruckOnly();
     if(oldT){ ["unit","year","make","model","vin"].forEach(function(k){ var kk="old"+k.charAt(0).toUpperCase()+k.slice(1); leaseValues[kk]=leaseValues[kk]||oldT[k]||""; }); }
-    if(newT){ ["unit","year","make","model","vin"].forEach(function(k){ var kk="new"+k.charAt(0).toUpperCase()+k.slice(1); leaseValues[kk]=leaseValues[kk]||newT[k]||""; }); }
-    if(alertIfMissing && S365.signedIn && ((!oldT && leaseValues.oldUnit) || (!newT && leaseValues.newUnit))){
-      window.alert((!oldT&&leaseValues.oldUnit?"I couldn’t find the terminated truck on the Trucks tab.\n":"")+(!newT&&leaseValues.newUnit?"I couldn’t find the added truck on the Trucks tab.\n":"")+"You can still hand-fill the missing fields.");
+    if(needsNew && newT){ ["unit","year","make","model","vin"].forEach(function(k){ var kk="new"+k.charAt(0).toUpperCase()+k.slice(1); leaseValues[kk]=leaseValues[kk]||newT[k]||""; }); }
+    if(alertIfMissing && S365.signedIn && ((!oldT && leaseValues.oldUnit) || (needsNew && !newT && leaseValues.newUnit))){
+      window.alert((!oldT&&leaseValues.oldUnit?"I couldn’t find the terminated truck on the Trucks tab.\n":"")+(needsNew&&!newT&&leaseValues.newUnit?"I couldn’t find the added truck on the Trucks tab.\n":"")+"You can still hand-fill the missing fields.");
     }
     if(alertIfMissing && !hasFleetLookupData()){ window.alert("Fleet Master data is not loaded yet. Sign in, or wait for the remembered data/live refresh to load, then try again. You can still hand-fill the fields."); }
   }
@@ -8978,7 +8993,9 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     var unit=leaseValues.oldUnit||"###";
     var p1="Ultimate Logistics, LLC, the owner of Unit# "+unit+", hereby terminates the lease agreement by & between Ultimate Logistics LLC & "+oldCo+", as it pertains to Unit# "+unit+"; "+leaseVehicle("old")+"; "+(leaseValues.oldVin||"VIN#")+".";
     var pLease="Unit#"+unit+" lease start date: "+leaseDateText(leaseValues.oldLeaseStart,"lease start date")+" - lease end date: "+leaseDateText(leaseValues.oldLeaseEnd,"lease end date");
-    var p2="Please remove Unit# "+unit+" from the "+oldCo+" insurance policy & replace it with Unit# "+(leaseValues.newUnit||"###")+"; "+leaseVehicle("new")+"; "+(leaseValues.newVin||"VIN#")+". Cover page attached.";
+    var p2=leaseIsTruckOnly()?
+      "Please remove Unit# "+unit+", "+leaseVehicle("old")+"; "+(leaseValues.oldVin||"VIN#")+", from the "+oldCo+" insurance policy.":
+      "Please remove Unit# "+unit+" from the "+oldCo+" insurance policy & replace it with Unit# "+(leaseValues.newUnit||"###")+"; "+leaseVehicle("new")+"; "+(leaseValues.newVin||"VIN#")+". Cover page attached.";
     return {p1:p1,pLease:pLease,p2:p2};
   }
   function updateLeasePreview(){ var old=leaseBody.querySelector(".lease-preview"); if(old) old.replaceWith(leasePreview()); }
@@ -9007,7 +9024,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     stream+="ET\n";
     var pdf=buildPdfWithAptosStyle(stream);
     var blob=new Blob([pdf],{type:"application/pdf"});
-    var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="Unit "+safeFilePart(leaseValues.oldUnit||"###")+" Lease Termination "+fileNameCasePart(leaseValues.oldCompany||"Company")+".pdf"; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },500);
+    var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="Unit "+safeFilePart(leaseValues.oldUnit||"###")+" Lease Termination "+(leaseIsTruckOnly()?"Truck Only ":"")+fileNameCasePart(leaseValues.oldCompany||"Company")+".pdf"; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },500);
   }
   function pdfTextWidthApproxFont(s,size,bold){
     try{ _coverMeasureCanvas=_coverMeasureCanvas||document.createElement("canvas"); var ctx=_coverMeasureCanvas.getContext("2d"); ctx.font=(bold?"700 ":"")+size+"pt Aptos, 'Aptos Body', Arial, sans-serif"; return ctx.measureText(String(s||"")).width*72/96; }
