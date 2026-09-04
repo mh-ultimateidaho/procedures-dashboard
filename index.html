@@ -7383,7 +7383,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       assign=assign||{}; detail=detail||driverDetailsByText(baseLabel)||{};
       var id=detail.id||detail.driverId||assign.driverId||"", name=detail.name||assign.name||firstLastFromLastFirst(baseLabel||key||""), label=detail.label||baseLabel||name||key;
       var dedupe=lookupNorm(id||label||name||key); if(!dedupe) return;
-      var row={key:key||label, label:label, name:name, display:label+(assign.truck?" #"+assign.truck:""), truck:assign.truck||"", authority:assign.authority||"", dot:assign.dot||"", driverId:id, driverDetail:detail};
+      var row={key:key||label, label:label, name:name, display:label+(assign.truck?" #"+assign.truck:""), truck:assign.truck||"", authority:assign.authority||"", dot:assign.dot||"", driverAuthorityId:detail.driverAuthorityId||assign.driverAuthorityId||"", driverAuthority:detail.driverAuthority||assign.driverAuthority||"", driverId:id, driverDetail:detail};
       if(!seen[dedupe] || (!seen[dedupe].truck && row.truck)) seen[dedupe]=row;
     }
     Object.keys(by).forEach(function(k){ var rec=by[k]||{}, base=stripTruckSuffixFromDriverLabel(k||rec.name||""); put(k,base,rec,driverDetailsByText(rec)||driverDetailsByText(base)); });
@@ -7394,6 +7394,9 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   function lookupDriverByKey(key){ return currentDriverRecords().filter(function(r){return r.key===key;})[0] || null; }
   function truckDetailsByUnit(unit){ var look=(S365&&S365.coverLookups)||{}, tr=look.tractorsByUnit||{}; return tr[lookupNorm(unit)] || null; }
   function authorityDetailsByName(auth){ var look=(S365&&S365.coverLookups)||{}, au=look.authoritiesByName||{}; return au[lookupNorm(auth)] || null; }
+  function authorityDetailsById(id){ var look=(S365&&S365.coverLookups)||{}, au=look.authoritiesById||{}; return au[lookupNorm(id)] || null; }
+  function driverAuthorityDetailsFor(rec){ rec=rec||{}; var d=rec.driverDetail||driverDetailsByText(rec)||{}, id=rec.driverAuthorityId||d.driverAuthorityId||"", name=rec.driverAuthority||d.driverAuthority||""; return (id&&authorityDetailsById(id)) || (name&&authorityDetailsByName(name)) || null; }
+  function driverAuthorityLabelFor(rec){ rec=rec||{}; var d=rec.driverDetail||driverDetailsByText(rec)||{}, a=driverAuthorityDetailsFor(rec)||{}; return a.authority || rec.driverAuthority || d.driverAuthority || rec.driverAuthorityId || d.driverAuthorityId || ""; }
   function currentDriverForTruck(unit){ unit=lookupNorm(unit); return currentDriverRecords().filter(function(r){return lookupNorm(r.truck)===unit;})[0] || null; }
   function currentDriversForAuthority(auth){ auth=lookupNorm(auth); return currentDriverRecords().filter(function(r){return lookupNorm(r.authority)===auth;}); }
   function kv(label,value,muted){ return el("div",{class:"info-kv"}, el("div",{class:"k",text:label}), el("div",{class:"v"+(muted?" muted":""),text:lookupValue(value)})); }
@@ -7407,15 +7410,18 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     else window.prompt("Copy this:", txt);
   }
   function insuranceTextFor(rec){
-    rec=rec||{}; var d=rec.driverDetail||driverDetailsByText(rec)||{}, t=truckDetailsByUnit(rec.truck)||{}, a=authorityDetailsByName(rec.authority)||{};
+    rec=rec||{}; var d=rec.driverDetail||driverDetailsByText(rec)||{}, t=truckDetailsByUnit(rec.truck)||{}, a=authorityDetailsByName(rec.authority)||{}, da=driverAuthorityDetailsFor(rec)||{}, driverAuth=driverAuthorityLabelFor(rec), driverAuthId=rec.driverAuthorityId||d.driverAuthorityId||"";
     return [
       "Driver: "+lookupValue(d.name||rec.name||firstLastFromLastFirst(rec.label||rec.key)),
       "Driver ID: "+lookupValue(d.id||rec.driverId),
+      "Driver's Authority: "+lookupValue(driverAuth),
+      "Driver's Auth ID: "+lookupValue(driverAuthId),
+      "Driver's Authority DOT #: "+lookupValue(da.dot),
       "CDL: "+lookupValue(d.cdl)+(d.cdlState?" ("+d.cdlState+")":""),
       "CDL Exp: "+lookupValue(lookupDate(d.cdlExp)),
       "Medical Exp: "+lookupValue(lookupDate(d.medicalExp)),
-      "Authority: "+lookupValue(rec.authority),
-      "DOT #: "+lookupValue(a.dot||rec.dot),
+      "Driving under: "+lookupValue(rec.authority),
+      "Driving DOT #: "+lookupValue(a.dot||rec.dot),
       "MC #: "+lookupValue(a.mc),
       "EIN: "+lookupValue(a.ein),
       "Insurance Exp: "+lookupValue(lookupDate(a.insuranceExp)),
@@ -7453,9 +7459,10 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   }
   function renderDriverProfile(rec){
     if(!rec) return el("div",{class:"empty",text:"Choose a driver to see Fleet Master details."});
-    var d=rec.driverDetail||driverDetailsByText(rec)||{}, t=truckDetailsByUnit(rec.truck)||{}, a=authorityDetailsByName(rec.authority)||{}, card=el("div",{class:"lookup-card primary"});
+    var d=rec.driverDetail||driverDetailsByText(rec)||{}, t=truckDetailsByUnit(rec.truck)||{}, a=authorityDetailsByName(rec.authority)||{}, da=driverAuthorityDetailsFor(rec)||{}, driverAuth=driverAuthorityLabelFor(rec), driverAuthId=rec.driverAuthorityId||d.driverAuthorityId||"", card=el("div",{class:"lookup-card primary"});
     card.appendChild(el("h3",{text:d.name||firstLastFromLastFirst(rec.label||rec.key||"Driver")}));
-    card.appendChild(el("div",{class:"lookup-meta",text:[rec.authority, rec.truck?("Unit #"+rec.truck):"", (a.dot||rec.dot)?("DOT "+(a.dot||rec.dot)):""].filter(Boolean).join(" · ")||"No current assignment details"}));
+    var metaBits=[]; if(driverAuth) metaBits.push("Driver authority: "+driverAuth); if(rec.authority) metaBits.push("Driving under: "+rec.authority); if(rec.truck) metaBits.push("Unit #"+rec.truck); if(da.dot) metaBits.push("Driver DOT "+da.dot); else if(a.dot||rec.dot) metaBits.push("Driving DOT "+(a.dot||rec.dot));
+    card.appendChild(el("div",{class:"lookup-meta",text:metaBits.filter(Boolean).join(" · ")||"No current assignment details"}));
     var revealKey=rec.key||d.id||d.name||"driver";
     var ssnText=(d.ssnLast4 && lookupState.revealed[revealKey+":ssn"]) ? d.ssnLast4 : (d.ssnLast4?"••••":"—");
     var ssnBox=kv("SSN last 4", ssnText, !d.ssnLast4);
@@ -7467,12 +7474,14 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     card.appendChild(el("div",{class:"info-grid"},
       kv("Driver ID",d.id||rec.driverId), kv("CDL #",d.cdl), kv("CDL State",d.cdlState), dateKv("CDL Exp",d.cdlExp), dateKv("Medical Exp",d.medicalExp), ssnBox, dobBox,
       kv("Cell",d.phone), kv("Email",d.email), kv("Address",fullAddr),
-      kv("Current truck",rec.truck), kv("Current authority",rec.authority), kv("DOT #",a.dot||rec.dot)
+      kv("Driver's Auth ID",driverAuthId), kv("Driver's authority",driverAuth), kv("Current truck",rec.truck), kv("Driving under",rec.authority), kv("Driving DOT #",a.dot||rec.dot)
     ));
-    var miss=missingBox([["CDL #",d.cdl],["CDL Exp",d.cdlExp],["Medical Exp",d.medicalExp],["Current truck",rec.truck],["Current authority",rec.authority],["SSN last 4",d.ssnLast4]]); if(miss) card.appendChild(miss);
+    var miss=missingBox([["CDL #",d.cdl],["CDL Exp",d.cdlExp],["Medical Exp",d.medicalExp],["Current truck",rec.truck],["Driving under",rec.authority],["SSN last 4",d.ssnLast4]]); if(miss) card.appendChild(miss);
     card.appendChild(el("div",{class:"lookup-section-title",text:"Current truck"}));
     card.appendChild(el("div",{class:"info-grid"}, kv("Unit #",rec.truck), kv("Truck",[t.year,t.make,t.model].filter(Boolean).join(" ")), kv("VIN",t.vin), kv("Plate",t.plate), kv("Color",t.color), dateKv("Annual inspection",t.annualInspection)));
-    card.appendChild(el("div",{class:"lookup-section-title",text:"Authority"}));
+    card.appendChild(el("div",{class:"lookup-section-title",text:"Driver's authority"}));
+    card.appendChild(el("div",{class:"info-grid"}, kv("Company",da.authority||driverAuth), kv("Authority ID",driverAuthId||da.authorityId), kv("DOT #",da.dot), kv("MC #",da.mc), kv("EIN",da.ein), dateKv("Insurance Exp",da.insuranceExp), kv("Insurer/Agent",da.insurerAgent), kv("Policy type",da.policyType)));
+    card.appendChild(el("div",{class:"lookup-section-title",text:"Current driving authority"}));
     card.appendChild(el("div",{class:"info-grid"}, kv("Company",a.authority||rec.authority), kv("DOT #",a.dot||rec.dot), kv("MC #",a.mc), kv("EIN",a.ein), dateKv("Insurance Exp",a.insuranceExp), kv("Insurer/Agent",a.insurerAgent), kv("Policy type",a.policyType)));
     var actions=el("div",{class:"lookup-actions"}, el("button",{class:"btn small",text:"📄 Cover page",onclick:function(){ fillCoverFromDriver(rec); }}), el("button",{class:"btn small",text:"📝 Lease termination",onclick:function(){ fillLeaseFromDriver(rec); }}), el("button",{class:"btn small",text:"Copy insurance info",onclick:function(){ copyText(insuranceTextFor(rec),"Insurance info copied"); }}));
     card.appendChild(actions); var links=secondaryFolderLinks(rec); if(links) card.appendChild(links); return card;
@@ -7506,7 +7515,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     lookupBody.textContent="";
     var drivers=currentDriverRecords(), look=(S365&&S365.coverLookups)||{};
     if(!hasFleetLookupData()) lookupBody.appendChild(el("div",{class:"warn-note",text:"No Fleet Master data is loaded yet. Sign in or wait for remembered data to load."}));
-    else lookupBody.appendChild(el("p",{class:"note",text:"Fleet Info uses Fleet Master details for insurance/document work. Folder links are secondary because Office Doc Lookup already handles document searching."}));
+    else lookupBody.appendChild(el("p",{class:"note",text:"Fleet Info uses Fleet Master details for insurance/document work. Driver profiles show the driver's own authority from the Drivers tab, plus the current driving authority from Assignments."}));
     var tabs=el("div",{class:"lookup-tabs"});
     [["driver","Driver"],["truck","Truck"],["authority","Authority"]].forEach(function(p){ tabs.appendChild(el("button",{class:"btn small"+(lookupState.mode===p[0]?" on":""),text:p[1],onclick:function(){ lookupState.mode=p[0]; renderFleetLookup(); }})); });
     lookupBody.appendChild(tabs);
@@ -8582,7 +8591,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   var coverValues={driverpick:"", authoritypick:"", truckpick:"", driver:"", authority:"", safetyCompany:"", dot:"", ein:"", mc:"", unit:"", year:"", make:"", model:"", plate:"", vin:"", color:""};
 
   function loadCoverLookups(){
-    var out={authoritiesByName:{}, tractorsByUnit:{}, driversByName:{}, driversById:{}, authorities:[], tractors:[], drivers:[]};
+    var out={authoritiesByName:{}, authoritiesById:{}, tractorsByUnit:{}, driversByName:{}, driversById:{}, authorities:[], tractors:[], drivers:[]};
     function clean(v){ return String(v==null?"":v).trim(); }
     function key(v){ return clean(v).toLowerCase(); }
     function isActiveCurrent(v){
@@ -8637,15 +8646,16 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     return Promise.all([readMaybe("Authorities"), readMaybe("Trucks"), readMaybe("Tractors"), readMaybe("Drivers")]).then(function(all){
       var authVals=all[0]||[], truckVals=(all[1]&&all[1].length?all[1]:all[2])||[], drVals=all[3]||[];
       if(authVals.length){
-        var h=authVals[0]||[], ia=hidx(h,["Authority","Authority / LLC","LLC","Company","Company Name","Name","Legal Name"]),
+        var h=authVals[0]||[], ia=hidx(h,["Authority","Authority / LLC","LLC","Company","Company Name","Name","Legal Name"]), iaid=hidx(h,["Authority ID","AuthorityID","Auth ID","AuthID","Authority's ID","LLC ID","Company ID"]),
           idot=hidx(h,["DOT #","DOT#","U.S. DOT#","USDOT","US DOT","DOT"]), imc=hidx(h,["MC #","MC#","MC","MC Number"]), iein=hidx(h,["EIN","FEIN","Federal ID","Federal ID #","Tax ID"]),
           iagent=hidx(h,["Insurer/Agent","Insurer","Agent","Insurance Agent"]), ipolicy=hidx(h,["Policy Type","Coverage","Coverage Type"]), ipolicyDate=hidx(h,["Policy Date","Effective Date","Policy Effective"]), idrug=hidx(h,["Drug Testing Policy Date","Drug Test Policy Date","D&A Policy Date","DA Policy Date"]),
           icur=hidx(h,["Status","Current?","Current"]), iins=hidx(h,["Insurance Exp","Insurance Expiration","Insurance Exp.","Insurance Exp Date","Insurance Expiration Date","Ins Exp","Ins. Exp","Policy Exp","Policy Expiration"]);
         for(var r=1;r<authVals.length;r++){
           var row=authVals[r]||[]; if(dashboardIsPlaceholderRow.apply(null,row)) continue;
           var name=ia>=0?clean(row[ia]):""; if(!name) continue;
-          var rec={authority:name, dot:idot>=0?clean(row[idot]):"", mc:imc>=0?clean(row[imc]):"", ein:iein>=0?clean(row[iein]):"", insurerAgent:iagent>=0?clean(row[iagent]):"", policyType:ipolicy>=0?clean(row[ipolicy]):"", policyDate:ipolicyDate>=0?clean(row[ipolicyDate]):"", drugTestDate:idrug>=0?clean(row[idrug]):"", current:icur>=0?clean(row[icur]):"", status:icur>=0?clean(row[icur]):"", insuranceExp:iins>=0?clean(row[iins]):""};
-          out.authoritiesByName[key(name)]=rec;
+          var authId=iaid>=0?clean(row[iaid]):"";
+          var rec={authority:name, authorityId:authId, authId:authId, dot:idot>=0?clean(row[idot]):"", mc:imc>=0?clean(row[imc]):"", ein:iein>=0?clean(row[iein]):"", insurerAgent:iagent>=0?clean(row[iagent]):"", policyType:ipolicy>=0?clean(row[ipolicy]):"", policyDate:ipolicyDate>=0?clean(row[ipolicyDate]):"", drugTestDate:idrug>=0?clean(row[idrug]):"", current:icur>=0?clean(row[icur]):"", status:icur>=0?clean(row[icur]):"", insuranceExp:iins>=0?clean(row[iins]):""};
+          out.authoritiesByName[key(name)]=rec; if(authId) out.authoritiesById[key(authId)]=rec;
           // Authority dropdowns use the Fleet Master Status dropdown first, then fall back to Insurance Exp for older sheet versions.
           // Include Current, Returning, Potential, Pending, New, and Temp; exclude Quit, Fired, and Old.
           if(includeByDateOrCurrent(rec.insuranceExp, rec.current, iins>=0, icur>=0)) out.authorities.push(rec);
@@ -8671,7 +8681,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
         out.tractors.sort(function(a,b){ return String(a.unit).localeCompare(String(b.unit), undefined, {numeric:true, sensitivity:"base"}); });
       }
       if(drVals.length){
-        var dh=drVals[0]||[], iid=hidx(dh,["Driver ID","DriverID","ID"]), iname=hidx(dh,["Driver Name","Full Name","Name"]), ifirst=hidx(dh,["First","First Name"]), imiddle=hidx(dh,["Middle","Middle Name"]), ilast=hidx(dh,["Last","Last Name"]), isuffix=hidx(dh,["Suffix"]), icurD=hidx(dh,["Status","Current?","Current"]),
+        var dh=drVals[0]||[], iid=hidx(dh,["Driver ID","DriverID","ID"]), idriverAuth=hidx(dh,["Driver's Auth ID","Drivers Auth ID","Driver Auth ID","Driver Authority ID","Driver's Authority ID","Authority ID","Auth ID","AuthorityID","AuthID"]), iname=hidx(dh,["Driver Name","Full Name","Name"]), ifirst=hidx(dh,["First","First Name"]), imiddle=hidx(dh,["Middle","Middle Name"]), ilast=hidx(dh,["Last","Last Name"]), isuffix=hidx(dh,["Suffix"]), icurD=hidx(dh,["Status","Current?","Current"]),
           iaddr=hidx(dh,["Address","Driver Address","Street Address"]), icity=hidx(dh,["City","Driver City"]), istate=hidx(dh,["State","Driver State"]), izip=hidx(dh,["Zip","Zip Code","Postal Code"]), iphone=hidx(dh,["Cell","Cell Phone","Mobile","Mobile Phone","Phone","Phone Number","Driver Phone"]), iemail=hidx(dh,["Email","Email Address","Driver Email"]), idob=hidx(dh,["DOB","Date of Birth","Birth Date","Driver DOB"]), iyor=hidx(dh,["OTR","Years of OTR","Years OTR","OTR Years","YOR","Years of O.T.R.","O.T.R."]),
           icdl=hidx(dh,["CDL #","CDL#","CDL Number","License #"]), icdlState=hidx(dh,["CDL State","State"]), icdlExp=hidx(dh,["CDL Exp","CDL Expiration","CDL Exp.","CDL Exp Date","CDL Expiration Date"]), imed=hidx(dh,["Medical Exp","Medical Expiration","Medical Exp.","Medical Exp Date","Medical Expiration Date","Med Exp","Med. Exp"]), issn=hidx(dh,["SSN Last 4","SSN Last4","Last 4","SSN"]);
         for(var d=1;d<drVals.length;d++){
@@ -8687,7 +8697,8 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
             var ssnRaw=issn>=0?clean(dr[issn]):"";
             var rawAddr=iaddr>=0?clean(dr[iaddr]):"", parsedAddr=splitDriverAddress(rawAddr);
             var city=icity>=0?clean(dr[icity]):parsedAddr.city, st=istate>=0?clean(dr[istate]):parsedAddr.state, zip=izip>=0?clean(dr[izip]):parsedAddr.zip;
-            var recD={id:id, driverId:id, name:name, label:label, first:first, middle:imiddle>=0?clean(dr[imiddle]):"", last:last, suffix:isuffix>=0?clean(dr[isuffix]):"", current:icurD>=0?clean(dr[icurD]):"", status:icurD>=0?clean(dr[icurD]):"", address:rawAddr?(city||st||zip?parsedAddr.street:rawAddr):"", city:city, state:st, zip:zip, phone:iphone>=0?clean(dr[iphone]):"", email:iemail>=0?clean(dr[iemail]):"", dob:idob>=0?clean(dr[idob]):"", yearsOtr:iyor>=0?clean(dr[iyor]):"", cdl:icdl>=0?clean(dr[icdl]):"", cdlState:icdlState>=0?clean(dr[icdlState]):"", cdlExp:icdlExp>=0?clean(dr[icdlExp]):"", medicalExp:imed>=0?clean(dr[imed]):"", ssnLast4:ssnRaw?ssnRaw.slice(-4):""};
+            var driverAuthId=idriverAuth>=0?clean(dr[idriverAuth]):"", driverAuthRec=driverAuthId ? ((out.authoritiesById||{})[key(driverAuthId)] || (out.authoritiesByName||{})[key(driverAuthId)]) : null, driverAuthName=driverAuthRec ? driverAuthRec.authority : driverAuthId;
+            var recD={id:id, driverId:id, name:name, label:label, first:first, middle:imiddle>=0?clean(dr[imiddle]):"", last:last, suffix:isuffix>=0?clean(dr[isuffix]):"", current:icurD>=0?clean(dr[icurD]):"", status:icurD>=0?clean(dr[icurD]):"", address:rawAddr?(city||st||zip?parsedAddr.street:rawAddr):"", city:city, state:st, zip:zip, phone:iphone>=0?clean(dr[iphone]):"", email:iemail>=0?clean(dr[iemail]):"", dob:idob>=0?clean(dr[idob]):"", yearsOtr:iyor>=0?clean(dr[iyor]):"", cdl:icdl>=0?clean(dr[icdl]):"", cdlState:icdlState>=0?clean(dr[icdlState]):"", cdlExp:icdlExp>=0?clean(dr[icdlExp]):"", medicalExp:imed>=0?clean(dr[imed]):"", ssnLast4:ssnRaw?ssnRaw.slice(-4):"", driverAuthorityId:driverAuthId, driverAuthority:driverAuthName, driverAuthorityDetail:driverAuthRec};
             out.driversByName[key(name)]=recD;
             if(id){ out.driversByName[key(id)]=recD; out.driversById[key(id)]=recD; }
             if(label) out.driversByName[key(label)]=recD;
@@ -8702,8 +8713,10 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
           S365.roster.drivers=out.drivers.map(function(d){
             var existing=mergedByDriver[d.label] || mergedByDriver[d.name] || mergedByDriver[(d.name||"")+(d.id?(" #"+d.id):"")];
             var keyVal=d.label || d.name;
-            mergedByDriver[keyVal]=Object.assign({name:d.name, truck:"", authority:"", dot:""}, existing||{});
+            mergedByDriver[keyVal]=Object.assign({name:d.name, truck:"", authority:"", dot:"", driverAuthorityId:d.driverAuthorityId||"", driverAuthority:d.driverAuthority||""}, existing||{});
             mergedByDriver[keyVal].name=d.name || (existing&&existing.name) || "";
+            mergedByDriver[keyVal].driverAuthorityId=d.driverAuthorityId || (existing&&existing.driverAuthorityId) || "";
+            mergedByDriver[keyVal].driverAuthority=d.driverAuthority || (existing&&existing.driverAuthority) || "";
             return {key:keyVal, label:d.label||d.name};
           });
           S365.roster.byDriver=mergedByDriver;
