@@ -139,6 +139,18 @@
   .pkg-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;margin-top:16px}
   .pkg-sensitive{background:#fff7e6;border:1px solid #f0d28a;border-radius:10px;padding:10px;margin-bottom:12px}
   .pkg-sensitive .note{margin:0}
+  .pkg-calc-box{border:1px solid #c7d7f2;background:#f7faff;border-radius:12px;padding:13px;margin:12px 0 15px}
+  .pkg-calc-title{font-size:12px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-bottom:3px}
+  .pkg-calc-help{font-size:12.5px;color:var(--muted);margin:0 0 11px;line-height:1.4}
+  .pkg-calc-inputs{margin-bottom:0}
+  .pkg-calc-arrow{text-align:center;color:var(--accent);font-size:11.5px;font-weight:800;letter-spacing:.02em;margin:3px 0 9px}
+  .pkg-calc-results{margin-bottom:0}
+  .pkg-auto-result{border:1px solid #d4e0f6;background:#fff;border-radius:10px;padding:8px 9px}
+  .pkg-auto-result label{color:var(--accent)}
+  .pkg-auto-result input{background:#f8fbff;border-color:#b9cdee}
+  .pkg-auto-help{font-size:10.5px;color:var(--accent);font-weight:700;margin-top:3px}
+  .pkg-manual-subtitle{font-size:11px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:14px 0 8px}
+  .pkg-manual-footnote{margin:8px 0 0}
   .lease-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;margin-top:16px}
   .lease-preview{border:1px solid var(--line);border-radius:12px;background:#fff;padding:72pt 54pt 42pt;margin-top:12px;font-family:Aptos,"Aptos Body",Arial,sans-serif;color:#000;line-height:1.32;min-height:760px;font-size:14pt}
   .lease-preview .lease-title{font-weight:700;text-decoration:underline;font-size:14pt;margin-bottom:48pt}
@@ -9090,7 +9102,9 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   var PACKAGE_CURRENCY_FIELDS={LeaseBiMonthlyPay:true,LeaseMonthlyPay:true,TractorEquipCosts:true,TractorDownPay:true,TractorBalloonPay:true,TractorBalance:true,TrailerCostPerMonth:true};
   var PACKAGE_NO_BOLD_VALUE_FIELDS={DriverAddress:true,DriverCity:true,DriverState:true,DriverZip:true,DriverPhone:true,DOB:true,SSN:true,DriverEmailaddress:true,CDLNumber:true,CDLExpDate:true,CDLIssueState:true,YOR:true,MedicalExpDate:true,TransitDrugTestDate:true,TransitDot:true,TransitMC:true,TransitEINNumber:true,DriverCompanyEIN:true,DriverDOT:true,DriverMC:true,TractorUnitNumber:true,TractorYear:true,TractorMake:true,TractorPlate:true,TractorColor:true,TractorVin:true,LeaseStartDate:true,LeaseEndDate:true,LeaseNumberofMonths:true,LeaseBiMonthlyPay:true,LeaseMonthlyPay:true,TractorEquipCosts:true,TractorDownPay:true,TractorBalloonPay:true,TractorBalance:true,TrailerCostPerMonth:true};
   var PACKAGE_DATE_FIELDS={LeaseStartDate:true,LeaseEndDate:true,DOB:true,CDLExpDate:true,MedicalExpDate:true,TransitDrugTestDate:true};
-  var PACKAGE_LEASE_PAYMENT_FIELDS=[["Lease start date","LeaseStartDate"],["Lease end date","LeaseEndDate"],["# of months","LeaseNumberofMonths"],["Bi-monthly payment","LeaseBiMonthlyPay"],["Monthly payment","LeaseMonthlyPay"],["Equipment cost","TractorEquipCosts"],["Down payment","TractorDownPay"],["Balloon payment","TractorBalloonPay"],["Equipment balance","TractorBalance"],["Trailer cost per month","TrailerCostPerMonth"]];
+  var PACKAGE_LEASE_CALC_INPUT_FIELDS=[["Equipment cost","TractorEquipCosts"],["Monthly payment","LeaseMonthlyPay"],["Lease start date","LeaseStartDate"]];
+  var PACKAGE_LEASE_CALC_OUTPUT_FIELDS=[["# of months","LeaseNumberofMonths"],["Lease end date","LeaseEndDate"]];
+  var PACKAGE_LEASE_PAYMENT_FIELDS=[["Bi-monthly payment","LeaseBiMonthlyPay"],["Down payment","TractorDownPay"],["Balloon payment","TractorBalloonPay"],["Equipment balance","TractorBalance"],["Trailer cost per month","TrailerCostPerMonth"]];
   var PACKAGE_TOP_MANUAL_FIELDS=[["Full SSN","SSN","text"]];
   var PACKAGE_DEFAULT_ZERO_FIELDS={TractorDownPay:true,TractorBalloonPay:true,TractorBalance:true,TrailerCostPerMonth:true};
   var PACKAGE_OPTIONAL_EMPTY_FIELDS={MiddleName:true,Suffix:true};
@@ -9296,11 +9310,39 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     return list;
   }
   function renderLeasePaymentPanel(){
-    var panel=el("div",{class:"pkg-panel"}, el("h3",{text:"Required manual info"}), el("p",{class:"note",text:"Enter the lease/payment details here. # of months auto-fills as Equipment cost ÷ Monthly payment, rounded up; Lease end date auto-fills that many calendar months after Lease start date. You can still edit either calculated value afterward. SSN clears after closing; zero-payment fields default to $0.00 but can be changed."}));
+    var panel=el("div",{class:"pkg-panel"},
+      el("h3",{text:"Required manual info"}),
+      el("p",{class:"note",text:"Start with the lease calculator below. The term fields calculate automatically, but you can type over either result when a lease needs a manual value."})
+    );
+
+    var calcBox=el("div",{class:"pkg-calc-box"},
+      el("div",{class:"pkg-calc-title",text:"Lease term calculator"}),
+      el("p",{class:"pkg-calc-help",text:"Enter these 3 fields first. Equipment cost ÷ Monthly payment is rounded up to whole months, then that many calendar months are added to the lease start date."})
+    );
+    var inputGrid=el("div",{class:"pkg-grid pkg-calc-inputs"});
+    PACKAGE_LEASE_CALC_INPUT_FIELDS.forEach(function(f){ inputGrid.appendChild(packageInputField(f[0],f[1])); });
+    calcBox.appendChild(inputGrid);
+
+    var arrow=el("div",{class:"pkg-calc-arrow",text:"↓ Auto-calculates"});
+    calcBox.appendChild(arrow);
+
+    var resultGrid=el("div",{class:"pkg-grid pkg-calc-results"});
+    PACKAGE_LEASE_CALC_OUTPUT_FIELDS.forEach(function(f){
+      var field=packageInputField(f[0],f[1]);
+      field.classList.add("pkg-auto-result");
+      field.appendChild(el("div",{class:"pkg-auto-help",text:"Auto-calculated • type over to override"}));
+      resultGrid.appendChild(field);
+    });
+    calcBox.appendChild(resultGrid);
+    panel.appendChild(calcBox);
+
+    var otherTitle=el("div",{class:"pkg-manual-subtitle",text:"Other manual fields"});
+    panel.appendChild(otherTitle);
     var grid=el("div",{class:"pkg-grid"});
     PACKAGE_TOP_MANUAL_FIELDS.forEach(function(f){ grid.appendChild(packageInputField(f[0],f[1],f[2]||"text",f[3])); });
     PACKAGE_LEASE_PAYMENT_FIELDS.forEach(function(f){ grid.appendChild(packageInputField(f[0],f[1])); });
     panel.appendChild(grid);
+    panel.appendChild(el("p",{class:"note pkg-manual-footnote",text:"SSN clears after closing. Zero-payment fields default to $0.00 but can be changed."}));
     return panel;
   }
   function renderDriverPackage(){
