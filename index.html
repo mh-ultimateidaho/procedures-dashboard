@@ -9111,6 +9111,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     {id:"auth-two-page-lease", type:"changingAuthorities", label:"Two Page Lease", fileName:"Two Page Lease.docx", scriptId:"pkg-tpl-truck-two-page-lease"}
   ];
   var packageValues=blankPackageValues();
+  var packageLeaseLastAutoMonths="", packageLeaseLastAutoEnd="";
 
   function defaultPackageTemplateIds(type){ return PACKAGE_TEMPLATES.filter(function(t){return t.type===type;}).map(function(t){return t.id;}); }
   function blankPackageValues(){
@@ -9132,9 +9133,41 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     if(t){ packageValues.packageType=t.type; packageValues.selectedTemplates=[t.id]; }
     renderDriverPackage();
   }
-  function closeDriverPackage(){ packageOverlay.classList.add("hidden"); packageOverlay.setAttribute("aria-hidden","true"); document.body.style.overflow=""; packageValues=blankPackageValues(); packageManualOpen=false; if(packageBody) packageBody.textContent=""; }
-  function resetPackageValues(){ packageValues=blankPackageValues(); packageManualOpen=false; }
+  function closeDriverPackage(){ packageOverlay.classList.add("hidden"); packageOverlay.setAttribute("aria-hidden","true"); document.body.style.overflow=""; packageValues=blankPackageValues(); packageLeaseLastAutoMonths=""; packageLeaseLastAutoEnd=""; packageManualOpen=false; if(packageBody) packageBody.textContent=""; }
+  function resetPackageValues(){ packageValues=blankPackageValues(); packageLeaseLastAutoMonths=""; packageLeaseLastAutoEnd=""; packageManualOpen=false; }
   function packageDate(v){ var raw=String(v==null?"":v).trim(); var iso=expDateISO(raw); if(!iso) return raw; var p=iso.split("-"); return Number(p[1])+"/"+Number(p[2])+"/"+p[0]; }
+  function packageDatePlusMonths(v,months){
+    var d=expParseDate(v), count=Math.max(0,Math.floor(Number(months)||0));
+    if(!d || !count) return "";
+    var day=d.getDate(), target=new Date(d.getFullYear(),d.getMonth()+count,1);
+    var lastDay=new Date(target.getFullYear(),target.getMonth()+1,0).getDate();
+    target.setDate(Math.min(day,lastDay));
+    return (target.getMonth()+1)+"/"+target.getDate()+"/"+target.getFullYear();
+  }
+  function recalculatePackageLeaseTerms(updateDom){
+    var cost=packageNumberFromMoney(packageValues.TractorEquipCosts), monthly=packageNumberFromMoney(packageValues.LeaseMonthlyPay);
+    var monthsEl=updateDom?document.getElementById("pkg-LeaseNumberofMonths"):null;
+    var endEl=updateDom?document.getElementById("pkg-LeaseEndDate"):null;
+    if(cost!=null && monthly!=null && cost>0 && monthly>0){
+      var months=Math.ceil(cost/monthly), monthsValue=formatPackageDecimal(months,2);
+      packageValues.LeaseNumberofMonths=monthsValue;
+      packageLeaseLastAutoMonths=monthsValue;
+      if(packageValues.LeaseStartDate){
+        var endDate=packageDatePlusMonths(packageValues.LeaseStartDate,months);
+        if(endDate){ packageValues.LeaseEndDate=endDate; packageLeaseLastAutoEnd=endDate; }
+      }else if(packageValues.LeaseEndDate===packageLeaseLastAutoEnd){
+        packageValues.LeaseEndDate=""; packageLeaseLastAutoEnd="";
+      }
+      if(monthsEl) monthsEl.value=packageValues.LeaseNumberofMonths||"";
+      if(endEl) endEl.value=packageValues.LeaseEndDate||"";
+      return months;
+    }
+    if(packageLeaseLastAutoMonths && packageValues.LeaseNumberofMonths===packageLeaseLastAutoMonths){ packageValues.LeaseNumberofMonths=""; packageLeaseLastAutoMonths=""; }
+    if(packageLeaseLastAutoEnd && packageValues.LeaseEndDate===packageLeaseLastAutoEnd){ packageValues.LeaseEndDate=""; packageLeaseLastAutoEnd=""; }
+    if(monthsEl) monthsEl.value=packageValues.LeaseNumberofMonths||"";
+    if(endEl) endEl.value=packageValues.LeaseEndDate||"";
+    return null;
+  }
   function splitPersonName(name){
     name=firstLastFromLastFirst(stripTruckSuffixFromDriverLabel(name||"")); var parts=name.split(/\s+/).filter(Boolean);
     if(!parts.length) return {first:"", middle:"", last:""};
@@ -9223,11 +9256,14 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   }
   function packageInputField(label,key,type,wide){
     var inp=el("input",{type:type||"text",id:"pkg-"+key}); inp.value=packageValues[key]||"";
-    inp.addEventListener("input",function(){ packageValues[key]=inp.value; });
+    inp.addEventListener("input",function(){
+      packageValues[key]=inp.value;
+      if(key==="TractorEquipCosts" || key==="LeaseMonthlyPay") recalculatePackageLeaseTerms(true);
+    });
     if(PACKAGE_CURRENCY_FIELDS[key]){
-      inp.addEventListener("blur",function(){ var v=formatPackageCurrency(inp.value); if(v){ inp.value=v; packageValues[key]=v; } });
+      inp.addEventListener("blur",function(){ var v=formatPackageCurrency(inp.value); if(v){ inp.value=v; packageValues[key]=v; } if(key==="TractorEquipCosts" || key==="LeaseMonthlyPay") recalculatePackageLeaseTerms(true); });
     }else if(PACKAGE_DATE_FIELDS[key]){
-      inp.addEventListener("blur",function(){ var v=packageDate(inp.value); if(v){ inp.value=v; packageValues[key]=v; } });
+      inp.addEventListener("blur",function(){ var v=packageDate(inp.value); if(v){ inp.value=v; packageValues[key]=v; } if(key==="LeaseStartDate") recalculatePackageLeaseTerms(true); });
     }else if(key==="LeaseNumberofMonths"){
       inp.addEventListener("blur",function(){ var v=formatPackageDecimal(inp.value,2); if(v){ inp.value=v; packageValues[key]=v; } });
     }else if(key==="SSN"){
@@ -9260,7 +9296,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     return list;
   }
   function renderLeasePaymentPanel(){
-    var panel=el("div",{class:"pkg-panel"}, el("h3",{text:"Required manual info"}), el("p",{class:"note",text:"SSN and lease/payment fields stay manual. SSN clears after closing; zero-payment fields default to $0.00 but can be changed."}));
+    var panel=el("div",{class:"pkg-panel"}, el("h3",{text:"Required manual info"}), el("p",{class:"note",text:"Enter the lease/payment details here. # of months auto-fills as Equipment cost ÷ Monthly payment, rounded up; Lease end date auto-fills that many calendar months after Lease start date. You can still edit either calculated value afterward. SSN clears after closing; zero-payment fields default to $0.00 but can be changed."}));
     var grid=el("div",{class:"pkg-grid"});
     PACKAGE_TOP_MANUAL_FIELDS.forEach(function(f){ grid.appendChild(packageInputField(f[0],f[1],f[2]||"text",f[3])); });
     PACKAGE_LEASE_PAYMENT_FIELDS.forEach(function(f){ grid.appendChild(packageInputField(f[0],f[1])); });
