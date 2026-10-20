@@ -5028,7 +5028,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     var cust=isCustom(id); if(cust) return cust;
     var base=builtinById[id]; if(!base) return null;
     var ov=config.cardOverrides[id];
-    if(ov){ var m=clone(base); if(ov.steps) m.steps=ov.steps; if(ov.blocks) m.blocks=ov.blocks; if(ov.title!=null) m.title=ov.title; if(ov.defaultMode) m.defaultMode=ov.defaultMode; m.toggles=mergeCardToggles(base.toggles, ov.toggles); if(ov.coveringTitle!=null) m.coveringTitle=ov.coveringTitle; if(ov.lastEdited) m.lastEdited=ov.lastEdited; return normalizeAuthoritySpecialToggle(m); }
+    if(ov){ var m=clone(base); if(ov.steps) m.steps=ov.steps; if(ov.blocks) m.blocks=ov.blocks; if(ov.title!=null) m.title=ov.title; if(ov.section!=null) m.section=ov.section; if(ov.defaultMode) m.defaultMode=ov.defaultMode; m.toggles=mergeCardToggles(base.toggles, ov.toggles); if(ov.coveringTitle!=null) m.coveringTitle=ov.coveringTitle; if(ov.lastEdited) m.lastEdited=ov.lastEdited; return normalizeAuthoritySpecialToggle(m); }
     return normalizeAuthoritySpecialToggle(base);
   }
   function getOriginalCard(id){
@@ -5109,6 +5109,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
         steps: clone(draft.steps||null),
         blocks: clone(draft.blocks||null),
         title: draft.title,
+        section: draft.section,
         defaultMode: draft.defaultMode,
         toggles: clone(draft.toggles||null),
         coveringTitle: draft.coveringTitle,
@@ -5554,6 +5555,21 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
 
     // body
     mBody.textContent="";
+    if(modalState.editMode){
+      var moveWrap=el("div",{class:"ctx",style:"padding:10px 12px;margin-bottom:14px"});
+      var moveGrid=el("div",{class:"ctx-grid"});
+      var moveSel=el("select");
+      SECTIONS.forEach(function(sct){ var o=el("option",{value:sct.id,text:sct.name}); if(sct.id===card.section)o.selected=true; moveSel.appendChild(o); });
+      moveSel.addEventListener("change",function(){
+        captureContextForm(); captureChecks();
+        var mut=getMutableCard(card.id); mut.section=moveSel.value;
+        renderModal();
+      });
+      moveGrid.appendChild(field2("Card section",moveSel,"ctx-pick"));
+      moveWrap.appendChild(moveGrid);
+      moveWrap.appendChild(el("div",{class:"note",style:"margin-top:6px",text:"Change this to move the card to another Browse section. It saves with the rest of the card when you click Done editing."}));
+      mBody.appendChild(moveWrap);
+    }
     if(card.type==="driver-event"){ mBody.appendChild(renderContextForm(card)); }
     mBody.appendChild(renderContent(card));
 
@@ -7421,6 +7437,94 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(function(){ setSync("ok","Copied ✓",label||"Copied"); }).catch(function(){ window.prompt("Copy this:", txt); }); }
     else window.prompt("Copy this:", txt);
   }
+  function fleetPdfPlain(v){
+    var x=String(v==null?"":v).trim();
+    if(!x) return "-";
+    x=x.replace(/[\u2018\u2019]/g,"'").replace(/[\u201C\u201D]/g,'"').replace(/[\u2013\u2014]/g,"-").replace(/\u2022/g,"-");
+    try{ x=x.normalize("NFKD").replace(/[\u0300-\u036f]/g,""); }catch(e){}
+    return x.replace(/[^\x20-\x7E]/g,"");
+  }
+  function fleetPdfFit(text,size,max,min){
+    text=fleetPdfPlain(text); size=Number(size)||10; max=Number(max)||240; min=Number(min)||7;
+    var w=pdfTextWidthApproxFont(text,size,false);
+    if(w<=max) return size;
+    return Math.max(min,size*(max/w));
+  }
+  function fleetPdfDriverSections(rec){
+    rec=rec||{};
+    var d=rec.driverDetail||driverDetailsByText(rec)||{}, t=truckDetailsByUnit(rec.truck)||{}, a=authorityDetailsByName(rec.authority)||{}, da=driverAuthorityDetailsFor(rec)||{}, driverAuth=driverAuthorityLabelFor(rec), driverAuthId=rec.driverAuthorityId||d.driverAuthorityId||"";
+    var fullAddr=[d.address,[d.city,d.state,d.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+    return {
+      name:d.name||rec.name||firstLastFromLastFirst(rec.label||rec.key||"Driver"),
+      sections:[
+        {title:"Driver - Personal Information",fields:[
+          ["Name",d.name||rec.name||firstLastFromLastFirst(rec.label||rec.key)], ["Driver ID",d.id||rec.driverId],
+          ["Address",fullAddr], ["Phone",d.phone],
+          ["Email",d.email], ["Date of Birth",lookupDate(d.dob)||d.dob],
+          ["SSN (last 4)",d.ssnLast4], ["Years OTR",d.yearsOtr]
+        ]},
+        {title:"CDL / Medical",fields:[
+          ["CDL #",d.cdl], ["Issuing State",d.cdlState],
+          ["CDL Expiration",lookupDate(d.cdlExp)||d.cdlExp], ["Medical Expiration",lookupDate(d.medicalExp)||d.medicalExp]
+        ]},
+        {title:"Driver's Authority",fields:[
+          ["Company",da.authority||driverAuth], ["Authority ID",driverAuthId||da.authorityId],
+          ["DOT #",da.dot], ["MC #",da.mc],
+          ["EIN",da.ein], ["Insurance Expiration",lookupDate(da.insuranceExp)||da.insuranceExp]
+        ]},
+        {title:"Current Transit / Assignment",fields:[
+          ["Driving Under",a.authority||rec.authority], ["DOT #",a.dot||rec.dot],
+          ["MC #",a.mc], ["Drug Testing Policy Date",lookupDate(a.policyDate)||a.policyDate]
+        ]},
+        {title:"Tractor Information",fields:[
+          ["Unit #",rec.truck||t.unit], ["Year / Make / Model",[t.year,t.make,t.model].filter(Boolean).join(" ")],
+          ["VIN",t.vin], ["Plate",t.plate],
+          ["Color",t.color], ["Annual Inspection",lookupDate(t.annualInspection)||t.annualInspection]
+        ]}
+      ]
+    };
+  }
+  function buildFleetDriverInfoPdf(rec){
+    var info=fleetPdfDriverSections(rec), margin=36, pageW=612, contentW=540, colGap=8, colW=(contentW-colGap)/2;
+    var y=752, stream="BT\n0 0 0 rg\n";
+    function text(txt,x,yy,size,bold){ txt=fleetPdfPlain(txt); stream+=(bold?"/FB ":"/FR ")+Number(size).toFixed(2)+" Tf\n1 0 0 1 "+Number(x).toFixed(2)+" "+Number(yy).toFixed(2)+" Tm ("+pdfEsc(txt)+") Tj\n"; }
+    function rect(x,bottom,w,h,fill){
+      stream+="ET\n";
+      if(fill){ stream+="0.91 0.94 0.98 rg\n"+x.toFixed(2)+" "+bottom.toFixed(2)+" "+w.toFixed(2)+" "+h.toFixed(2)+" re f\n"; }
+      stream+="0.78 0.81 0.86 RG\n0.65 w\n"+x.toFixed(2)+" "+bottom.toFixed(2)+" "+w.toFixed(2)+" "+h.toFixed(2)+" re S\nBT\n0 0 0 rg\n";
+    }
+    text("ULTIMATE LOGISTICS - DRIVER INFORMATION",margin,y,17,true); y-=20;
+    text(info.name,margin,y,12,true); y-=16;
+    text("Fleet Master snapshot - "+new Date().toLocaleDateString(),margin,y,8,false); y-=18;
+    info.sections.forEach(function(sec,si){
+      var headH=18;
+      rect(margin,y-headH,contentW,headH,true);
+      text(sec.title,margin+7,y-13,9,true);
+      y-=headH;
+      for(var i=0;i<sec.fields.length;i+=2){
+        var rowH=30;
+        for(var c=0;c<2;c++){
+          var f=sec.fields[i+c]; if(!f) continue;
+          var x=margin+c*(colW+colGap);
+          rect(x,y-rowH,colW,rowH,false);
+          text(f[0],x+6,y-9,6.8,true);
+          var val=fleetPdfPlain(f[1]), fs=fleetPdfFit(val,9.5,colW-12,6.5);
+          text(val,x+6,y-23,fs,false);
+        }
+        y-=rowH;
+      }
+      if(si<info.sections.length-1) y-=7;
+    });
+    text("Generated from the Fleet Info view. Verify time-sensitive data before use.",margin,28,7.5,false);
+    stream+="ET\n";
+    return buildPdfWithAptosStyle(stream);
+  }
+  function downloadFleetDriverPdf(rec){
+    if(!rec) return;
+    var info=fleetPdfDriverSections(rec), pdf=buildFleetDriverInfoPdf(rec), blob=new Blob([pdf],{type:"application/pdf"});
+    var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="Driver Info - "+safeFilePart(info.name||"Driver")+".pdf"; document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },500);
+  }
   function insuranceTextFor(rec){
     rec=rec||{}; var d=rec.driverDetail||driverDetailsByText(rec)||{}, t=truckDetailsByUnit(rec.truck)||{}, a=authorityDetailsByName(rec.authority)||{}, da=driverAuthorityDetailsFor(rec)||{}, driverAuth=driverAuthorityLabelFor(rec), driverAuthId=rec.driverAuthorityId||d.driverAuthorityId||"";
     return [
@@ -7495,7 +7599,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     card.appendChild(el("div",{class:"info-grid"}, kv("Company",da.authority||driverAuth), kv("Authority ID",driverAuthId||da.authorityId), kv("DOT #",da.dot), kv("MC #",da.mc), kv("EIN",da.ein), dateKv("Insurance Exp",da.insuranceExp), kv("Insurer/Agent",da.insurerAgent), kv("Policy type",da.policyType)));
     card.appendChild(el("div",{class:"lookup-section-title",text:"Current driving authority"}));
     card.appendChild(el("div",{class:"info-grid"}, kv("Company",a.authority||rec.authority), kv("DOT #",a.dot||rec.dot), kv("MC #",a.mc), kv("EIN",a.ein), dateKv("Insurance Exp",a.insuranceExp), kv("Insurer/Agent",a.insurerAgent), kv("Policy type",a.policyType)));
-    var actions=el("div",{class:"lookup-actions"}, el("button",{class:"btn small",text:"📄 Cover page",onclick:function(){ fillCoverFromDriver(rec); }}), el("button",{class:"btn small",text:"📝 Lease termination",onclick:function(){ fillLeaseFromDriver(rec); }}), el("button",{class:"btn small",text:"Copy insurance info",onclick:function(){ copyText(insuranceTextFor(rec),"Insurance info copied"); }}));
+    var actions=el("div",{class:"lookup-actions"}, el("button",{class:"btn small primary",text:"⬇ 1-page driver PDF",onclick:function(){ downloadFleetDriverPdf(rec); }}), el("button",{class:"btn small",text:"📄 Cover page",onclick:function(){ fillCoverFromDriver(rec); }}), el("button",{class:"btn small",text:"📝 Lease termination",onclick:function(){ fillLeaseFromDriver(rec); }}), el("button",{class:"btn small",text:"Copy insurance info",onclick:function(){ copyText(insuranceTextFor(rec),"Insurance info copied"); }}));
     card.appendChild(actions); var links=secondaryFolderLinks(rec); if(links) card.appendChild(links); return card;
   }
   function renderTruckProfile(unit){
@@ -7520,7 +7624,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     card.appendChild(el("div",{class:"lookup-section-title",text:"Current drivers"}));
     var table=el("div",{class:"info-table"}, el("div",{class:"info-tr head"}, el("div",{text:"Driver"}), el("div",{text:"Truck"}), el("div",{text:"CDL Exp"}), el("div",{text:"Medical"}), el("div",{text:"Actions"})));
     if(!matches.length) table.appendChild(el("div",{class:"exp-empty",text:"No current drivers found for this authority."}));
-    matches.forEach(function(rec){ var d=rec.driverDetail||driverDetailsByText(rec)||{}; table.appendChild(el("div",{class:"info-tr"}, el("div",{text:d.name||rec.name||rec.label}), el("div",{text:rec.truck||"—"}), el("div",{text:lookupDate(d.cdlExp)||"—"}), el("div",{text:lookupDate(d.medicalExp)||"—"}), el("div",{class:"info-actions"}, el("button",{class:"btn small",text:"Cover",onclick:function(){ fillCoverFromDriver(rec); }}), el("button",{class:"btn small",text:"Lease",onclick:function(){ fillLeaseFromDriver(rec); }}), el("button",{class:"btn small",text:"Copy",onclick:function(){ copyText(insuranceTextFor(rec),"Driver info copied"); }})))); });
+    matches.forEach(function(rec){ var d=rec.driverDetail||driverDetailsByText(rec)||{}; table.appendChild(el("div",{class:"info-tr"}, el("div",{text:d.name||rec.name||rec.label}), el("div",{text:rec.truck||"—"}), el("div",{text:lookupDate(d.cdlExp)||"—"}), el("div",{text:lookupDate(d.medicalExp)||"—"}), el("div",{class:"info-actions"}, el("button",{class:"btn small",text:"PDF",onclick:function(){ downloadFleetDriverPdf(rec); }}), el("button",{class:"btn small",text:"Cover",onclick:function(){ fillCoverFromDriver(rec); }}), el("button",{class:"btn small",text:"Lease",onclick:function(){ fillLeaseFromDriver(rec); }}), el("button",{class:"btn small",text:"Copy",onclick:function(){ copyText(insuranceTextFor(rec),"Driver info copied"); }})))); });
     card.appendChild(table); return card;
   }
   function renderFleetLookup(){
