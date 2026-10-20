@@ -5565,7 +5565,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
         var mut=getMutableCard(card.id); mut.section=moveSel.value;
         renderModal();
       });
-      moveGrid.appendChild(field2("Card section",moveSel,"ctx-pick"));
+      moveGrid.appendChild(el("div",{class:"field ctx-pick"}, el("label",{text:"Card section"}), moveSel));
       moveWrap.appendChild(moveGrid);
       moveWrap.appendChild(el("div",{class:"note",style:"margin-top:6px",text:"Change this to move the card to another Browse section. It saves with the rest of the card when you click Done editing."}));
       mBody.appendChild(moveWrap);
