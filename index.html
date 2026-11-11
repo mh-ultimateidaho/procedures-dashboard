@@ -5604,6 +5604,10 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     }
     if(!isNewDriver) grid.appendChild(field("Current truck #", truckCtrl("f-old")));
     grid.appendChild(field("New truck #", truckCtrl("f-new", true)));
+    var pickedTruck=(modalState.formValues && roster && roster.byDriver)?roster.byDriver[modalState.formValues.driverpick]:null;
+    if(pickedTruck && pickedTruck.regularTruck){
+      grid.appendChild(el("p",{class:"note ctx-pick",style:"margin:0",text:"Temp truck "+pickedTruck.truck+" = driving now. Regular truck "+pickedTruck.regularTruck+" = in shop. The truck fields use individual numbers; choose either from the dropdown as needed."}));
+    }
     grid.appendChild(renderFolderLinks());
     wrap.appendChild(grid);
 
@@ -6846,7 +6850,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       if(!raw) return false;
       var data=JSON.parse(raw);
       if(!data || !data.roster || !data.coverLookups) return false;
-      S365.roster=data.roster;
+      S365.roster=normalizeRosterTruckData(data.roster);
       S365.coverLookups=data.coverLookups;
       S365.expirationItems=Array.isArray(data.expirationItems)?data.expirationItems:[];
       S365.fleetCacheAt=Number(data.at)||0;
@@ -6861,6 +6865,40 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     S365.fleetCacheAt=payload.at;
     S365.fleetLiveAt=payload.at;
     S365.fleetSource="live";
+  }
+
+  // Fleet Master displays "777/775" when a driver is using temp truck 777
+  // and regular truck 775 is in the shop. A truck lookup must use ONE unit.
+  function splitRosterTruck(raw){
+    var text=String(raw==null?"":raw).trim();
+    var parts=text.split("/").map(function(x){return x.trim();}).filter(Boolean);
+    return {raw:text, active:parts[0]||"", regular:parts.length>1?(parts[1]||""):""};
+  }
+  function normalizeRosterTruck(rec){
+    rec=rec||{};
+    var units=splitRosterTruck(rec.truckRaw||rec.truck);
+    rec.truckRaw=units.raw;
+    rec.truck=units.active;
+    rec.regularTruck=units.regular;
+    rec.tempTruck=units.regular?units.active:"";
+    return rec;
+  }
+  function normalizeRosterTruckData(roster){
+    if(!roster) return roster;
+    var by=roster.byDriver||{};
+    Object.keys(by).forEach(function(key){by[key]=normalizeRosterTruck(by[key]);});
+    var seen={};
+    (roster.trucks||[]).forEach(function(v){var units=splitRosterTruck(v); if(units.active) seen[units.active]=1; if(units.regular) seen[units.regular]=1;});
+    Object.keys(by).forEach(function(k){if(by[k].truck) seen[by[k].truck]=1; if(by[k].regularTruck) seen[by[k].regularTruck]=1;});
+    roster.trucks=Object.keys(seen).sort(function(a,b){return a.localeCompare(b,undefined,{numeric:true,sensitivity:"base"});});
+    (roster.drivers||[]).forEach(function(d){
+      var rec=by[d.key];
+      if(rec && rec.regularTruck){
+        var base=stripTruckSuffixFromDriverLabel(d.label||d.key);
+        d.label=base+" #"+rec.truck+" (temp; regular "+rec.regularTruck+")";
+      }
+    });
+    return roster;
   }
 
   var FIXED_MAPPING = { worksheet:"Current Roster", nameMode:"firstlast",
@@ -7022,9 +7060,14 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
         else { var f=iF>=0?String(row[iF]||"").trim():"", l=iL>=0?String(row[iL]||"").trim():""; name=(l||"")+((l&&f)?", ":"")+(f||""); }
         var truck=iT>=0?String(row[iT]||"").trim():"", aut=iA>=0?String(row[iA]||"").trim():"", dot=iD>=0?String(row[iD]||"").trim():"";
         if(!name && !truck && !aut) continue;
-        var rec={name:name, truck:truck, authority:aut, dot:dot};
-        if(name){ var key=name+(truck?(" #"+truck):""); drivers.push({key:key, label:key}); byDriver[key]=rec; }
-        if(truck) trucks[truck]=1;
+        var rec=normalizeRosterTruck({name:name, truck:truck, authority:aut, dot:dot});
+        if(name){
+          var key=name+(rec.truck?(" #"+rec.truck):"");
+          var label=key+(rec.regularTruck?(" (temp; regular "+rec.regularTruck+")"):"");
+          drivers.push({key:key, label:label}); byDriver[key]=rec;
+        }
+        if(rec.truck) trucks[rec.truck]=1;
+        if(rec.regularTruck) trucks[rec.regularTruck]=1;
         if(aut){
           auths[aut]=1;
           var authKey=aut.trim().toLowerCase();
@@ -7060,7 +7103,11 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     captureContextForm();
     var rec=S365.roster.byDriver[key], v=modalState.formValues, et=card.eventType;
     v.driverpick=key; v.driver=rec.name;
+    // A slash on Current Roster means TEMP/REGULAR, not a combined unit number.
     if(et==="authority-change"){ v.oldauth=rec.authority||""; v.olddot=rec.dot||""; v.old=rec.truck||""; v.new=rec.truck||""; }
+    else if(et==="temp-truck" && rec.regularTruck){ v.auth=rec.authority||""; v.dot=rec.dot||""; v.old=rec.regularTruck; v.new=rec.truck||""; }
+    else if(et==="out-temp" && rec.regularTruck){ v.auth=rec.authority||""; v.dot=rec.dot||""; v.old=rec.truck||""; v.new=rec.regularTruck; }
+    else if(et==="perm-truck" && rec.regularTruck){ v.auth=rec.authority||""; v.dot=rec.dot||""; v.old=rec.regularTruck; }
     else if(et==="perm-truck" || et==="temp-truck"){ v.auth=rec.authority||""; v.dot=rec.dot||""; v.old=rec.truck||""; }
     else if(et==="new-driver"){ v.auth=rec.authority||""; v.dot=rec.dot||""; v.new=rec.truck||""; }
     else { v.auth=rec.authority||""; v.dot=rec.dot||""; v.old=rec.truck||""; }
@@ -7411,7 +7458,8 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
       assign=assign||{}; detail=detail||driverDetailsByText(baseLabel)||{};
       var id=detail.id||detail.driverId||assign.driverId||"", name=detail.name||assign.name||firstLastFromLastFirst(baseLabel||key||""), label=detail.label||baseLabel||name||key;
       var dedupe=lookupNorm(id||label||name||key); if(!dedupe) return;
-      var row={key:key||label, label:label, name:name, display:label+(assign.truck?" #"+assign.truck:""), truck:assign.truck||"", authority:assign.authority||"", dot:assign.dot||"", driverAuthorityId:detail.driverAuthorityId||assign.driverAuthorityId||"", driverAuthority:detail.driverAuthority||assign.driverAuthority||"", driverId:id, driverDetail:detail};
+      var units=splitRosterTruck(assign.truckRaw||assign.truck);
+      var row={key:key||label, label:label, name:name, display:label+(units.active?" #"+units.active:"")+(units.regular?" (temp; regular "+units.regular+")":""), truck:units.active, regularTruck:units.regular, truckRaw:units.raw, authority:assign.authority||"", dot:assign.dot||"", driverAuthorityId:detail.driverAuthorityId||assign.driverAuthorityId||"", driverAuthority:detail.driverAuthority||assign.driverAuthority||"", driverId:id, driverDetail:detail};
       if(!seen[dedupe] || (!seen[dedupe].truck && row.truck)) seen[dedupe]=row;
     }
     Object.keys(by).forEach(function(k){ var rec=by[k]||{}, base=stripTruckSuffixFromDriverLabel(k||rec.name||""); put(k,base,rec,driverDetailsByText(rec)||driverDetailsByText(base)); });
@@ -7420,12 +7468,17 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     return out.sort(function(a,b){ return String(a.label||a.name).localeCompare(String(b.label||b.name),undefined,{numeric:true,sensitivity:"base"}); });
   }
   function lookupDriverByKey(key){ return currentDriverRecords().filter(function(r){return r.key===key;})[0] || null; }
-  function truckDetailsByUnit(unit){ var look=(S365&&S365.coverLookups)||{}, tr=look.tractorsByUnit||{}; return tr[lookupNorm(unit)] || null; }
+  function truckDetailsByUnit(unit){ var look=(S365&&S365.coverLookups)||{}, tr=look.tractorsByUnit||{}; return tr[lookupNorm(splitRosterTruck(unit).active)] || null; }
   function authorityDetailsByName(auth){ var look=(S365&&S365.coverLookups)||{}, au=look.authoritiesByName||{}; return au[lookupNorm(auth)] || null; }
   function authorityDetailsById(id){ var look=(S365&&S365.coverLookups)||{}, au=look.authoritiesById||{}; return au[lookupNorm(id)] || null; }
   function driverAuthorityDetailsFor(rec){ rec=rec||{}; var d=rec.driverDetail||driverDetailsByText(rec)||{}, id=rec.driverAuthorityId||d.driverAuthorityId||"", name=rec.driverAuthority||d.driverAuthority||""; return (id&&authorityDetailsById(id)) || (name&&authorityDetailsByName(name)) || null; }
   function driverAuthorityLabelFor(rec){ rec=rec||{}; var d=rec.driverDetail||driverDetailsByText(rec)||{}, a=driverAuthorityDetailsFor(rec)||{}; return a.authority || rec.driverAuthority || d.driverAuthority || rec.driverAuthorityId || d.driverAuthorityId || ""; }
-  function currentDriverForTruck(unit){ unit=lookupNorm(unit); return currentDriverRecords().filter(function(r){return lookupNorm(r.truck)===unit;})[0] || null; }
+  function currentDriverForTruck(unit){
+    unit=lookupNorm(unit);
+    var records=currentDriverRecords();
+    return records.filter(function(r){return lookupNorm(r.truck)===unit;})[0]
+      || records.filter(function(r){return r.regularTruck && lookupNorm(r.regularTruck)===unit;})[0] || null;
+  }
   function currentDriversForAuthority(auth){ auth=lookupNorm(auth); return currentDriverRecords().filter(function(r){return lookupNorm(r.authority)===auth;}); }
   function kv(label,value,muted){ return el("div",{class:"info-kv"}, el("div",{class:"k",text:label}), el("div",{class:"v"+(muted?" muted":""),text:lookupValue(value)})); }
   function dateKv(label,value){ var pretty=lookupDate(value), days=lookupDays(value); return kv(label, pretty ? (pretty+(days?" · "+days:"")) : "—", !pretty); }
@@ -7557,7 +7610,12 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     coverValues={driverpick:rec.key||"", authoritypick:rec.authority||"", truckpick:rec.truck||"", driver:d.name||firstLastFromLastFirst(rec.name||rec.label||rec.key), authority:rec.authority||"", safetyCompany:rec.authority||"", dot:rec.dot||a.dot||"", ein:a.ein||"", mc:a.mc||"", unit:rec.truck||"", year:t.year||"", make:t.make||"", model:t.model||"", plate:t.plate||"", vin:t.vin||"", color:t.color||""};
     autofillCoverDetails(false); closeFleetLookup(); openCoverPage();
   }
-  function fillCoverFromTruck(unit){ var rec=currentDriverForTruck(unit), t=truckDetailsByUnit(unit)||{}; if(rec) return fillCoverFromDriver(rec); coverValues={driverpick:"", authoritypick:"", truckpick:unit||"", driver:"", authority:"", safetyCompany:"", dot:"", ein:"", mc:"", unit:unit||"", year:t.year||"", make:t.make||"", model:t.model||"", plate:t.plate||"", vin:t.vin||"", color:t.color||""}; closeFleetLookup(); openCoverPage(); }
+  function fillCoverFromTruck(unit){
+    // Respect the selected unit, including a regular truck while its driver is in a temp.
+    var rec=currentDriverForTruck(unit), t=truckDetailsByUnit(unit)||{}, d=rec?(rec.driverDetail||driverDetailsByText(rec)||{}):{}, a=rec?(authorityDetailsByName(rec.authority)||{}):{};
+    coverValues={driverpick:(rec&&rec.key)||"", authoritypick:(rec&&rec.authority)||"", truckpick:unit||"", driver:d.name||(rec&&firstLastFromLastFirst(rec.name||rec.label||rec.key))||"", authority:(rec&&rec.authority)||"", safetyCompany:(rec&&rec.authority)||"", dot:(rec&&rec.dot)||a.dot||"", ein:a.ein||"", mc:a.mc||"", unit:unit||"", year:t.year||"", make:t.make||"", model:t.model||"", plate:t.plate||"", vin:t.vin||"", color:t.color||""};
+    closeFleetLookup(); openCoverPage();
+  }
   function fillLeaseFromDriver(rec){
     if(!rec) return; resetLeaseValues();
     var t=truckDetailsByUnit(rec.truck)||{};
@@ -7570,14 +7628,15 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
   function secondaryFolderLinks(rec){
     var links=el("div",{class:"secondary-links"}), label=stripTruckSuffixFromDriverLabel((rec&&rec.key)||(rec&&rec.label)||(rec&&rec.name)||"");
     if(label) links.appendChild(el("a",{href:driverFolderUrl(label),target:"_blank",rel:"noopener",text:"Driver folder ↗"}));
-    if(rec && rec.truck) links.appendChild(el("a",{href:tractorFolderUrl(rec.truck),target:"_blank",rel:"noopener",text:"Truck folder ↗"}));
+    if(rec && rec.truck) links.appendChild(el("a",{href:tractorFolderUrl(rec.truck),target:"_blank",rel:"noopener",text:rec.regularTruck?"Temp truck folder ↗":"Truck folder ↗"}));
+    if(rec && rec.regularTruck) links.appendChild(el("a",{href:tractorFolderUrl(rec.regularTruck),target:"_blank",rel:"noopener",text:"Regular truck folder ↗"}));
     return links.childNodes.length?links:null;
   }
   function renderDriverProfile(rec){
     if(!rec) return el("div",{class:"empty",text:"Choose a driver to see Fleet Master details."});
     var d=rec.driverDetail||driverDetailsByText(rec)||{}, t=truckDetailsByUnit(rec.truck)||{}, a=authorityDetailsByName(rec.authority)||{}, da=driverAuthorityDetailsFor(rec)||{}, driverAuth=driverAuthorityLabelFor(rec), driverAuthId=rec.driverAuthorityId||d.driverAuthorityId||"", card=el("div",{class:"lookup-card primary"});
     card.appendChild(el("h3",{text:d.name||firstLastFromLastFirst(rec.label||rec.key||"Driver")}));
-    var metaBits=[]; if(driverAuth) metaBits.push("Driver authority: "+driverAuth); if(rec.authority) metaBits.push("Driving under: "+rec.authority); if(rec.truck) metaBits.push("Unit #"+rec.truck); if(da.dot) metaBits.push("Driver DOT "+da.dot); else if(a.dot||rec.dot) metaBits.push("Driving DOT "+(a.dot||rec.dot));
+    var metaBits=[]; if(driverAuth) metaBits.push("Driver authority: "+driverAuth); if(rec.authority) metaBits.push("Driving under: "+rec.authority); if(rec.truck) metaBits.push("Driving #"+rec.truck+(rec.regularTruck?" (temp)":"")); if(rec.regularTruck) metaBits.push("Regular #"+rec.regularTruck+" (in shop)"); if(da.dot) metaBits.push("Driver DOT "+da.dot); else if(a.dot||rec.dot) metaBits.push("Driving DOT "+(a.dot||rec.dot));
     card.appendChild(el("div",{class:"lookup-meta",text:metaBits.filter(Boolean).join(" · ")||"No current assignment details"}));
     var revealKey=rec.key||d.id||d.name||"driver";
     var ssnText=(d.ssnLast4 && lookupState.revealed[revealKey+":ssn"]) ? d.ssnLast4 : (d.ssnLast4?"••••":"—");
@@ -7590,7 +7649,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     card.appendChild(el("div",{class:"info-grid"},
       kv("Driver ID",d.id||rec.driverId), kv("CDL #",d.cdl), kv("CDL State",d.cdlState), dateKv("CDL Exp",d.cdlExp), dateKv("Medical Exp",d.medicalExp), ssnBox, dobBox,
       kv("Cell",d.phone), kv("Email",d.email), kv("Address",fullAddr),
-      kv("Driver's Auth ID",driverAuthId), kv("Driver's authority",driverAuth), kv("Current truck",rec.truck), kv("Driving under",rec.authority), kv("Driving DOT #",a.dot||rec.dot)
+      kv("Driver's Auth ID",driverAuthId), kv("Driver's authority",driverAuth), kv(rec.regularTruck?"Driving now (temp)":"Current truck",rec.truck), rec.regularTruck?kv("Regular truck (in shop)",rec.regularTruck):null, kv("Driving under",rec.authority), kv("Driving DOT #",a.dot||rec.dot)
     ));
     var miss=missingBox([["CDL #",d.cdl],["CDL Exp",d.cdlExp],["Medical Exp",d.medicalExp],["Current truck",rec.truck],["Driving under",rec.authority],["SSN last 4",d.ssnLast4]]); if(miss) card.appendChild(miss);
     card.appendChild(el("div",{class:"lookup-section-title",text:"Current truck"}));
@@ -7606,7 +7665,7 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
     if(!unit) return el("div",{class:"empty",text:"Choose a truck/unit to see Fleet Master details."});
     var t=truckDetailsByUnit(unit)||{unit:unit}, rec=currentDriverForTruck(unit), a=authorityDetailsByName(rec&&rec.authority)||{}, card=el("div",{class:"lookup-card primary"});
     card.appendChild(el("h3",{text:"Unit #"+(t.unit||unit)}));
-    card.appendChild(el("div",{class:"lookup-meta",text:[rec&&rec.name, rec&&rec.authority].filter(Boolean).join(" · ")||"No current driver found"}));
+    card.appendChild(el("div",{class:"lookup-meta",text:[rec&&rec.name,rec&&rec.authority,rec&&rec.regularTruck?(lookupNorm(rec.regularTruck)===lookupNorm(unit)?"Regular truck (in shop)":"Currently driving (temp truck)"):""].filter(Boolean).join(" · ")||"No current driver found"}));
     card.appendChild(el("div",{class:"info-grid"}, kv("Truck",[t.year,t.make,t.model].filter(Boolean).join(" ")), kv("VIN",t.vin), kv("Plate",t.plate), kv("Color",t.color), dateKv("Annual inspection",t.annualInspection), kv("In service",t.inService), kv("Current driver",rec&&(rec.driverDetail&&rec.driverDetail.name||rec.name||rec.label)), kv("Current authority",rec&&rec.authority), kv("DOT #",a.dot||(rec&&rec.dot))));
     var miss=missingBox([["VIN",t.vin],["Plate",t.plate],["Color",t.color],["Annual inspection",t.annualInspection]]); if(miss) card.appendChild(miss);
     card.appendChild(el("div",{class:"lookup-actions"}, el("button",{class:"btn small",text:"📄 Cover page",onclick:function(){ fillCoverFromTruck(unit); }}), el("button",{class:"btn small",text:"📝 Lease termination",onclick:function(){ fillLeaseFromTruck(unit); }}), el("button",{class:"btn small",text:"Copy truck info",onclick:function(){ copyText(truckInfoText(unit),"Truck info copied"); }})));
@@ -8827,7 +8886,9 @@ UEsDBBQAAAAIAAAAIQA8xY0PJwIAAHkVAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbM2YS28aMRSF95Xy
         if(S365 && S365.roster){
           var mergedByDriver=Object.assign({}, S365.roster.byDriver||{});
           S365.roster.drivers=out.drivers.map(function(d){
-            var existing=mergedByDriver[d.label] || mergedByDriver[d.name] || mergedByDriver[(d.name||"")+(d.id?(" #"+d.id):"")];
+            // The roster key contains "Last, First #truck"; Drivers-tab labels
+            // usually contain only "Last, First". Match by driver identity, not exact key.
+            var existing=mergedByDriver[d.label] || mergedByDriver[d.name] || mergedByDriver[(d.name||"")+(d.id?(" #"+d.id):"")] || assignmentForDriverDetail(d);
             var keyVal=d.label || d.name;
             mergedByDriver[keyVal]=Object.assign({name:d.name, truck:"", authority:"", dot:"", driverAuthorityId:d.driverAuthorityId||"", driverAuthority:d.driverAuthority||""}, existing||{});
             mergedByDriver[keyVal].name=d.name || (existing&&existing.name) || "";
